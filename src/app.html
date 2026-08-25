@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+
+		<!--
+			SEARCH-ENGINE METADATA LIVES HERE, NOT IN `<svelte:head>`.
+
+			The application runs with `ssr = false`: the prerendered `index.html` contains no rendered
+			component markup, so anything a component puts in the head only exists once the page has
+			executed JavaScript. A crawler that does not run scripts would see an empty document. This
+			file is the only head that is always in the delivered HTML.
+
+			The texts stay ENGLISH even though the interface follows the browser: the shell language is
+			decided at runtime (`shell/i18n.ts`), and a crawler never gets there.
+		-->
+		<title>webserf — The Settlers (1993) in the browser</title>
+		<meta
+			name="description"
+			content="“The Settlers” of 1993, in your browser: the rules ported from the original DOS program, the graphics read from your own copy of the game. Nothing is uploaded — your archive and your saved games stay with you."
+		/>
+		<meta name="author" content="webserf" />
+		<meta name="color-scheme" content="dark" />
+		<meta name="theme-color" content="#0a0b0a" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="webserf" />
+		<meta property="og:title" content="webserf — The Settlers (1993) in the browser" />
+		<meta
+			property="og:description"
+			content="A browser reimplementation of the 1993 DOS game “The Settlers”. Bring your own copy of the game files — nothing is uploaded."
+		/>
+		<meta property="og:image" content="./icon-512.png" />
+		<meta name="twitter:card" content="summary" />
+
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

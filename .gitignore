@@ -1,0 +1,26 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+# NOT anchored to the root on purpose: `svelte-kit sync` writes a `.svelte-kit/` next to whatever
+# directory it was started from, so stray copies appear inside `src/` whenever a tool runs from
+# there. With `/.svelte-kit` those would have been committed.
+.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
