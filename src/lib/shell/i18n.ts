@@ -185,6 +185,9 @@ const EN = {
 	'info.source.title': 'Source code',
 	'info.source.note':
 		'Open source, and issues and pull requests are always welcome. Bug reports from the “Report a bug” screen land in the same place.',
+	'info.build.title': 'Build',
+	'info.build.unknown': 'This copy was built without a version stamp.',
+	'info.build.modified': 'built with uncommitted changes',
 	'info.original.title': 'The original',
 	'info.original.note': 'Still on sale — and by far the tidiest way to a copy of the game files:',
 	'info.original.link': 'The Settlers History Edition (Ubisoft)',
@@ -323,6 +326,9 @@ const DE: Record<ShellKey, string> = {
 	'info.source.title': 'Quelltext',
 	'info.source.note':
 		'Offener Quelltext, und über Issues und Pull Requests freuen wir uns jederzeit. Fehlerberichte aus dem Bildschirm „Fehler melden“ landen an derselben Stelle.',
+	'info.build.title': 'Programmstand',
+	'info.build.unknown': 'Diese Fassung wurde ohne Stand-Angabe gebaut.',
+	'info.build.modified': 'mit noch nicht eingecheckten Änderungen gebaut',
 	'info.original.title': 'Das Original',
 	'info.original.note': 'Gibt es noch zu kaufen — und das ist mit Abstand der sauberste Weg zu den Spieldateien:',
 	'info.original.link': 'Die Siedler History Edition (Ubisoft)',

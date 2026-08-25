@@ -7,8 +7,13 @@
 	 * what am I looking at, who made it, and where is the source. The log hint survives as the last
 	 * paragraph — it costs one line and helps exactly the person who now has to write a report.
 	 */
-	import { st } from './i18n.js';
+	import { commitDateText, commitUrl, shortCommit } from './build-info.js';
+	import { shellLanguage, st } from './i18n.js';
 	import { PROJECT_REPO, PROJECT_URL } from './project.js';
+
+	const commit = shortCommit();
+	const commitLink = commitUrl();
+	const commitDate = commitDateText(shellLanguage());
 </script>
 
 <section>
@@ -23,6 +28,28 @@
 		<a href={PROJECT_URL} target="_blank" rel="noreferrer noopener">{PROJECT_REPO}</a>
 	</p>
 	<p class="note">{st('info.source.note')}</p>
+</section>
+
+<section>
+	<h3>{st('info.build.title')}</h3>
+	<p class="note">
+		{#if commit === null}
+			{st('info.build.unknown')}
+		{:else}
+			<!--
+				A DIRTY BUILD IS NOT THAT COMMIT, so it carries no link: the page on the forge would
+				show different code than what is running here. The hash still says what this is a
+				change on top of, which is why it stays.
+			-->
+			{#if commitLink === null}
+				<code>{commit}</code>
+			{:else}
+				<a href={commitLink} target="_blank" rel="noreferrer noopener"><code>{commit}</code></a>
+			{/if}
+			{#if commitDate !== null}&nbsp;· {commitDate}{/if}
+			{#if commitLink === null}&nbsp;— {st('info.build.modified')}{/if}
+		{/if}
+	</p>
 </section>
 
 <section>
@@ -68,5 +95,10 @@
 
 	.note a {
 		color: var(--accent);
+	}
+
+	.note code {
+		font-family: inherit;
+		letter-spacing: 0.04em;
 	}
 </style>

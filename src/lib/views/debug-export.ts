@@ -33,6 +33,7 @@ import { MAP_FIELD_COUNT, reduceReportState } from '../core/report-state.js';
 import { buildZipDeflated } from '../core/zip.js';
 import { newReportId, reportName } from './report-name.js';
 import { ISSUE_NOTE_LIMIT, newIssueUrl } from '../shell/project.js';
+import { buildStamp } from '../shell/build-info.js';
 
 export interface RecordedAction {
   readonly tick: number;
@@ -237,6 +238,10 @@ function buildReport(input: DebugReportInput, id: string): string {
     '',
     '## State',
     '',
+    // WHICH CODE PRODUCED THIS. Without it a report cannot be matched to a state of the source, and
+    // "that was fixed weeks ago" is not decidable — the one fact about the report that comes from
+    // neither the save game nor the recorded actions.
+    `- build: ${buildStamp()}`,
     `- source: ${input.sourceFile ?? 'unknown'}`,
     `- gameTick ${h.tick} · rotation ${h.rotation}/${h.rotationWrap} · RNG [${h.random.join(', ')}]`,
     `- map ${h.mapCols}×${h.mapRows} (mapSize ${h.mapSize}) · active players [${state.activePlayers.join(', ')}]`,
@@ -393,7 +398,7 @@ export function issueBody(input: DebugReportInput, id: string, fileName: string)
     '',
     '### Fingerprint',
     '',
-    `- report \`${id}\` · source ${input.sourceFile ?? 'unknown'}`,
+    `- report \`${id}\` · source ${input.sourceFile ?? 'unknown'} · build \`${buildStamp()}\``,
     `- gameTick ${h.tick} · map ${h.mapCols}×${h.mapRows} (mapSize ${h.mapSize})` +
       ` · active players [${input.state.activePlayers.join(', ')}]`,
   ];
