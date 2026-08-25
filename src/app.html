@@ -35,6 +35,16 @@
 		<meta property="og:image" content="./icon-512.png" />
 		<meta name="twitter:card" content="summary" />
 
+		<!--
+			INSTALLABILITY. The manifest link belongs here for the same reason as the metadata above: with
+			`ssr = false` a `<svelte:head>` entry only exists once the page has run its JavaScript, while
+			the browser weighs the install criteria against the document it loaded.
+
+			Being installed is not cosmetic here — an installed application is the only place where the
+			browser keeps a granted folder handle across restarts, which is what the saved games use.
+		-->
+		<link rel="manifest" href="./manifest.webmanifest" />
+
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

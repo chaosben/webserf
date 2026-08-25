@@ -1,0 +1,28 @@
+{
+	"id": "/",
+	"name": "webserf - Settle in the web",
+	"short_name": "webserf",
+	"description": "“The Settlers” of 1993, in your browser: the rules ported from the original DOS program, the graphics read from your own copy of the game. Nothing is uploaded — your archive and your saved games stay with you.",
+	"lang": "en",
+	"dir": "ltr",
+	"start_url": "./",
+	"scope": "./",
+	"display": "standalone",
+	"orientation": "any",
+	"background_color": "#0a0b0a",
+	"theme_color": "#0a0b0a",
+	"icons": [
+		{
+			"src": "./icon-192.png",
+			"type": "image/png",
+			"sizes": "192x192",
+			"purpose": "any"
+		},
+		{
+			"src": "./icon-512.png",
+			"type": "image/png",
+			"sizes": "512x512",
+			"purpose": "any"
+		}
+	]
+}
