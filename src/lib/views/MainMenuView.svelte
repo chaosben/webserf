@@ -58,7 +58,8 @@
     type MainMenuState,
     type MenuTarget,
   } from '../core/main-menu.js';
-  import { fitScale, wheelZoomFactor } from './zoom-gesture.js';
+  import { fitScale, pinchZoom, wheelZoomFactor } from './zoom-gesture.js';
+  import { TOUCH_IDLE, touchDown, touchMove, touchUp } from './touch-gesture.js';
   import {
     CREDITS_PALETTE_ENTRY,
     CREDITS_STEPS,
@@ -184,6 +185,24 @@
   let availWidth = $state(0);
   let availHeight = $state(0);
   let canvas: HTMLCanvasElement | null = $state(null);
+  /**
+   * The full area — the reference frame of the touch gestures, and the element that keeps the
+   * browser's pinch away. Not the canvas: that one is only {@link MENU_SURFACE} × {@link scale}
+   * large, so a finger beside it would never reach a handler, and zooming out would shrink it away
+   * from under the fingers in the middle of the gesture.
+   */
+  let viewEl: HTMLDivElement | null = $state(null);
+
+  /**
+   * **Touch: the phases of the surface** (addition — the original knows no touchscreen). Only the
+   * two-finger pinch is of interest here; the menu has no special click and therefore no long press,
+   * and the tap is the ordinary click. Details of the machine: `touch-gesture.ts`.
+   */
+  let touch = TOUCH_IDLE;
+  /** Zoom and finger distance at the start of the pinch — from the DRAWN scale, as {@link zoomBy}. */
+  let pinchStart: { scale: number; dist: number } | null = null;
+  /** Up to this travel a single finger still counts as standing still. */
+  const TOUCH_MOVE_THRESHOLD = 5;
 
   /**
    * The open popup — `vp[0x70]` in the original, a field of the viewport and not menu state; hence
@@ -635,6 +654,9 @@
     // While the map is being generated the menu accepts nothing. In the original that is not a
     // lock but the consequence of the single thread: it runs through without reading input.
     if (mapGenProgress !== null) return;
+    // Tail of a touch gesture. It stands before the credits branch on purpose: a pinch must not
+    // skip the opening sequence.
+    if (touch.phase === 'spent') return;
     // Take focus, so typing works right after "PASSWORT" — `onkeydown` needs it.
     canvas?.focus();
     // The opening credits abort on the LEFT mouse button only (@0x46ba tests `0x1f56`); `onclick`
@@ -718,11 +740,76 @@
     playUiSounds(r.sound);
   }
 
-  /** Wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away. */
+  /**
+   * Wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away. A pinch
+   * on a real touchscreen does NOT arrive here — it comes as pointer events ({@link onPointerMove}).
+   */
   function handleWheel(e: WheelEvent): void {
     e.preventDefault();
     zoomBy(wheelZoomFactor(e));
   }
+
+  /**
+   * **Two-finger zoom.** There is nothing to anchor: the menu has no camera, its surface sits
+   * flex-centred on the stage and {@link fitScale} keeps it fitting — so zooming about the centre is
+   * inherent here, not a shortcut.
+   *
+   * `touch-action: none` on this element is what makes the gesture ours at all; without it the
+   * browser zooms the page and none of this runs.
+   */
+  function onPointerDown(e: PointerEvent): void {
+    if (e.pointerType !== 'touch') return;
+    const r = touchDown(touch, e.pointerId, e.clientX, e.clientY, performance.now());
+    touch = r.state;
+    if (r.outcome?.kind === 'pinchStart') pinchStart = { scale, dist: r.outcome.dist };
+  }
+
+  function onPointerMove(e: PointerEvent): void {
+    if (e.pointerType !== 'touch') return;
+    const r = touchMove(touch, e.pointerId, e.clientX, e.clientY, TOUCH_MOVE_THRESHOLD);
+    touch = r.state;
+    const start = pinchStart;
+    if (r.outcome?.kind !== 'pinch' || start === null) return;
+    zoom = pinchZoom(start.scale, start.dist, r.outcome.dist, ZOOM_MIN, ZOOM_MAX);
+  }
+
+  function onPointerUp(e: PointerEvent): void {
+    if (e.pointerType !== 'touch') return;
+    const r = touchUp(touch, e.pointerId);
+    touch = r.state;
+    if (r.outcome?.kind === 'ended') pinchStart = null;
+  }
+
+  /**
+   * The gesture listeners hang on the container **imperatively**, not as attributes: the a11y rules
+   * ask a plain element with pointer handlers for a role, and this one has none to give — the
+   * interactive element is the canvas inside it, and a two-finger zoom has no keyboard counterpart
+   * that a role would promise.
+   *
+   * The `gesture*` trio in the same place, for a second reason: **WebKit ignores `touch-action` for
+   * the pinch.** There the page would keep zooming although the handlers work fine, and the counter
+   * is `preventDefault` on those non-standard events (`passive: false`, absent from the typings).
+   * Its limit, plainly: where `touch-action` is honoured they never fire, so there this is dead
+   * weight — and on WebKit it cannot be checked from here.
+   */
+  $effect(() => {
+    const el = viewEl;
+    if (el === null) return;
+    const stop = (ev: Event) => ev.preventDefault();
+    const gestures = ['gesturestart', 'gesturechange', 'gestureend'];
+    el.addEventListener('pointerdown', onPointerDown);
+    el.addEventListener('pointermove', onPointerMove);
+    el.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('pointercancel', onPointerUp);
+    for (const name of gestures) el.addEventListener(name, stop, { passive: false });
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+      el.removeEventListener('pointermove', onPointerMove);
+      el.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('pointercancel', onPointerUp);
+      for (const name of gestures) el.removeEventListener(name, stop);
+    };
+  });
 
   /**
    * The pointer hangs on the drawn {@link scale} and rounds to whole steps: the system scales
@@ -892,7 +979,12 @@
 
 </script>
 
-<div class="menu-view" bind:clientWidth={availWidth} bind:clientHeight={availHeight}>
+<div
+  class="menu-view"
+  bind:this={viewEl}
+  bind:clientWidth={availWidth}
+  bind:clientHeight={availHeight}
+>
   <!-- `tabindex` only so `onkeydown` fires at all — the original has no focus concept. -->
   <canvas
     bind:this={canvas}
@@ -907,7 +999,10 @@
 
 <style>
   /* Full area: the menu surface sits centred on the stage, without frame and without control bar.
-     Zooming is by mouse wheel only (`handleWheel`) — there is deliberately no control for it. */
+     Zooming is by mouse wheel (`handleWheel`) or two fingers (`onPointerMove`) — there is
+     deliberately no control for it.
+     `touch-action: none` is not decoration: with Pointer Events it is the ONLY lever against the
+     browser's own pinch zoom, and `preventDefault` on a pointer event is none. */
   .menu-view {
     position: relative;
     height: 100%;
@@ -915,6 +1010,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    touch-action: none;
   }
   canvas {
     image-rendering: pixelated;

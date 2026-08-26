@@ -224,7 +224,7 @@ const EN = {
 	'record.needGame': 'Start a game first — there is nothing to record yet.',
 	'record.done': '{name} — {frames} images, {size}.',
 	'view.map':
-		'Map view (left: place cursor, left drag: pull the view, right held: push the view like the original, middle held: grab and pull, right+left or Shift/Alt+left: special click, wheel or pinch: zoom)',
+		'Map view (left: place cursor, left drag: pull the view, right held: push the view like the original, middle held: grab and pull, right+left or Shift/Alt+left or long press: special click, wheel or two fingers: zoom)',
 	'view.buildMenu': 'Build menu',
 	'view.soil': 'Soil samples',
 	'view.message': 'Message',
@@ -384,7 +384,7 @@ const DE: Record<ShellKey, string> = {
 	'record.needGame': 'Starte zuerst ein Spiel — es gibt noch nichts aufzunehmen.',
 	'record.done': '{name} — {frames} Bilder, {size}.',
 	'view.map':
-		'Kartenansicht (links: Zeiger setzen, links ziehen: Ansicht nachziehen, rechts halten: Ansicht schieben wie im Original, mittlere Taste halten: greifen und ziehen, rechts+links oder Umschalt/Alt+links: Spezialklick, Rad oder Zwei-Finger: Lupe)',
+		'Kartenansicht (links: Zeiger setzen, links ziehen: Ansicht nachziehen, rechts halten: Ansicht schieben wie im Original, mittlere Taste halten: greifen und ziehen, rechts+links oder Umschalt/Alt+links oder langes Drücken: Spezialklick, Rad oder Zwei-Finger: Lupe)',
 	'view.buildMenu': 'Bau-Menü',
 	'view.soil': 'Bodenproben',
 	'view.message': 'Mitteilung',

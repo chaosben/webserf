@@ -285,7 +285,15 @@
     type MapPreviewData,
   } from '../core/map-preview.js';
 
-  import { wheelZoomFactor } from './zoom-gesture.js';
+  import { anchorCamera, pinchZoom, scenePoint, wheelZoomFactor } from './zoom-gesture.js';
+  import {
+    TOUCH_HOLD_MS,
+    TOUCH_IDLE,
+    touchDown,
+    touchMove,
+    touchTick,
+    touchUp,
+  } from './touch-gesture.js';
 
   let {
     save,
@@ -2902,7 +2910,8 @@
    * version got out of measuring the bar's own DOM element.
    */
   function slotPixel(
-    e: MouseEvent,
+    clientX: number,
+    clientY: number,
     b: { x: number; y: number; width: number; height: number },
     srcW: number,
     srcH: number,
@@ -2910,8 +2919,8 @@
     const el = host;
     if (el === undefined) return null;
     return boxPixel(
-      e.clientX,
-      e.clientY,
+      clientX,
+      clientY,
       el.getBoundingClientRect(),
       el.width,
       el.height,
@@ -2921,9 +2930,12 @@
     );
   }
 
-  /** The bar's pixel under the pointer, or `null` when the click is not on the bar. */
-  function barPixel(e: MouseEvent): { x: number; y: number } | null {
-    return barVisible ? slotPixel(e, CONTROL_PANEL_BOUNDS, BAR_WIDTH, BAR_HEIGHT) : null;
+  /**
+   * The bar's pixel under the given client point, or `null` when it is not on the bar. Coordinates
+   * rather than an event: a long press dispatches without one (see {@link dispatchClickAt}).
+   */
+  function barPixel(clientX: number, clientY: number): { x: number; y: number } | null {
+    return barVisible ? slotPixel(clientX, clientY, CONTROL_PANEL_BOUNDS, BAR_WIDTH, BAR_HEIGHT) : null;
   }
 
   /**
@@ -3253,10 +3265,16 @@
 
   /**
    * Display zoom. The original has none — {@link DEFAULT_ZOOM} is our default, and afterwards the
-   * value belongs exclusively to the mouse wheel (`onWheel`): a control for it is deliberately not
-   * provided. `minZoom` bounds it downwards (whole world in frame).
+   * value belongs to the two gestures that write it: the mouse wheel (`onWheel`) and the two-finger
+   * pinch (`applyPinch`). A control for it is deliberately not provided. `minZoom` bounds it
+   * downwards (whole world in frame), {@link ZOOM_MAX} upwards.
    */
   const DEFAULT_ZOOM = 3;
+  /**
+   * Upper bound of the zoom. Not to be confused with the 8 of the cursor scale — that one is the
+   * limit of the browser's cursor images and has nothing to do with the map.
+   */
+  const ZOOM_MAX = 8;
   let zoom = $state(DEFAULT_ZOOM);
   /**
    * Camera: scene pixels of the window's top-left corner. **Unbounded** — that is the infinite
@@ -3693,6 +3711,34 @@
   const DOUBLE_CLICK_MAX_MS = 12 * 80;
 
   /**
+   * **Touch: the phases of the surface** (addition — the original knows no touchscreen).
+   *
+   * One finger keeps behaving like the left button: tap = click, drag = grab pan. On top of that sit
+   * the two gestures a tablet has no other way to reach — the two-finger pinch, which the browser
+   * would otherwise spend on zooming the *page*, and the long press, the only substitute left for
+   * the special click where there is neither a right button nor a keyboard.
+   *
+   * The phase machine is in `touch-gesture.ts` and takes no part in the reactivity: it is read and
+   * written at pointer-move rate. Coordinates handed to it are `offsetX/offsetY`, element pixels —
+   * that is what the pinch anchor needs, and it costs no layout.
+   */
+  let touch = TOUCH_IDLE;
+  /**
+   * The pointer whose press started the running drag — pan and capture belong to it alone. Without
+   * it the second finger of a pinch pulls the map by the whole distance between the fingers: on
+   * touch every finger reports `button 0`, so nothing else in the handlers tells them apart.
+   */
+  let dragPointerId: number | null = null;
+  /** Runs while a long press is pending; whether it is really due decides the reducer. */
+  let holdTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * What the pinch grabbed at its start: the scene point under the first midpoint, plus zoom and
+   * finger distance of that moment. The camera is recomputed from it **absolutely** on every move,
+   * so the rounding cannot accumulate and the gesture is exactly reversible.
+   */
+  let pinchStart: { zoom: number; dist: number; sceneX: number; sceneY: number } | null = null;
+
+  /**
    * **Autoplay gesture**: an `AudioContext` may only run after a user gesture. The first grab on the
    * map is one — hence no separate "sound on" control is needed. Repeated calls are harmless.
    *
@@ -3705,8 +3751,103 @@
     if (uiMusic) void musicPlayer?.start();
   }
 
+  /** A capture is given back only while it is still ours — `pointercancel` has already taken it. */
+  function releaseCapture(el: HTMLElement | null, id: number): void {
+    if (el !== null && el.hasPointerCapture(id)) el.releasePointerCapture(id);
+  }
+
+  /** Ends a running drag, whichever button or finger started it. */
+  function endDrag(el: HTMLElement | null): void {
+    if (dragPointerId !== null) releaseCapture(el, dragPointerId);
+    dragPointerId = null;
+    dragMode = null;
+    leftDragging = false;
+  }
+
+  function clearHold(): void {
+    if (holdTimer !== null) clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+
+  /**
+   * **Long press = special click** (see {@link isSpecialModifier}). `TOUCH_HOLD_MS` is the measure
+   * of the system for a second action; the original has no holding at all.
+   *
+   * It fires while the finger is still down, not when it lifts: that puts the answer at the moment
+   * of the gesture, and it makes us independent of the question whether the browser still delivers a
+   * `click` after a long press whose context menu we suppressed. Either way the trailing click is
+   * swallowed by the `spent` phase.
+   *
+   * The timer needs no cancelling when the press dies (travel, second finger): the reducer answers
+   * `null` and nothing happens.
+   */
+  function armHold(): void {
+    clearHold();
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      const r = touchTick(touch, performance.now(), TOUCH_HOLD_MS);
+      touch = r.state;
+      if (r.outcome?.kind !== 'hold') return;
+      endDrag(viewportEl);
+      // The press point is the one the left-button branch recorded — client coordinates, which is
+      // what the dispatcher takes.
+      dispatchClickAt(downX, downY, true);
+    }, TOUCH_HOLD_MS);
+  }
+
+  /** Grabs the scene point under the first midpoint; a running drag has to give way. */
+  function beginPinch(o: { dist: number; midX: number; midY: number }, el: HTMLElement | null): void {
+    clearHold();
+    endDrag(el);
+    sawLeftDown = false;
+    downOnBar = false;
+    panRestX = 0;
+    panRestY = 0;
+    pinchStart = {
+      zoom,
+      dist: o.dist,
+      sceneX: scenePoint(camX, zoom, o.midX),
+      sceneY: scenePoint(camY, zoom, o.midY),
+    };
+  }
+
+  /**
+   * Zoom **and** two-finger pan in one step: the scene point grabbed at the start goes back under
+   * the current midpoint. `minZoom` is read live rather than snapshotted — the URL bar of a tablet
+   * browser and a rotation both change the window in the middle of a gesture.
+   *
+   * Not gated on `mapAcceptsClicks` or on the bar, exactly like the wheel: the zoom is a display
+   * addition and stays available with a popup open. The pan is gated, because there the original has
+   * a say (`FUN_0000d630` bails out on a modal popup).
+   */
+  function applyPinch(o: { dist: number; midX: number; midY: number }): void {
+    const start = pinchStart;
+    if (start === null) return;
+    const next = pinchZoom(start.zoom, start.dist, o.dist, minZoom, ZOOM_MAX);
+    camX = anchorCamera(start.sceneX, next, o.midX);
+    camY = anchorCamera(start.sceneY, next, o.midY);
+    zoom = next;
+  }
+
   function onPointerDown(e: PointerEvent) {
     resumeAudio();
+    if (e.pointerType === 'touch') {
+      // The very first thing in the handler: two fingers landing in the same frame deliver two
+      // `pointerdown`, and the second would otherwise overwrite the click ledger of the first.
+      const r = touchDown(touch, e.pointerId, e.offsetX, e.offsetY, performance.now());
+      touch = r.state;
+      if (r.outcome?.kind === 'pinchStart') {
+        beginPinch(r.outcome, e.currentTarget as HTMLElement);
+        return;
+      }
+      // Only a single finger goes on as a left button. Anything else is a further finger or the tail
+      // of a gesture, and must not touch the ledger.
+      if (r.outcome?.kind === 'holdArmed') armHold();
+      else return;
+    } else if (touch.phase === 'spent' && touch.down === 0) {
+      // A mouse on the same device must not run into the tail of a touch gesture.
+      touch = TOUCH_IDLE;
+    }
     // Right button (button 2) = original pan. `FUN_0000d630` bails out immediately when `vp[1]`
     // bit 1 is clear — so with a popup open nothing scrolls either. Middle button (button 1) =
     // grab pan (addition); `preventDefault` suppresses the browser autoscroll.
@@ -3714,7 +3855,7 @@
       if (e.button === 2) rightDown = true;
       // A press on the bar is not a map drag (see `downOnBar`). The right button still counts as
       // held: that posture IS the special click, and it belongs to the bar button underneath.
-      if (barPixel(e) !== null) return;
+      if (barPixel(e.clientX, e.clientY) !== null) return;
       if (!mapAcceptsClicks) return;
       if (e.button === 1) e.preventDefault();
       dragMode = e.button === 2 ? 'push' : 'grab';
@@ -3726,13 +3867,14 @@
       lastY = e.clientY;
       panRestX = 0;
       panRestY = 0;
+      dragPointerId = e.pointerId;
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       return;
     }
     if (e.button !== 0) return;
     // Left button: click candidate. `e.buttons` bit 1 = right button held at the same time.
     sawLeftDown = true;
-    downOnBar = barPixel(e) !== null;
+    downOnBar = barPixel(e.clientX, e.clientY) !== null;
     downSpecial = isSpecialModifier(e);
     downX = e.clientX;
     downY = e.clientY;
@@ -3750,6 +3892,9 @@
    *
    * Deliberately NOT the left double click: that is taken by the fast build click
    * (`viewOptions` bit 2).
+   *
+   * On a touchscreen none of these exists — no right button, no keyboard. There the substitute is
+   * the **long press** ({@link armHold}), which goes through the same dispatcher.
    */
   function isSpecialModifier(e: MouseEvent): boolean {
     return (e.buttons & 2) !== 0 || e.shiftKey || e.altKey;
@@ -3757,16 +3902,29 @@
   function onPointerMove(e: PointerEvent) {
     // Pointer position for the screen recording. `offsetX/offsetY` and not a measured rectangle:
     // the canvas fills the viewport 1:1, so this is already the canvas pixel — and it costs no
-    // layout, which matters at pointer-move rate.
-    pointerCanvasX = e.offsetX;
-    pointerCanvasY = e.offsetY;
-    pointerInside = true;
-      // **Left drag pans the map** (addition for touchpads, not in the original).
-      //
-      // Why this is collision-free — proven, not assumed: a left drag past the 5 px threshold is
-      // already DISCARDED today (`if (!mapAcceptsClicks || dragged) return;` in the click
-      // dispatcher). Direction is `'grab'` like the middle button — on a touchpad one drags the
-      // content along, not away.
+    // layout, which matters at pointer-move rate. Only the primary pointer: with two fingers the
+    // recorded cursor would otherwise jump back and forth between them.
+    if (e.isPrimary) {
+      pointerCanvasX = e.offsetX;
+      pointerCanvasY = e.offsetY;
+      pointerInside = true;
+    }
+    if (e.pointerType === 'touch') {
+      const r = touchMove(touch, e.pointerId, e.offsetX, e.offsetY, DRAG_THRESHOLD);
+      touch = r.state;
+      if (r.outcome?.kind === 'pinch') {
+        applyPinch(r.outcome);
+        return;
+      }
+      // While pinching (a further finger) and in the tail of a gesture nothing pans.
+      if (touch.phase === 'pinch' || touch.phase === 'spent') return;
+    }
+    // **Left drag pans the map** (addition for touchpads, not in the original).
+    //
+    // Why this is collision-free — proven, not assumed: a left drag past the 5 px threshold is
+    // already DISCARDED today (`if (!mapAcceptsClicks || dragged) return;` in the click
+    // dispatcher). Direction is `'grab'` like the middle button — on a touchpad one drags the
+    // content along, not away.
     if (dragMode === null && sawLeftDown && !downOnBar && (e.buttons & 1) !== 0 && mapAcceptsClicks) {
       if (Math.hypot(e.clientX - downX, e.clientY - downY) >= DRAG_THRESHOLD) {
         dragMode = 'grab';
@@ -3775,10 +3933,12 @@
         lastY = e.clientY;
         panRestX = 0;
         panRestY = 0;
+        dragPointerId = e.pointerId;
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       }
     }
-    if (dragMode !== null) {
+    // The pan belongs to the pointer that started it — see {@link dragPointerId}.
+    if (dragMode !== null && dragPointerId === e.pointerId) {
       // **Original direction (`'push'`): the map is PUSHED AWAY, not grabbed** — on both axes.
       // Byte-proven: the input layer adds the raw mouse delta unchanged into the accumulator
       // (`vp[0x10] += dx`, `vp[0x12] += dy` @0x624f5/0x62500) and uses the SAME delta without
@@ -3815,10 +3975,20 @@
   let pointerInside = false;
 
   function onPointerUp(e: PointerEvent) {
+    if (e.pointerType === 'touch') {
+      const r = touchUp(touch, e.pointerId);
+      touch = r.state;
+      if (r.outcome?.kind === 'ended') pinchStart = null;
+      clearHold();
+      if (touch.phase === 'spent') {
+        // Tail of a gesture: nothing pans, and the `click` that follows is swallowed in `onClick`.
+        endDrag(e.currentTarget as HTMLElement);
+        return;
+      }
+    }
     if (e.button === 2 || e.button === 1) {
-      dragMode = null;
       if (e.button === 2) rightDown = false;
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      endDrag(e.currentTarget as HTMLElement);
       // Right *clicked* (not dragged) ⇒ double-click detection like `vp[1]` bit 4/5 + `vp[0x9e]`:
       // the second click within the window triggers the fast map click (option `vp[0x86]` bit 1).
       if (e.button === 2 && Math.hypot(e.clientX - rightDownX, e.clientY - rightDownY) < DRAG_THRESHOLD) {
@@ -3835,11 +4005,22 @@
     }
     // Left button released: end a running left drag. The click is still suppressed by the 5 px
     // threshold in the click dispatcher — nothing extra to do here.
-    if (e.button === 0 && leftDragging) {
-      leftDragging = false;
-      dragMode = null;
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    if (e.button === 0 && leftDragging && dragPointerId === e.pointerId) {
+      endDrag(e.currentTarget as HTMLElement);
     }
+  }
+
+  /**
+   * `pointercancel` — the system took the touch away (switching apps, too many fingers). It carries
+   * `button === -1`, so none of the branches above sees it, and the capture is already gone.
+   */
+  function onPointerCancel(e: PointerEvent) {
+    if (e.pointerType === 'touch') {
+      touch = touchUp(touch, e.pointerId).state;
+      if (touch.phase !== 'pinch') pinchStart = null;
+    }
+    clearHold();
+    if (dragPointerId === e.pointerId) endDrag(e.currentTarget as HTMLElement);
   }
 
   /**
@@ -3867,42 +4048,82 @@
     return () => el.removeEventListener('click', onClick);
   });
 
+  /**
+   * **WebKit ignores `touch-action` for the pinch.** There the page would keep zooming although our
+   * own pointer handlers work fine; the counter is `preventDefault` on the non-standard `gesture*`
+   * events. They are absent from the DOM typings, hence imperatively and with `passive: false`.
+   *
+   * Its limit, plainly: on engines that honour `touch-action` these events never fire, so there this
+   * is dead weight — and on WebKit it cannot be checked from here.
+   */
+  $effect(() => {
+    const el = viewportEl;
+    if (el === null) return;
+    const stop = (ev: Event) => ev.preventDefault();
+    const names = ['gesturestart', 'gesturechange', 'gestureend'];
+    for (const name of names) el.addEventListener(name, stop, { passive: false });
+    return () => {
+      for (const name of names) el.removeEventListener(name, stop);
+    };
+  });
+
+  /** A pending long press must not fire into a component that is already gone. */
+  $effect(() => () => clearHold());
+
   function onClick(e: MouseEvent): void {
     // Autoplay gesture here as well — every click of the game screen arrives here, bar and popup
     // included: there is one canvas and therefore one dispatcher, as in the original.
     resumeAudio();
+    // Tail of a touch gesture: a pinch or a long press has already had its say. The phase holds
+    // until the next fresh press, because this click arrives AFTER the last finger has left.
+    if (touch.phase === 'spent') {
+      sawLeftDown = false;
+      downSpecial = false;
+      downOnBar = false;
+      return;
+    }
     const special = downSpecial || rightDown || isSpecialModifier(e);
     const dragged = sawLeftDown && Math.hypot(e.clientX - downX, e.clientY - downY) >= DRAG_THRESHOLD;
     sawLeftDown = false;
     downSpecial = false;
     downOnBar = false;
-    // **Bar first, then popup, then map** — the y split of the original dispatcher
-    // (`FUN_000272d7`: `y >= vp[0x30]` = 440 is the bar). The bar stands BEFORE `mapAcceptsClicks`,
-    // because it stays usable with a popup open (own branch). Nothing is dragged here: a left drag
-    // ending over the bar is not a bar click.
-    if (!dragged) {
-      const onBar = barPixel(e);
-      if (onBar !== null) {
-        handleBarClick(onBar.x, onBar.y, special);
-        return;
-      }
+    // A left drag past the threshold is no click — not on the bar, not in the popup, not on the map.
+    if (dragged) return;
+    dispatchClickAt(e.clientX, e.clientY, special);
+  }
+
+  /**
+   * **The one click dispatcher of the game screen**, addressed by client coordinates.
+   *
+   * Not by an event, because the long press has none: it fires from a timer while the finger is
+   * still down ({@link armHold}). Going through here is what makes the special click of a touch
+   * device take exactly the path of a mouse one — bar, popup and map keep every context rule.
+   *
+   * **Bar first, then popup, then map** — the y split of the original dispatcher (`FUN_000272d7`:
+   * `y >= vp[0x30]` = 440 is the bar). The bar stands BEFORE `mapAcceptsClicks`, because it stays
+   * usable with a popup open (own branch).
+   */
+  function dispatchClickAt(clientX: number, clientY: number, special: boolean): void {
+    const onBar = barPixel(clientX, clientY);
+    if (onBar !== null) {
+      handleBarClick(onBar.x, onBar.y, special);
+      return;
     }
     // With a popup open the map takes no clicks (`vp[1]` bit 1 clear). The click goes into the popup
     // router — and expires there even when it lands outside the popup rectangle, which is exactly
     // what @0x2bff7 does after subtracting the anchor.
     const slot = openPopupSlot;
     if (slot !== null) {
-      if (!dragged) {
-        const p = slotPixel(e, POPUP_BOUNDS, POPUP_W, POPUP_H);
-        if (p !== null) dispatchPopupClick(slot, p.x, p.y, special);
-      }
+      const p = slotPixel(clientX, clientY, POPUP_BOUNDS, POPUP_W, POPUP_H);
+      if (p !== null) dispatchPopupClick(slot, p.x, p.y, special);
       return;
     }
-    if (dragged) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const el = viewportEl;
+    if (el === null) return;
+    const rect = el.getBoundingClientRect();
     const t = windowToTile(
-      (e.clientX - rect.left) / zoom,
-      (e.clientY - rect.top) / zoom,
+      (clientX - rect.left) / zoom,
+      (clientY - rect.top) / zoom,
       camera,
       geo,
       heightAt,
@@ -3910,7 +4131,7 @@
     );
     // The element pixels come along: the road-building edge scroll checks the click PIXELS against
     // the border of the map area, not the tile.
-    mapClick(t.col, t.row, special, e.clientX - rect.left, e.clientY - rect.top);
+    mapClick(t.col, t.row, special, clientX - rect.left, clientY - rect.top);
   }
 
   /**
@@ -4100,19 +4321,21 @@
     // No pointer in the picture once it has left the window (see `pointerInside`).
     pointerInside = false;
   }
-  /** Mouse wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away. */
+  /**
+   * Mouse wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away.
+   * A pinch on a real touchscreen does NOT arrive here — it comes as pointer events
+   * ({@link applyPinch}).
+   */
   function onWheel(e: WheelEvent) {
     e.preventDefault();
     // Lower bound: whole world in frame — below that only repetition would follow.
-    const next = Math.max(minZoom, Math.min(8, zoom * wheelZoomFactor(e)));
+    const next = Math.max(minZoom, Math.min(ZOOM_MAX, zoom * wheelZoomFactor(e)));
     // Zoom around the cursor: the scene point under the pointer stays put.
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    const sceneX = camX + mx / zoom;
-    const sceneY = camY + my / zoom;
-    camX = Math.round(sceneX - mx / next);
-    camY = Math.round(sceneY - my / next);
+    camX = anchorCamera(scenePoint(camX, zoom, mx), next, mx);
+    camY = anchorCamera(scenePoint(camY, zoom, my), next, my);
     zoom = next;
   }
 </script>
@@ -4126,6 +4349,7 @@
     onpointerdown={onPointerDown}
     onpointermove={onPointerMove}
     onpointerup={onPointerUp}
+    onpointercancel={onPointerCancel}
     onpointerleave={onPointerLeave}
     onwheel={onWheel}
     onkeydown={handleDiskKey}
