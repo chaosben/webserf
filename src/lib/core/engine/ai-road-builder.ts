@@ -30,6 +30,10 @@
  *    mark, so over land the ring walk dies immediately), and the road layer sets the endpoint bit
  *    `flag[4]` only when the bit is CLEAR - which is the bit the interactive road builder clears for
  *    boat roads.
+ * 5. The original reads the path byte WHOLE and tests single bits in it; our tile model splits that
+ *    byte (`paths` masked to 0x3f, bit 6 as `blocked`, bit 7 as `object === 1`). A literal `paths &
+ *    0x40` is therefore constant 0 - the block-marker gate of the ordinary branch was dead that way,
+ *    and the AI routed roads straight across a lake and booked them as land roads.
  *
  * Without a counterpart here: the original marks tiles for redraw (our renderer redraws every frame)
  * and aliases the candidate list over the no-longer-needed cost grid.
@@ -352,7 +356,11 @@ export function classifyRoadCell(
   }
 
  // --- ordinary mode (no order): the grid carries terrain costs
-  if ((tile.paths & 0x40) !== 0) return false; // `bt $0x6` @0x57ae7 — block marker
+ // `btl $0x6,0x1c(%edi)` @0x57add, reject @0x57ae7 - the block marker, tested on the RAW path byte
+ // that @0x5786b/@0x5786d put into that slot. The original's `andb $0x3f` sits in the OTHER branch
+ // (@0x57890, boat-road order), so bit 6 is still there here. Ours is the field `blocked`; a literal
+ // `paths & 0x40` cannot fire because `paths` is already masked (see point 5 in the module head).
+  if (tile.blocked) return false;
   const obj = tile.object & 0x7f;
   if (obj !== 0 && RB_OBJECT_CLASS[obj] > 1) return false; // @0x57af9
 

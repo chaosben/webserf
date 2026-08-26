@@ -379,7 +379,8 @@ function flagSiteHead(state: GameState, table: number[], start: number): boolean
  * Run the surroundings survey and return the four tables.
  *
  * @param possibility The build possibility `player+0x101`. Probe branch A passes the classifier's
- * value, branch B passes **0** (`mov $0x0 -> player[0x101]` @0x5c91b) — that lands in the `else`
+ * value, branch B passes **0** (`mov $0x0,%al` @0x5c91b, stored to `player[0x101]` @0x5c920) — that
+ * lands in the `else`
  * branch, where the "own land" comparison is different too (see below).
  */
 export function aiSurveySurroundings(
