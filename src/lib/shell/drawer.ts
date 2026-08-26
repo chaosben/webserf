@@ -17,6 +17,20 @@ export interface DrawerGroup {
 }
 
 /**
+ * A mark on a rail icon — "something is going on in this group, even though its panel is closed".
+ *
+ * A flag on {@link DrawerGroup} would not work: the group list is a module-level `const` and cannot
+ * carry running state. Passing marks separately also keeps the rail free of any knowledge about what
+ * is being marked: it draws a dot and reads out the name the mark brings along.
+ */
+export interface DrawerMark {
+	/** {@link DrawerGroup.id} of the marked group. */
+	group: string;
+	/** What the mark means, appended to the button's name — a nameless dot is not announced. */
+	labelKey: ShellKey;
+}
+
+/**
  * A tab inside ONE overlay. The group (icon on the left) picks the screen, the tab picks the topic
  * within it — save-game storage and the asset archive are both "import & export" but have nothing
  * to do with each other.

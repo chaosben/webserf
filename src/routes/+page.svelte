@@ -14,16 +14,19 @@
 	import MapView from '$lib/views/MapView.svelte';
 	import Dropzone from '$lib/shell/Dropzone.svelte';
 	import DrawerRail from '$lib/shell/DrawerRail.svelte';
-	import type { DrawerGroup, OverlayTab } from '$lib/shell/drawer.js';
+	import type { DrawerGroup, DrawerMark, OverlayTab } from '$lib/shell/drawer.js';
 	import OverlayPanel from '$lib/shell/OverlayPanel.svelte';
 	import SettingsPanel from '$lib/shell/SettingsPanel.svelte';
 	import BugReportPanel from '$lib/shell/BugReportPanel.svelte';
+	import RecordingPanel from '$lib/shell/RecordingPanel.svelte';
 	import InfoPanel from '$lib/shell/InfoPanel.svelte';
 	import SavesPanel from '$lib/shell/SavesPanel.svelte';
 	import IconSettings from '~icons/material-symbols-light/settings-outline';
 	import IconTransfer from '~icons/material-symbols-light/swap-vert';
 	import IconBug from '~icons/material-symbols-light/bug-report-outline';
+	import IconRecord from '~icons/material-symbols-light/videocam-outline';
 	import IconInfo from '~icons/material-symbols-light/info-outline';
+	import { recordings } from '$lib/shell/recording.svelte.js';
 	import { log } from '$lib/shell/log.js';
 	import { st } from '$lib/shell/i18n.js';
 	import { settings } from '$lib/settings/settings.svelte.js';
@@ -47,8 +50,17 @@
 		{ id: 'settings', icon: IconSettings, labelKey: 'group.settings' },
 		{ id: 'io', icon: IconTransfer, labelKey: 'group.io' },
 		{ id: 'bug', icon: IconBug, labelKey: 'group.bug' },
+		{ id: 'record', icon: IconRecord, labelKey: 'group.record' },
 		{ id: 'info', icon: IconInfo, labelKey: 'group.info' }
 	];
+
+	/**
+	 * The mark on the recording icon while a video is running — the only way to see it with the panel
+	 * closed. A module constant rather than an inline literal so the rail is not handed a new array on
+	 * every render.
+	 */
+	const RECORDING_MARKS: readonly DrawerMark[] = [{ group: 'record', labelKey: 'rail.recording' }];
+	const NO_MARKS: readonly DrawerMark[] = [];
 
 	/**
 	 * The tabs of the import/export screen. Both halves used to sit below each other in one overlay
@@ -440,6 +452,7 @@
 	<DrawerRail
 		groups={GROUPS}
 		active={activeGroup}
+		marks={recordings.running ? RECORDING_MARKS : NO_MARKS}
 		onselect={(id) => settings.set('drawerGroup', id)}
 	/>
 
@@ -547,6 +560,10 @@
 		{:else if activeGroup === 'bug'}
 			<OverlayPanel title={st('group.bug')} onclose={() => settings.set('drawerGroup', null)}>
 				<BugReportPanel />
+			</OverlayPanel>
+		{:else if activeGroup === 'record'}
+			<OverlayPanel title={st('group.record')} onclose={() => settings.set('drawerGroup', null)}>
+				<RecordingPanel />
 			</OverlayPanel>
 		{:else if activeGroup === 'info'}
 			<OverlayPanel title={st('group.info')} onclose={() => settings.set('drawerGroup', null)}>

@@ -29,6 +29,11 @@
 /**
  * Report order, part 1: THE FRAME in its own order, with the sum `frame` last (a test relies on
  * that).
+ *
+ * `ui` is the ONE phase that `frame` does not contain: the bar and the open popup are composed onto
+ * the map after the map pass has returned, so the cost per image is `frame + ui`. It is measured
+ * separately rather than folded in because the two answer different questions — `frame` is what the
+ * map costs, `ui` is what the interface adds on top of it.
  */
 export const RENDER_PHASES = [
   'resize',
@@ -38,6 +43,7 @@ export const RENDER_PHASES = [
   'rgba',
   'upload',
   'scale',
+  'ui',
   'frame',
 ] as const;
 
@@ -69,6 +75,7 @@ export const PHASE_LABEL: Record<RenderPhase, string> = {
   rgba: 'palette → colour (CPU)',
   upload: 'putImageData',
   scale: 'drawImage (zoom)',
+  ui: 'bar / popup onto the map',
   pump: 'logic pump (whole clock callback)',
   logic: 'runTicks (simulation only)',
 };

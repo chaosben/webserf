@@ -78,9 +78,14 @@ export type PopupPaint =
   /** subject gone — the original closes its window here */
   | 'close';
 
-/** If the body reports `'close'`, nothing is drawn. */
+/**
+ * Paints one popup and hands back its surface; `null` means the body reported `'close'` — the
+ * subject is gone and the original closes the window instead of drawing it.
+ *
+ * It returns the FRAMEBUFFER rather than drawing into a canvas: where the surface ends up is the
+ * compositor's business, and keeping this function free of the DOM is what makes it testable.
+ */
 export function paintPopup(
-  canvas: HTMLCanvasElement,
   draw: SpriteProvider,
   body: (fb: Framebuffer) => PopupPaint | void,
   /**
@@ -90,18 +95,13 @@ export function paintPopup(
    * (@0x44578 before @0x4459a).
    */
   playerButtons?: PopupPlayerButtonsView,
-): PopupPaint {
-  const ctx = canvas.getContext('2d');
-  if (ctx === null) return 'drawn';
+): Framebuffer | null {
   const fb = createFramebuffer(POPUP_W, POPUP_H);
   clearFramebuffer(fb, BG[0], BG[1], BG[2]);
-  if (body(fb) === 'close') return 'close';
+  if (body(fb) === 'close') return null;
   drawPopupFrame(fb, draw);
   if (playerButtons) drawPopupPlayerButtons(fb, draw, playerButtons);
-  const img = ctx.createImageData(fb.width, fb.height);
-  img.data.set(fb.rgba);
-  ctx.putImageData(img, 0, 0);
-  return 'drawn';
+  return fb;
 }
 
 // --- Build menu (screens 3..7) -------------------------------------------------------------------

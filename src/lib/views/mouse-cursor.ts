@@ -15,9 +15,18 @@ export const CURSOR_HOTSPOT = { x: 8, y: 8 } as const;
 /** Browsers reject cursor images larger than 128×128; the sprite is 16×16. */
 export const CURSOR_MAX_SCALE = 8;
 
-/** `null` when there is no 2D context — the browser cursor then stays as it is. */
-export function buildCursorStyle(sprite: DecodedSprite, scale = 1): string | null {
-  const s = Math.max(1, Math.min(CURSOR_MAX_SCALE, Math.floor(scale)));
+/** The whole-number scale actually used — a cursor image is scaled hard by the system. */
+export const cursorScaleOf = (scale: number): number =>
+  Math.max(1, Math.min(CURSOR_MAX_SCALE, Math.floor(scale)));
+
+/**
+ * The pointer sprite as a drawable canvas, scaled by whole steps without smoothing.
+ *
+ * Two consumers: the CSS cursor below, and the screen recording, which draws the pointer into the
+ * captured frame because a CSS cursor is not part of the canvas. `null` when there is no 2D context.
+ */
+export function buildCursorCanvas(sprite: DecodedSprite, scale = 1): HTMLCanvasElement | null {
+  const s = cursorScaleOf(scale);
   const canvas = document.createElement('canvas');
   canvas.width = sprite.width * s;
   canvas.height = sprite.height * s;
@@ -30,19 +39,36 @@ export function buildCursorStyle(sprite: DecodedSprite, scale = 1): string | nul
   );
   if (s === 1) {
     ctx.putImageData(src, 0, 0);
-  } else {
-    // Nearest neighbour: 1:1 into a helper canvas, then scaled up unsmoothed.
-    const tmp = document.createElement('canvas');
-    tmp.width = sprite.width;
-    tmp.height = sprite.height;
-    const tctx = tmp.getContext('2d');
-    if (tctx === null) return null;
-    tctx.putImageData(src, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
+    return canvas;
   }
+  // Nearest neighbour: 1:1 into a helper canvas, then scaled up unsmoothed.
+  const tmp = document.createElement('canvas');
+  tmp.width = sprite.width;
+  tmp.height = sprite.height;
+  const tctx = tmp.getContext('2d');
+  if (tctx === null) return null;
+  tctx.putImageData(src, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/**
+ * The CSS cursor for a pointer canvas that already exists.
+ *
+ * Separate from {@link buildCursorStyle} because the recording needs the canvas itself: building it
+ * once and turning it into a style from there saves the second, identical build per scale step.
+ */
+export function cursorStyleFrom(canvas: HTMLCanvasElement, scale = 1): string {
+  const s = cursorScaleOf(scale);
   const hx = CURSOR_HOTSPOT.x * s;
   const hy = CURSOR_HOTSPOT.y * s;
   // `crosshair` as a fallback in case the browser rejects the data URI (CSP or similar).
   return `url(${canvas.toDataURL('image/png')}) ${hx} ${hy}, crosshair`;
+}
+
+/** `null` when there is no 2D context — the browser cursor then stays as it is. */
+export function buildCursorStyle(sprite: DecodedSprite, scale = 1): string | null {
+  const canvas = buildCursorCanvas(sprite, scale);
+  return canvas === null ? null : cursorStyleFrom(canvas, scale);
 }

@@ -140,7 +140,11 @@
     drawMenuBody,
     drawObjectPopupBody,
     paintPopup,
+    POPUP_W,
+    POPUP_H,
   } from './popup-draw.js';
+  import { boxPixel, originBoxRect, uiScaleFor } from './ui-layout.js';
+  import { composeUiOverlay, type OverlayLayer } from './ui-overlay.js';
   import {
     clearFramebuffer,
     clickControlPanel,
@@ -150,7 +154,6 @@
     drawControlPanelFrame,
     drawMapPreviewBar,
     drawMessageIndicators,
-    drawPopupFrame,
     hitPopupPlayerButton,
     hitTestControlPanelButton,
     hitTestPanel,
@@ -164,8 +167,8 @@
     POPUP_BOUNDS,
     MAP_AREA,
     SLIDER_BAR_COLOR_INDEX,
-    UI_SCREEN,
     type CursorMarkerPair,
+    type Framebuffer,
     type PanelButtonAction,
     type PopupPlayerButtonsView,
     type SpriteProvider,
@@ -259,7 +262,15 @@
     serfCensusPopupAction,
     inventoryModePopupAction,
   } from '../core/building-popup.js';
-  import { CURSOR_MAX_SCALE, CURSOR_SPRITE_INDEX, buildCursorStyle } from './mouse-cursor.js';
+  import {
+    CURSOR_HOTSPOT,
+    CURSOR_MAX_SCALE,
+    CURSOR_SPRITE_INDEX,
+    buildCursorCanvas,
+    cursorScaleOf,
+    cursorStyleFrom,
+  } from './mouse-cursor.js';
+  import { recordings } from '../shell/recording.svelte.js';
   import {
     MAP_PREVIEW_ACTION,
     MAP_PREVIEW_HITBOXES,
@@ -927,7 +938,6 @@
 
   /** Currently open build screen (`vp[0x72]`) or null = closed. */
   let buildMenuScreen = $state<number | null>(null);
-  let buildMenuCanvas = $state<HTMLCanvasElement | null>(null);
   /** Feedback of the last menu click (e.g. a rejected build site). */
   let buildMenuNote = $state<string | null>(null);
 
@@ -960,13 +970,9 @@
   });
 
   /** Click into the build menu: original click table → action → command or paging. */
-  function handleBuildMenuClick(e: MouseEvent): void {
-    const el = buildMenuCanvas;
+  function handleBuildMenuClick(x: number, y: number, special: boolean): void {
     const screen = buildMenuScreen;
-    if (el === null || screen === null || selected === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+    if (screen === null || selected === null) return;
     // **The player switch in the frame head** (spectator mode) lies BEFORE the screen dispatch — the
     // same in the original: `popup_click_router` checks the y<0 strip (@0x2c016 ff.) before entering
     // the screen's jump table (@0x2c09c).
@@ -1001,7 +1007,7 @@
       col,
       row,
       action.buildingType,
-      (e.buttons & 2) !== 0, // special click, `bt $0x3` on `vp[1]` @0x30155
+      special, // special click, `bt $0x3` on `vp[1]` @0x30155
     );
     const sound = buildMenuOutcomeSound(outcome);
     if (outcome === 'blocked') {
@@ -1053,30 +1059,11 @@
     closePopups();
   }
 
-  $effect(() => {
-    const el = buildMenuCanvas;
-    const draw = uiProvider;
-    const screen = buildMenuScreen;
-    if (el === null || draw === null || screen === null) return;
-    const site = buildSite;
-    paintPopup(
-      el,
-      draw,
-      (fb) =>
-        drawBuildMenuBody(fb, draw, screen, {
-          militaryBlocked: site?.militaryBlocked === true,
-          flagBlocked: site?.flagBlocked === true,
-          playerColor: buildPlayer,
-        }),
-      popupPlayerButtons,
-    );
-  });
 
   // --- soil-sample popup (screen 0x16) -----------------------------------------------------------
 
   /** Is the soil-sample popup open? A popup screen of its own in the original (`vp[0x72] == 0x16`). */
   let soilPopupOpen = $state(false);
-  let soilCanvas = $state<HTMLCanvasElement | null>(null);
 
   /**
    * The four raw sums around the selected tile — in the original the renderer recomputes them on
@@ -1108,12 +1095,7 @@
   );
 
   /** Click into the soil-sample popup: the only zone is the exit symbol. */
-  function handleSoilPopupClick(e: MouseEvent): void {
-    const el = soilCanvas;
-    if (el === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+  function handleSoilPopupClick(x: number, y: number): void {
     // Screen 0x16 has exactly one zone ("RAUS"); a hit sounds as everywhere (@0x2cd3b).
     if (soilPopupAction(x, y) === SOIL_POPUP_ACTION_EXIT) {
       playUiSound(UI_SOUND_PANEL_BUTTON);
@@ -1121,21 +1103,6 @@
     }
   }
 
-  $effect(() => {
-    const el = soilCanvas;
-    const draw = uiProvider;
-    const analysis = soilAnalysis;
-    if (el === null || draw === null || analysis === null) return;
-    const ctx = el.getContext('2d');
-    if (ctx === null) return;
-    const fb = createFramebuffer(144, 160);
-    clearFramebuffer(fb, 30, 30, 34);
-    drawSoilPopup(fb, draw, analysis, uiTextColor);
-    drawPopupFrame(fb, draw);
-    const img = ctx.createImageData(fb.width, fb.height);
-    img.data.set(fb.rgba);
-    ctx.putImageData(img, 0, 0);
-  });
 
   // --- statistics/distribution menu (popup screens 8, 0x1b, 0x24) + its sub-screens --------------
 
@@ -1156,7 +1123,6 @@
   }
 
   let menuScreen = $state<number | null>(null);
-  let menuCanvas = $state<HTMLCanvasElement | null>(null);
 
   /**
    * Is one of the four disk screens up? They stop the clock and silence the music — the original does
@@ -1450,13 +1416,9 @@
   }
 
   /** Click into a menu popup: the screen's original click table → action. */
-  function handleMenuPopupClick(e: MouseEvent): void {
-    const el = menuCanvas;
+  function handleMenuPopupClick(x: number, y: number): void {
     const screen = menuScreen;
-    if (el === null || screen === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+    if (screen === null) return;
     // **The player switch in the frame head** (spectator mode) lies BEFORE the screen dispatch — the
     // same in the original: `popup_click_router` checks the y<0 strip (@0x2c016 ff.) before entering
     // the screen's jump table (@0x2c09c).
@@ -1523,44 +1485,6 @@
         : `${action.label} — not ported yet.`);
   }
 
-  $effect(() => {
-    const el = menuCanvas;
-    const draw = uiProvider;
-    const screen = menuScreen;
-    if (el === null || draw === null || screen === null) return;
-    void frameVersion; // Statistiken zeigen Live-Zahlen
-    void compareStatsMode;
-    void resourceStatsItem;
-    paintPopup(
-      el,
-      draw,
-      (fb) =>
-        drawMenuBody(fb, draw, screen, {
-        stats: {
-          state: engineState,
-          player: buildPlayer,
-          compareMode: compareStatsMode,
-          resourceItem: resourceStatsItem,
-          paletteColor: palette === null ? undefined : paletteColor,
-        },
-        settings: settingsView,
-        options: optionsView,
-        device: deviceWorking,
-        barColor: uiBarColor,
-        textColor: uiTextColor,
-        playerColor: buildPlayer,
-        isSettings: (s) => SETTINGS_SCREENS.includes(s),
-        isStats: (s) => STATS_SCREENS.includes(s),
-        isOptions: (s) => OPTIONS_SCREENS.includes(s),
-        isDevice: (s) => s === DEVICE_SCREEN,
-        isMapFilter: (s) => MAP_FILTER_SCREENS.includes(s),
-        disk,
-          isDisk: (s) => DISK_SCREENS.includes(s),
-          diskBarColor,
-        }),
-      popupPlayerButtons,
-    );
-  });
 
   // --- disk menu (screens 0x17..0x1a) ------------------------------------------------------------
 
@@ -1716,7 +1640,7 @@
   // As soon as the name input runs, the canvas must have the focus — otherwise the user types into
   // nothing, and without a hint that it is not something else.
   $effect(() => {
-    if (disk?.nameInput != null) menuCanvas?.focus();
+    if (disk?.nameInput != null) viewportEl?.focus();
   });
 
   // --- special-click windows (popup screens 0x2a / 0x28 / 0x27 / 0x29) ---------------------------
@@ -1738,7 +1662,6 @@
    * second source for the same thing would be exactly the trap.
    */
   let objectSubjectPos = $state<{ col: number; row: number }>({ col: 0, row: 0 });
-  let objectCanvas = $state<HTMLCanvasElement | null>(null);
 
   /** Screens {@link drawObjectPopup} can draw. */
   const OBJECT_SCREENS: ReadonlySet<number> = new Set([0x2a, 0x28, 0x27, 0x29, 0x34, 0x26, 0x2b, 0x2c, 0x14, DEMOLISH_SCREEN]);
@@ -1762,39 +1685,14 @@
     outOfRange: 'attack: no own land within reach of the target.',
   };
 
-  $effect(() => {
-    const el = objectCanvas;
-    const draw = uiProvider;
-    const screen = objectScreen;
-    const subject = objectSubject;
-    void frameVersion; // the popups show live data (stocks, garrison)
-    if (el === null || draw === null || screen === null) return;
-    const res = paintPopup(
-      el,
-      draw,
-      (fb) =>
-        drawObjectPopupBody(fb, draw, screen, subject, {
-          state: engineState,
-          player: buildPlayer,
-          textColor: uiTextColor,
-          attachRoad: attachRoadPossible,
-        }),
-      popupPlayerButtons,
-    );
-    if (res === 'close') closePopups();
-  });
 
   /**
    * Click into a special-click window. Four of the six are DISPLAY ONLY (shared zone table
    * `@0x2c7e4`: just "RAUS"); the flag window additionally has geologist and road demolition.
    */
-  function handleObjectPopupClick(e: MouseEvent): void {
-    const el = objectCanvas;
+  function handleObjectPopupClick(x: number, y: number, special: boolean): void {
     const screen = objectScreen;
-    if (el === null || screen === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+    if (screen === null) return;
     // **The player switch in the frame head** (spectator mode) lies BEFORE the screen dispatch — the
     // same in the original: `popup_click_router` checks the y<0 strip (@0x2c016 ff.) before entering
     // the screen's jump table (@0x2c09c).
@@ -1868,7 +1766,6 @@
       }
       // The four lower ticks require the special click (`bt $0x3, vp[1]` @0x2e16e). Without it the
       // handler returns without doing anything.
-      const special = (e.buttons & 2) !== 0;
       if (act.special && !special) return;
       const bld = engineState.buildings[objectSubject];
       if (!bld) return;
@@ -2012,7 +1909,6 @@
    * 15×15 sprite.
    */
   let previewOpen = $state(false);
-  let previewCanvas = $state<HTMLCanvasElement | null>(null);
   let previewMode = $state(8);
   let previewFilter = $state(-1);
   let previewCenter = $state.raw<{ col: number; row: number }>({ col: 0, row: 0 });
@@ -2057,13 +1953,9 @@
    * `vp+0x46/0x48` is the CENTRE TILE of the view (see {@link viewCenterTile}) — the clicked tile
    * therefore ends up in the middle, not in the corner.
    */
-  function handlePreviewClick(e: MouseEvent): void {
-    const el = previewCanvas;
+  function handlePreviewClick(x: number, y: number, special: boolean): void {
     const data = previewData;
-    if (el === null || data === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+    if (data === null) return;
     const action = hitTestPanel(MAP_PREVIEW_HITBOXES, x, y);
     if (action === null) return;
     // @0x2cd3b — the map area is a zone of the table like any button in the original, so jumping to
@@ -2097,7 +1989,7 @@
     // **Special click on the building icon** — `@0x2fdc4` checks `vp[1]` bit 3 BEFORE anything else
     // and then opens the building selection (screen 0x2f) instead of toggling the overlay. Only this
     // one of the five bar zones has a special-click branch.
-    if (action === MAP_PREVIEW_ACTION.BUILDINGS && (e.buttons & 2) !== 0) {
+    if (action === MAP_PREVIEW_ACTION.BUILDINGS && special) {
       openScreen(0x2f);
       note('map: building filter');
       return;
@@ -2148,39 +2040,6 @@
     note('map (fast map click)');
   }
 
-  $effect(() => {
-    const el = previewCanvas;
-    const draw = uiProvider;
-    const data = previewData;
-    if (el === null || draw === null || data === null || !previewOpen) return;
-    const ctx = el.getContext('2d');
-    if (ctx === null) return;
-    const fb = createFramebuffer(144, 160);
-    clearFramebuffer(fb, 30, 30, 34);
-    // Marker and window centre are the same field (`vp+0x46/0x48`, respectively the `vp+0x74/0x76`
-    // set from it) — while the popup is open the map cannot scroll (modality).
-    drawMapPreview(
-      fb,
-      data,
-      {
-        centerCol: previewCenter.col,
-        centerRow: previewCenter.row,
-        cursorCol: previewCenter.col,
-        cursorRow: previewCenter.row,
-        mode: previewMode,
-        buildingFilter: previewFilter,
-        playerIndex: buildPlayer,
-        viewportSpan: previewSpan,
-        tileStep: previewStep,
-      },
-      draw,
-    );
-    drawMapPreviewBar(fb, draw, previewMode, previewFilter);
-    drawPopupFrame(fb, draw);
-    const img = ctx.createImageData(fb.width, fb.height);
-    img.data.set(fb.rgba);
-    ctx.putImageData(img, 0, 0);
-  });
 
   // --- original control bar (click + context icons) ----------------------------------------------
 
@@ -2199,7 +2058,6 @@
    * because the row is always replaced whole and never mutated element-wise.
    */
   let barIcons = $state.raw<readonly number[]>([...CONTROL_PANEL_DEFAULT_ICONS]);
-  let barCanvas = $state<HTMLCanvasElement | null>(null);
   /**
    * Sprite pair of the map markers (`panel[0xa4]` records 0 and 2), which `context_bar_set_icons` sets
    * together with the icons — `null` in the two early exits, then the init sprites stay (arrows +
@@ -2519,7 +2377,35 @@
    * before `mapAcceptsClicks` so it flows in there.
    */
   let missionEndStep = $state<number | null>(null);
-  /** Was the simulation running when the screen opened? (`pause_game_clock` @0x3831d) */
+  /** The popup slots of the original — one of them at most is open, see {@link openPopupSlot}. */
+  type UiSlot =
+    | 'buildMenu'
+    | 'soil'
+    | 'menu'
+    | 'message'
+    | 'missionEnd'
+    | 'object'
+    | 'preview';
+
+  /**
+   * **Which popup is open.** The original has exactly ONE popup slot — `vp[0x70]` holds the screen
+   * number — so at most one of these can be showing; our seven separate flags are the port's
+   * addition, and this is where they come back together.
+   *
+   * The order is the PAINTING order, and a later entry wins: drawing and click routing then agree
+   * about which window is on top without a second list that could drift apart.
+   */
+  const openPopupSlot = $derived.by((): UiSlot | null => {
+    let slot: UiSlot | null = null;
+    if (buildMenuScreen !== null) slot = 'buildMenu';
+    if (soilPopupOpen) slot = 'soil';
+    if (menuScreen !== null) slot = 'menu';
+    if (messageTypeByte !== null) slot = 'message';
+    if (missionEndStep !== null) slot = 'missionEnd';
+    if (objectScreen !== null) slot = 'object';
+    if (previewOpen) slot = 'preview';
+    return slot;
+  });
 
   /**
    * **Does the map accept clicks?** — `vp[1]` bit 1 in the original. The map click branch checks it
@@ -2532,15 +2418,33 @@
    * right next to `vp[0x70] = screen`), `FUN_0002860b` (close) sets it again. It therefore coincides
    * with "no popup open" — hence derived rather than kept as a second state that could drift apart.
    */
-  const mapAcceptsClicks = $derived(
-    buildMenuScreen === null &&
-      !soilPopupOpen &&
-      !previewOpen &&
-      menuScreen === null &&
-      objectScreen === null &&
-      messageTypeByte === null &&
-      missionEndStep === null,
-  );
+  const mapAcceptsClicks = $derived(openPopupSlot === null);
+
+  /**
+   * What the playing field announces itself as. With the popups drawn into the canvas there is no
+   * element left that could carry a `role="dialog"`; naming the open window here is the least a
+   * screen reader needs to notice that one opened at all.
+   */
+  const popupLabel = $derived.by((): string => {
+    switch (openPopupSlot) {
+      case 'buildMenu':
+        return st('view.buildMenu');
+      case 'soil':
+        return st('view.soil');
+      case 'message':
+        return st('view.message');
+      case 'missionEnd':
+        return st('view.missionEnd');
+      case 'object':
+        return st('view.object');
+      case 'preview':
+        return st('view.overview');
+      case 'menu':
+        return st('view.controlPanel');
+      default:
+        return st('view.map');
+    }
+  });
 
   /** Close all popups, as on closing in the original (`FUN_0002860b` @0x2860b). */
   function closePopups(): void {
@@ -2715,36 +2619,10 @@
     markEngineMutated();
   }
 
-  let messageCanvas = $state<HTMLCanvasElement | null>(null);
 
-  $effect(() => {
-    const el = messageCanvas;
-    const draw = uiProvider;
-    const typeByte = messageTypeByte;
-    if (el === null || draw === null || typeByte === null || palette === null) return;
-    const ctx = el.getContext('2d');
-    if (ctx === null) return;
-    const fb = createFramebuffer(144, 160);
-    clearFramebuffer(fb, 30, 30, 34);
-    drawMessagePopup(fb, draw, {
-      typeByte,
-      playerFaces: messageFaces,
-      palette: palette.rgba,
-      textColor: uiTextColor,
-    });
-    drawPopupFrame(fb, draw);
-    const img = ctx.createImageData(fb.width, fb.height);
-    img.data.set(fb.rgba);
-    ctx.putImageData(img, 0, 0);
-  });
 
   /** The tick in the window closes the message. */
-  function handleMessagePopupClick(e: MouseEvent): void {
-    const el = messageCanvas;
-    if (el === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+  function handleMessagePopupClick(x: number, y: number): void {
     // Screen 0x33 has exactly the tick zone; a hit sounds like any popup button (@0x2cd3b).
     if (hitTestPanel(MESSAGE_POPUP_HITBOXES, x, y) === MESSAGE_ACTION_CLOSE) {
       playUiSound(UI_SOUND_PANEL_BUTTON);
@@ -2754,7 +2632,6 @@
 
   // --- mission end (popup screen 0x36) -----------------------------------------------------------
 
-  let missionEndCanvas = $state<HTMLCanvasElement | null>(null);
 
   /** What the screen reads: game type, winner, campaign level, faces. */
   const missionEndView = $derived<MissionEndView>({
@@ -2822,30 +2699,171 @@
     menuScreen = MISSION_END_EXIT_SCREEN;
   }
 
-  $effect(() => {
-    const el = missionEndCanvas;
+  /**
+   * Is the bar showing? During the credits there is NO chrome: the original paints over the whole
+   * area and only brings frame and bar back afterwards (`call 0x718a ; call 0x6e50` at the exit).
+   * Read by the compositor AND by the click router, so the two cannot disagree about it.
+   */
+  const barVisible = $derived(uiProvider !== null && !showEndCredits);
+
+  /**
+   * THE OPEN POPUP AS A SURFACE — one slot, as in the original.
+   *
+   * `$derived` and not an effect: painting is a pure function of the state, and the compositor
+   * takes the result by identity, so a repaint needs no counter and no flag. Each branch reads only
+   * what it needs, which is also what keeps a closed popup from invalidating anything.
+   *
+   * `null` covers three different cases on purpose — no popup open, no sprites yet, and "the
+   * subject is gone" from {@link paintPopup}. Only the last one has a consequence, and it is drawn
+   * below where it can be seen.
+   */
+  const popupSurface = $derived.by((): Framebuffer | null => {
     const draw = uiProvider;
-    const index = missionEndStep;
-    if (el === null || draw === null || index === null) return;
-    const step = missionEndStepList[index];
-    // The credits step has no popup — it hangs on the full-screen overlay (see `showEndCredits`).
-    if (step === undefined || step.kind === 'endCredits') return;
-    const view = missionEndView;
-    paintPopup(
-      el,
-      draw,
-      (fb) => {
-        drawMissionEndPopup(
-          fb,
+    if (draw === null) return null;
+    switch (openPopupSlot) {
+      case 'buildMenu': {
+        const screen = buildMenuScreen;
+        if (screen === null) return null;
+        const site = buildSite;
+        return paintPopup(
           draw,
-          step,
-          view,
-          missionEndPassword(view, SETUP_PASSWORD_BYTES),
-          uiTextColor,
+          (fb) =>
+            drawBuildMenuBody(fb, draw, screen, {
+              militaryBlocked: site?.militaryBlocked === true,
+              flagBlocked: site?.flagBlocked === true,
+              playerColor: buildPlayer,
+            }),
+          popupPlayerButtons,
         );
-      },
-      popupPlayerButtons,
-    );
+      }
+      case 'soil': {
+        const analysis = soilAnalysis;
+        if (analysis === null) return null;
+        return paintPopup(draw, (fb) => drawSoilPopup(fb, draw, analysis, uiTextColor));
+      }
+      case 'menu': {
+        const screen = menuScreen;
+        if (screen === null) return null;
+        void frameVersion; // the statistics show live numbers
+        void compareStatsMode;
+        void resourceStatsItem;
+        return paintPopup(
+          draw,
+          (fb) =>
+            drawMenuBody(fb, draw, screen, {
+              stats: {
+                state: engineState,
+                player: buildPlayer,
+                compareMode: compareStatsMode,
+                resourceItem: resourceStatsItem,
+                paletteColor: palette === null ? undefined : paletteColor,
+              },
+              settings: settingsView,
+              options: optionsView,
+              device: deviceWorking,
+              barColor: uiBarColor,
+              textColor: uiTextColor,
+              playerColor: buildPlayer,
+              isSettings: (s) => SETTINGS_SCREENS.includes(s),
+              isStats: (s) => STATS_SCREENS.includes(s),
+              isOptions: (s) => OPTIONS_SCREENS.includes(s),
+              isDevice: (s) => s === DEVICE_SCREEN,
+              isMapFilter: (s) => MAP_FILTER_SCREENS.includes(s),
+              disk,
+              isDisk: (s) => DISK_SCREENS.includes(s),
+              diskBarColor,
+            }),
+          popupPlayerButtons,
+        );
+      }
+      case 'message': {
+        const typeByte = messageTypeByte;
+        if (typeByte === null || palette === null) return null;
+        const rgba = palette.rgba;
+        return paintPopup(draw, (fb) => {
+          drawMessagePopup(fb, draw, {
+            typeByte,
+            playerFaces: messageFaces,
+            palette: rgba,
+            textColor: uiTextColor,
+          });
+        });
+      }
+      case 'missionEnd': {
+        const index = missionEndStep;
+        if (index === null) return null;
+        const step = missionEndStepList[index];
+        // The credits step has no popup — it hangs on the full-screen overlay (`showEndCredits`).
+        if (step === undefined || step.kind === 'endCredits') return null;
+        const view = missionEndView;
+        return paintPopup(
+          draw,
+          (fb) => {
+            drawMissionEndPopup(
+              fb,
+              draw,
+              step,
+              view,
+              missionEndPassword(view, SETUP_PASSWORD_BYTES),
+              uiTextColor,
+            );
+          },
+          popupPlayerButtons,
+        );
+      }
+      case 'object': {
+        const screen = objectScreen;
+        if (screen === null) return null;
+        void frameVersion; // the popups show live data (stocks, garrison)
+        return paintPopup(
+          draw,
+          (fb) =>
+            drawObjectPopupBody(fb, draw, screen, objectSubject, {
+              state: engineState,
+              player: buildPlayer,
+              textColor: uiTextColor,
+              attachRoad: attachRoadPossible,
+            }),
+          popupPlayerButtons,
+        );
+      }
+      case 'preview': {
+        const data = previewData;
+        if (data === null) return null;
+        return paintPopup(draw, (fb) => {
+          // Marker and window centre are the same field (`vp+0x46/0x48`, respectively the
+          // `vp+0x74/0x76` set from it) — while the popup is open the map cannot scroll (modality).
+          drawMapPreview(
+            fb,
+            data,
+            {
+              centerCol: previewCenter.col,
+              centerRow: previewCenter.row,
+              cursorCol: previewCenter.col,
+              cursorRow: previewCenter.row,
+              mode: previewMode,
+              buildingFilter: previewFilter,
+              playerIndex: buildPlayer,
+              viewportSpan: previewSpan,
+              tileStep: previewStep,
+            },
+            draw,
+          );
+          drawMapPreviewBar(fb, draw, previewMode, previewFilter);
+        });
+      }
+      default:
+        return null;
+    }
+  });
+
+  /**
+   * The one case in which painting has a consequence: the special-click window reports that its
+   * subject is gone (a razed building, a removed flag), and the original closes the window there.
+   * It is an effect and not part of the painting because it writes state.
+   */
+  $effect(() => {
+    if (openPopupSlot === 'object' && uiProvider !== null && popupSurface === null) closePopups();
   });
 
   /**
@@ -2853,20 +2871,14 @@
    * is a bare `ret`) but consumes the clicks in its own wait loops (`FUN_00039335`). After the last
    * step comes the exit.
    */
-  function handleMissionEndClick(e: MouseEvent): void {
+  function handleMissionEndClick(x: number, y: number): void {
     if (missionEndStep === null) return;
-    // During the credits this element does not exist; the condition is the bolt against a click from
+    // During the credits nothing of this is drawn; the condition is the bolt against a click from
     // elsewhere skipping them — the original reads no key in the whole sequence.
     if (showEndCredits) return;
     // The frame-head strip applies here as well: in the original the y<0 branch of the click router
     // lies BEFORE the screen dispatch, which is the only reason this screen's cell is a bare `ret`.
-    const el = e.currentTarget as HTMLCanvasElement | null;
-    if (el !== null) {
-      const rect = el.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-      const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
-      if (popupPlayerSwitchClick(x, y)) return;
-    }
+    if (popupPlayerSwitchClick(x, y)) return;
     const next = missionEndStep + 1;
     if (next >= missionEndStepList.length) leaveMissionEnd();
     else missionEndStep = next;
@@ -2885,16 +2897,63 @@
    * reached the bar handler while the right button was held over the map — and that posture is
    * precisely the special click, so the three branches demanding it were the ones affected.
    *
-   * The test uses the RECTANGLE OF THE BAR CANVAS ITSELF rather than recomputed screen coordinates:
-   * the same source from which {@link handleBarClick} takes its panel pixels cannot drift apart.
+   * The hit test takes its rectangle from {@link originBoxRect} — the SAME computation that puts the
+   * bar on the screen. Drawing and hit test therefore cannot drift apart, which is what the old
+   * version got out of measuring the bar's own DOM element.
    */
-  function clickHitsBar(e: MouseEvent): boolean {
-    const el = barCanvas;
-    if (el === null) return false;
-    const r = el.getBoundingClientRect();
-    return (
-      e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom
+  function slotPixel(
+    e: MouseEvent,
+    b: { x: number; y: number; width: number; height: number },
+    srcW: number,
+    srcH: number,
+  ): { x: number; y: number } | null {
+    const el = host;
+    if (el === undefined) return null;
+    return boxPixel(
+      e.clientX,
+      e.clientY,
+      el.getBoundingClientRect(),
+      el.width,
+      el.height,
+      originBoxRect(b, uiScale, viewportW, viewportH),
+      srcW,
+      srcH,
     );
+  }
+
+  /** The bar's pixel under the pointer, or `null` when the click is not on the bar. */
+  function barPixel(e: MouseEvent): { x: number; y: number } | null {
+    return barVisible ? slotPixel(e, CONTROL_PANEL_BOUNDS, BAR_WIDTH, BAR_HEIGHT) : null;
+  }
+
+  /**
+   * A click inside the open popup, routed to the screen that owns it. One entry point, as in the
+   * original: `popup_click_router` @0x2bff7 subtracts the popup anchor and dispatches by screen.
+   */
+  function dispatchPopupClick(slot: UiSlot, x: number, y: number, special: boolean): void {
+    switch (slot) {
+      case 'buildMenu':
+        handleBuildMenuClick(x, y, special);
+        return;
+      case 'soil':
+        handleSoilPopupClick(x, y);
+        return;
+      case 'menu':
+        handleMenuPopupClick(x, y);
+        return;
+      case 'message':
+        handleMessagePopupClick(x, y);
+        return;
+      case 'missionEnd':
+        handleMissionEndClick(x, y);
+        return;
+      case 'object':
+        handleObjectPopupClick(x, y, special);
+        return;
+      case 'preview':
+        handlePreviewClick(x, y, special);
+        return;
+    }
   }
 
   /**
@@ -2905,12 +2964,7 @@
    * `special` = `vp[1]` bit 3 (right mouse button held) comes from the CALLER, because only it knows
    * all sources; after a pointer capture `e.buttons` alone is no longer reliable.
    */
-  function handleBarClick(e: MouseEvent, special: boolean): void {
-    const el = barCanvas;
-    if (el === null) return;
-    const rect = el.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * (el.width / rect.width));
-    const y = Math.floor((e.clientY - rect.top) * (el.height / rect.height));
+  function handleBarClick(x: number, y: number, special: boolean): void {
     const slot = hitTestControlPanelButton(x, y, BAR_OFFSET_X, BAR_OFFSET_Y);
     const clickedIcon = slot === null ? null : barIcons[slot];
     // Without a matching click kind `clickControlPanel` returns `null` — as in the original, where
@@ -3152,17 +3206,18 @@
     return `${label} ✓`;
   }
 
-  $effect(() => {
-    const el = barCanvas;
+  /**
+   * The bar as a SURFACE, not as a canvas of its own: `$derived` rather than an effect, because it
+   * is a pure function of the icon row and the two message indicators. The compositor recognises a
+   * change by the identity of the framebuffer, so nothing has to be counted or flagged.
+   */
+  const barSurface = $derived.by((): Framebuffer | null => {
     const draw = uiProvider;
-    const icons = barIcons;
-    if (el === null || draw === null) return;
-    const ctx = el.getContext('2d');
-    if (ctx === null) return;
+    if (draw === null || !barVisible) return null;
     const fb = createFramebuffer(BAR_WIDTH, BAR_HEIGHT);
     clearFramebuffer(fb, 20, 16, 12);
     drawControlPanelFrame(fb, draw, BAR_OFFSET_X, BAR_OFFSET_Y);
-    drawControlPanel(fb, draw, icons, BAR_OFFSET_X, BAR_OFFSET_Y);
+    drawControlPanel(fb, draw, barIcons, BAR_OFFSET_X, BAR_OFFSET_Y);
     // Message overlay last: the two sprites lie over the wooden field of the message column.
     drawMessageIndicators(
       fb,
@@ -3171,9 +3226,7 @@
       BAR_OFFSET_X,
       BAR_OFFSET_Y,
     );
-    const img = ctx.createImageData(fb.width, fb.height);
-    img.data.set(fb.rgba);
-    ctx.putImageData(img, 0, 0);
+    return fb;
   });
 
   const cols = $derived(save.header.mapCols);
@@ -3254,7 +3307,7 @@
    *   and its outer buttons would no longer be clickable. If the window itself is narrower than the
    *   bar (< 352 px), the lower bound wins.
    */
-  const uiScale = $derived(Math.max(1, Math.min(zoom, viewportW / BAR_WIDTH)));
+  const uiScale = $derived(uiScaleFor(zoom, viewportW));
 
   /**
    * Scale of the pointer — the same factor as the bar ({@link uiScale}, so never below 1×), but
@@ -3268,35 +3321,50 @@
   const cursorScale = $derived(Math.max(1, Math.min(CURSOR_MAX_SCALE, Math.round(uiScale))));
 
   /**
-   * Original mouse cursor over the playing field (archive slot `Cursor`, see `mouse-cursor.ts`).
-   * Falls back to the browser cursor while no archive is loaded (BYOA) — the sprite does not exist
-   * then.
+   * The pointer sprite as a drawable image. Built once per SCALE STEP, not per frame: the screen
+   * recording asks for it with every image it takes, and building it means two canvases and two
+   * draws. `null` while no archive is loaded (BYOA) — the sprite does not exist then.
    */
-  const cursorStyle = $derived.by<string | null>(() => {
+  const cursorImage = $derived.by<HTMLCanvasElement | null>(() => {
     const draw = uiProvider;
     const s = cursorScale;
     if (draw === null) return null;
     const spr = draw(CURSOR_SPRITE_INDEX);
-    return spr === null ? null : buildCursorStyle(spr, s);
+    return spr === null ? null : buildCursorCanvas(spr, s);
   });
 
   /**
-   * Places a box of the ORIGINAL screen (640×480) in the map window. The original screen is centred
-   * horizontally and anchored flush with the bottom, all boxes share the scale {@link uiScale} — that
-   * way the arrangement of the parts RELATIVE TO EACH OTHER matches the original: the bar at bottom
-   * centre, the popup 8 px left of centre and 19 px above the bar's top edge.
-   *
-   * `left` refers to the CENTRE of the box (with `translateX(-50%)` in the `.screen-box` class), so
-   * the centring stays exact independently of the window width.
+   * **What a screen recording records**: the one canvas — and the pointer, which it has to supply
+   * itself because a CSS cursor is not part of the canvas. It is drawn into the RECORDING's canvas
+   * only; on screen the system keeps moving the real one, which cannot lag behind.
    */
-  function originBoxStyle(b: { x: number; y: number; width: number; height: number }): string {
-    const dx = (b.x + b.width / 2 - UI_SCREEN.width / 2) * uiScale;
-    const bottom = (UI_SCREEN.height - (b.y + b.height)) * uiScale;
-    return (
-      `left: calc(50% + ${Math.round(dx)}px); bottom: ${Math.round(bottom)}px;` +
-      ` width: ${Math.round(b.width * uiScale)}px; height: ${Math.round(b.height * uiScale)}px;`
-    );
-  }
+  $effect(() =>
+    recordings.provide({
+      get canvas() {
+        // `host` is set before the first frame; the recorder only asks while recording.
+        return host as HTMLCanvasElement;
+      },
+      cursor: () => {
+        const img = cursorImage;
+        if (!pointerInside || img === null) return null;
+        const s = cursorScaleOf(cursorScale);
+        return {
+          x: Math.round(pointerCanvasX) - CURSOR_HOTSPOT.x * s,
+          y: Math.round(pointerCanvasY) - CURSOR_HOTSPOT.y * s,
+          image: img,
+        };
+      },
+    }),
+  );
+
+  /**
+   * Original mouse cursor over the playing field (archive slot `Cursor`, see `mouse-cursor.ts`).
+   * Falls back to the browser cursor while no archive is loaded (BYOA).
+   */
+  const cursorStyle = $derived.by<string | null>(() => {
+    const img = cursorImage;
+    return img === null ? null : cursorStyleFrom(img, cursorScale);
+  });
 
   /**
    * Smallest sensible zoom: the point at which the WHOLE world is in frame.
@@ -3456,6 +3524,32 @@
           }
         : undefined,
     });
+    // **The parts of the original screen on top of the map**, in painting order — popup below, bar
+    // above it, as in the original, whose exit brings frame and bar back after the window. This has
+    // to happen in the SAME pass: `renderMapFrame` re-creates the canvas surface on every frame, so
+    // a composition of its own would either be wiped or be left standing on its own.
+    const overlay: OverlayLayer[] = [];
+    const pop = popupSurface;
+    if (pop !== null) {
+      overlay.push({ fb: pop, rect: originBoxRect(POPUP_BOUNDS, uiScale, viewportW, viewportH) });
+    }
+    const bar = barSurface;
+    if (bar !== null) {
+      overlay.push({
+        fb: bar,
+        rect: originBoxRect(CONTROL_PANEL_BOUNDS, uiScale, viewportW, viewportH),
+      });
+    }
+    if (overlay.length > 0) {
+      metrics.begin('ui');
+      const ctx = canvas.getContext('2d');
+      if (ctx !== null) composeUiOverlay(ctx, overlay);
+      metrics.end('ui');
+    }
+    // The image is finished — hand it to a running screen recording. Deliberately HERE and not on a
+    // clock of its own: the video then has exactly the frames the player saw, and none while the
+    // simulation is paused. Costs nothing without a recording.
+    recordings.capture();
     // Service after drawing, in the original's order: **first** the duration countdown
     // (`FUN_00061c93`), **then** the drainer (`FUN_00061fe3` → `sound_start`). This runs when muted
     // as well — `play` is a no-op then, but the queue must still be drained, otherwise the
@@ -3566,13 +3660,20 @@
    *
    * Once the right press has called `setPointerCapture()`, the left button's `pointerdown` no longer
    * reaches our handler — `downSpecial` and the press point `downX/downY` would go stale, and the
-   * drag threshold discarded the click entirely. The bar was never affected because its overlay
-   * intercepts `pointerdown` and reads the special click from the `click` event; the map now uses
-   * that same source.
+   * drag threshold discarded the click entirely. Reading the button here and the special click from
+   * the `click` event is the source that survives a capture; with one canvas for the whole game
+   * screen, bar and map are on it anyway.
    */
   let rightDown = false;
   /** Did the left button deliver its `pointerdown` to us? ⇒ is `downX/downY` usable? */
   let sawLeftDown = false;
+  /**
+   * Did the press start on the control bar? With the bar drawn INTO the map canvas there is no
+   * element left that swallows `pointerdown` for it, so dragging away from a bar button would grab
+   * the map. The original cannot have this problem — it has no drag — and it scrolls only from the
+   * map area (`FUN_0000d630`).
+   */
+  let downOnBar = false;
   /** Is a **left drag** running (touchpad pan, addition)? See `onPointerMove`. */
   let leftDragging = false;
   /** The viewport itself — for the imperatively attached `click` listener (reasoning there). */
@@ -3611,6 +3712,9 @@
     // grab pan (addition); `preventDefault` suppresses the browser autoscroll.
     if (e.button === 2 || e.button === 1) {
       if (e.button === 2) rightDown = true;
+      // A press on the bar is not a map drag (see `downOnBar`). The right button still counts as
+      // held: that posture IS the special click, and it belongs to the bar button underneath.
+      if (barPixel(e) !== null) return;
       if (!mapAcceptsClicks) return;
       if (e.button === 1) e.preventDefault();
       dragMode = e.button === 2 ? 'push' : 'grab';
@@ -3628,6 +3732,7 @@
     if (e.button !== 0) return;
     // Left button: click candidate. `e.buttons` bit 1 = right button held at the same time.
     sawLeftDown = true;
+    downOnBar = barPixel(e) !== null;
     downSpecial = isSpecialModifier(e);
     downX = e.clientX;
     downY = e.clientY;
@@ -3650,13 +3755,19 @@
     return (e.buttons & 2) !== 0 || e.shiftKey || e.altKey;
   }
   function onPointerMove(e: PointerEvent) {
+    // Pointer position for the screen recording. `offsetX/offsetY` and not a measured rectangle:
+    // the canvas fills the viewport 1:1, so this is already the canvas pixel — and it costs no
+    // layout, which matters at pointer-move rate.
+    pointerCanvasX = e.offsetX;
+    pointerCanvasY = e.offsetY;
+    pointerInside = true;
       // **Left drag pans the map** (addition for touchpads, not in the original).
       //
       // Why this is collision-free — proven, not assumed: a left drag past the 5 px threshold is
       // already DISCARDED today (`if (!mapAcceptsClicks || dragged) return;` in the click
       // dispatcher). Direction is `'grab'` like the middle button — on a touchpad one drags the
       // content along, not away.
-    if (dragMode === null && sawLeftDown && (e.buttons & 1) !== 0 && mapAcceptsClicks) {
+    if (dragMode === null && sawLeftDown && !downOnBar && (e.buttons & 1) !== 0 && mapAcceptsClicks) {
       if (Math.hypot(e.clientX - downX, e.clientY - downY) >= DRAG_THRESHOLD) {
         dragMode = 'grab';
         leftDragging = true;
@@ -3694,6 +3805,15 @@
     // layout) plus `windowToTile` on EVERY mouse move. Whoever builds a hover display gets it back
     // here.
   }
+  /**
+   * Where the pointer is, in canvas pixels — kept only for the screen recording, which has to draw
+   * the pointer itself (a CSS cursor is not part of the canvas). `pointerInside` is false while it
+   * is outside the window, and then no pointer is drawn.
+   */
+  let pointerCanvasX = 0;
+  let pointerCanvasY = 0;
+  let pointerInside = false;
+
   function onPointerUp(e: PointerEvent) {
     if (e.button === 2 || e.button === 1) {
       dragMode = null;
@@ -3748,24 +3868,37 @@
   });
 
   function onClick(e: MouseEvent): void {
-    // Autoplay gesture here as well: the bar overlays stop `pointerdown`, but their `click` runs
-    // through this one dispatcher (see {@link clickHitsBar}).
+    // Autoplay gesture here as well — every click of the game screen arrives here, bar and popup
+    // included: there is one canvas and therefore one dispatcher, as in the original.
     resumeAudio();
     const special = downSpecial || rightDown || isSpecialModifier(e);
     const dragged = sawLeftDown && Math.hypot(e.clientX - downX, e.clientY - downY) >= DRAG_THRESHOLD;
     sawLeftDown = false;
     downSpecial = false;
-    // **Bar first, then map** — the y split of the original dispatcher (see {@link clickHitsBar}).
-    // It stands BEFORE `mapAcceptsClicks`, because the bar stays usable with a popup open (own
-    // branch), and before the map branch, because a click cannot be both. Nothing is dragged here:
-    // a left drag ending over the bar is not a bar click.
-    if (!dragged && clickHitsBar(e)) {
-      handleBarClick(e, special);
+    downOnBar = false;
+    // **Bar first, then popup, then map** — the y split of the original dispatcher
+    // (`FUN_000272d7`: `y >= vp[0x30]` = 440 is the bar). The bar stands BEFORE `mapAcceptsClicks`,
+    // because it stays usable with a popup open (own branch). Nothing is dragged here: a left drag
+    // ending over the bar is not a bar click.
+    if (!dragged) {
+      const onBar = barPixel(e);
+      if (onBar !== null) {
+        handleBarClick(onBar.x, onBar.y, special);
+        return;
+      }
+    }
+    // With a popup open the map takes no clicks (`vp[1]` bit 1 clear). The click goes into the popup
+    // router — and expires there even when it lands outside the popup rectangle, which is exactly
+    // what @0x2bff7 does after subtracting the anchor.
+    const slot = openPopupSlot;
+    if (slot !== null) {
+      if (!dragged) {
+        const p = slotPixel(e, POPUP_BOUNDS, POPUP_W, POPUP_H);
+        if (p !== null) dispatchPopupClick(slot, p.x, p.y, special);
+      }
       return;
     }
-    // With a popup open the map takes no clicks (`vp[1]` bit 1 clear ⇒ the click goes into the popup
-    // router and expires there).
-    if (!mapAcceptsClicks || dragged) return;
+    if (dragged) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const t = windowToTile(
       (e.clientX - rect.left) / zoom,
@@ -3964,6 +4097,8 @@
       : `special click → screen 0x${screen.toString(16)} (${SPECIAL_SCREEN_NAMES[screen] ?? '?'}) is not ported yet.`);
   }
   function onPointerLeave() {
+    // No pointer in the picture once it has left the window (see `pointerInside`).
+    pointerInside = false;
   }
   /** Mouse wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away. */
   function onWheel(e: WheelEvent) {
@@ -3993,101 +4128,26 @@
     onpointerup={onPointerUp}
     onpointerleave={onPointerLeave}
     onwheel={onWheel}
+    onkeydown={handleDiskKey}
     oncontextmenu={(e) => e.preventDefault()}
     style:cursor={cursorStyle}
     role="application"
-    aria-label={st('view.map')}
+    tabindex="-1"
+    aria-label={popupLabel}
   >
+    <!-- **The whole game screen is this one canvas.** Bar and popup are not elements of their own
+         but are blitted into it, as in the original, which has a single framebuffer: `renderMapFrame`
+         draws the map, `composeUiOverlay` puts the parts on top. That is what makes a screenshot and
+         a screen recording show the game rather than just the map, and it puts the stacking order
+         into the code instead of into the document order. -->
     <canvas bind:this={host}></canvas>
-    {#if buildMenuScreen !== null}
-      <!-- Original build popup: layout, click zones and actions byte-exact from the game; a click on
-           a building places it at the selected tile. It stands **at its original position**
-           (POPUP_BOUNDS) — no window frame, no title or closer of its own: paging happens through the
-           page icon IN the popup, closing through the pressed bar button.
-
-           The gate deliberately does NOT hang on `selected`: `mapAcceptsClicks` is already false from
-           the open screen, so an invisible popup would lock the map for good. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={st('view.buildMenu')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={buildMenuCanvas} width={144} height={160} onclick={handleBuildMenuClick}></canvas>
-      </div>
-    {/if}
-    {#if soilPopupOpen}
-      <!-- Soil-sample popup (screen 0x16): the geologist estimates the minerals within 24 rings
-           around the selected tile. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={st('view.soil')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={soilCanvas} width={144} height={160} onclick={handleSoilPopupClick}></canvas>
-      </div>
-    {/if}
-    {#if menuScreen !== null}
-      <!-- One popup slot for the menus (screen 8 / 0x1b / 0x24) AND the eight distribution
-           sub-screens — as in the original, where one handler only rewrites `vp[0x70]`. "RAUS"
-           closes in the menu and leads back to menu 0x1b from a sub-screen. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={menuScreen === 8
-          ? 'statistics menu'
-          : DISK_SCREENS.includes(menuScreen)
-            ? 'save game'
-            : MAP_FILTER_SCREENS.includes(menuScreen)
-              ? 'map building filter'
-              : SETTINGS_SCREENS.includes(menuScreen)
-                ? `distribution sub-screen 0x${menuScreen.toString(16)}`
-                : 'distribution / options menu'}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas
-          bind:this={menuCanvas}
-          width={144}
-          height={160}
-          tabindex="0"
-          onclick={handleMenuPopupClick}
-          onkeydown={handleDiskKey}
-        ></canvas>
-      </div>
-    {/if}
-    {#if messageTypeByte !== null}
-      <!-- Message window (screen 0x33): shows the taken message; the tick closes it. The jump to the
-           event location has already happened on opening. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={st('view.message')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={messageCanvas} width={144} height={160} onclick={handleMessagePopupClick}
-        ></canvas>
-      </div>
-    {/if}
     {#if showEndCredits && archive !== null}
       <!-- The end credits (`run_end_credits` @0x38b55): a full-screen sequence on a 352 × 240 surface
            of its own, not abortable, about 75 seconds. It covers the whole game screen because the
            original paints over it with `fill_rect(0, 0, 0x160, 0xf0, 0)`.
-           **No `originBoxStyle`**: the credits are not a popup IN the game screen but a screen of
-           their own. As a 640 × 480 box of the UI set they were a small box at `uiScale == 1` — that
-           is, at any zoom ≤ 1. They get the whole stage; `EndCreditsView` fits itself to the window. -->
+           The one part that stays a DOM overlay: it is not a popup IN the game screen but a screen of
+           its own, with a clock of its own, and it takes the whole stage — `EndCreditsView` fits
+           itself to the window. -->
       <div
         class="stage-box"
         role="dialog"
@@ -4098,92 +4158,12 @@
       >
         <EndCreditsView {archive} onfinished={leaveMissionEnd} music={musicPlayer} volume={uiVolume} />
       </div>
-    {:else if missionEndStep !== null}
-      <!-- Mission end (screen 0x36): mood picture → text page (with winner face and, after a won
-           campaign mission, the password of the next) → possibly a second picture. Every click steps
-           on; after the last comes the "ENDE" dialog (screen 0x22), just as in the original. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={st('view.missionEnd')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={missionEndCanvas} width={144} height={160} onclick={handleMissionEndClick}
-        ></canvas>
-      </div>
-    {/if}
-    {#if objectScreen !== null}
-      <!-- Special-click windows: flag (0x2a), construction site (0x28), mine (0x27, success rate)
-           and military building (0x29, garrison + gold). All show live data of the clicked object;
-           three are display only, the flag window has two actions. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={st('view.object')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={objectCanvas} width={144} height={160} onclick={handleObjectPopupClick}></canvas>
-      </div>
-    {/if}
-    {#if previewOpen}
-      <!-- Original overview map (popup screens 1/2, FUN_000422eb): landscape/ownership plus road,
-           building and border overlays, control bar below. A click into the map moves the main view
-           there (window origin) and closes the popup — as in the original. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(POPUP_BOUNDS)}
-        role="dialog"
-        tabindex="-1"
-        aria-label={st('view.overview')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={previewCanvas} width={144} height={160} onclick={handlePreviewClick}></canvas>
-      </div>
-    {/if}
-    <!-- `!showEndCredits`: during the credits there is NO chrome. The original paints over the whole
-         area and only brings frame and bar back afterwards (`call 0x718a ; call 0x6e50` at the exit);
-         the bar stands later in the markup than the credits and therefore lay visibly over them. -->
-    {#if uiProvider !== null && !showEndCredits}
-      <!-- Original control bar, **on** the map as in the original (there the map fills the whole
-           screen and the 352×40 bar sits over it, bottom centre). The two left icons come from the
-           build-site classification of the selected tile (FUN_000331a7), the three right ones are
-           the menu tabs; click = original dispatch by icon value.
-           **No `onclick` of its own**: the click runs through the ONE dispatcher in the viewport
-           (`onClick` → `clickHitsBar`), as `FUN_000272d7` does. A second handler here would fire
-           twice on every normal click — and not at all on the special click, because the right
-           button's pointer capture redirects mouse events to the viewport. -->
-      <div
-        class="screen-box"
-        style={originBoxStyle(CONTROL_PANEL_BOUNDS)}
-        role="toolbar"
-        tabindex="-1"
-        aria-label={st('view.controlPanel')}
-        onpointerdown={(e) => e.stopPropagation()}
-        onpointerup={(e) => e.stopPropagation()}
-      >
-        <canvas bind:this={barCanvas} width={BAR_WIDTH} height={BAR_HEIGHT}></canvas>
-      </div>
     {/if}
   </div>
 
 </section>
 
 <style>
-  /* A box of the original screen (bar, popup) — lies **on** the map, as in the original, where the
-     map fills the whole screen. Position/size come from `originBoxStyle()`; `left` refers to the box
-     centre, hence the shift by half the width here. */
-  .screen-box {
-    position: absolute;
-    transform: translateX(-50%);
-    line-height: 0;
-  }
   /* A screen of its own rather than a popup: it takes the whole stage. Black because the original
      paints the area with colour 0 — and so the map does not show through between mounting and the
      first drawn frame. */
@@ -4192,16 +4172,6 @@
     inset: 0;
     line-height: 0;
     background: #000;
-  }
-  /*
-   * **No cursor of its own** on bar/popups: the original cursor (archive slot `Cursor`, set on the
-   * viewport) is inherited and thus applies to the whole game screen — the original has exactly one
-   * cursor, over the control bar as well. A `cursor: pointer` here would displace the sprite cursor.
-   */
-  .screen-box canvas {
-    width: 100%;
-    height: 100%;
-    image-rendering: pixelated;
   }
   /* The map IS the page: it fills the shell stage completely. */
   .map {
@@ -4218,6 +4188,15 @@
   }
   .viewport:active {
     cursor: grabbing;
+  }
+  /*
+   * The viewport takes the keyboard focus while the save-game name is being typed — it is the only
+   * element left that can. No focus ring: it is the whole playing field, and the original draws its
+   * own text cursor into the window.
+   */
+  .viewport:focus,
+  .viewport:focus-visible {
+    outline: none;
   }
   canvas {
     display: block;

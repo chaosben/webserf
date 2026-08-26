@@ -66,9 +66,11 @@ const EN = {
 	'group.settings': 'Settings',
 	'group.io': 'Import & export',
 	'group.bug': 'Report a bug',
+	'group.record': 'Record',
 	'group.info': 'About webserf',
 	'overlay.close': 'Close',
 	'page.loading': 'Loading…',
+	'rail.recording': 'recording',
 
 	// -- Dropzone ------------------------------------------------------------------------------
 	'drop.aria': 'Drop the archive file here',
@@ -201,6 +203,26 @@ const EN = {
 	// -- Screen-reader labels for the game surfaces --------------------------------------------
 	// These are OURS, not the original's: the original has none. That is why they live here and not
 	// with the original strings — and why they have to follow the shell language.
+	'record.stillTitle': 'Screenshot',
+	'record.stillNote':
+		'Taken when this panel opened — map, control bar and any open popup, as they were drawn.',
+	'record.stillNone': 'No picture — the game screen gave none.',
+	'record.download': 'Download the picture ({size})',
+	'record.videoTitle': 'Video',
+	'record.intro':
+		'Records the game screen as a video — map, control bar, popups and the mouse pointer, exactly ' +
+		'as they are drawn. The recording follows the game: while the simulation is paused, no frames ' +
+		'are produced.',
+	'record.toFile': 'You pick a file first; the video is written into it while recording.',
+	'record.toMemory':
+		'This browser cannot write while recording, so the video is held in memory and offered as a ' +
+		'download at the end. Keep it short.',
+	'record.unsupported': 'This browser cannot record a canvas.',
+	'record.start': 'Start recording',
+	'record.stop': 'Stop recording',
+	'record.progress': 'Recording — {frames} images, about {seconds} s',
+	'record.needGame': 'Start a game first — there is nothing to record yet.',
+	'record.done': '{name} — {frames} images, {size}.',
 	'view.map':
 		'Map view (left: place cursor, left drag: pull the view, right held: push the view like the original, middle held: grab and pull, right+left or Shift/Alt+left: special click, wheel or pinch: zoom)',
 	'view.buildMenu': 'Build menu',
@@ -221,9 +243,11 @@ const DE: Record<ShellKey, string> = {
 	'group.settings': 'Einstellungen',
 	'group.io': 'Import & Export',
 	'group.bug': 'Fehler melden',
+	'group.record': 'Aufnehmen',
 	'group.info': 'Über webserf',
 	'overlay.close': 'Schließen',
 	'page.loading': 'Lädt…',
+	'rail.recording': 'Aufnahme läuft',
 
 	'drop.aria': 'Archiv-Datei hier ablegen',
 	'drop.lead': 'Legen Sie Ihr Spiel-Archiv hier ab — oder wählen Sie eine Datei.',
@@ -339,6 +363,26 @@ const DE: Record<ShellKey, string> = {
 	'info.log.note':
 		'Log-Ausgaben landen in der Browser-Konsole — Devtools öffnen und nach Kategorie filtern (assets, engine, menu, game). Die Zeichen-Messung läuft im Hintergrund mit und fährt in einem Fehlerbericht mit.',
 
+	'record.stillTitle': 'Bildschirmfoto',
+	'record.stillNote':
+		'Aufgenommen, als dieses Fenster aufging — Karte, Bedienleiste und ein offenes Fenster, so wie sie gezeichnet waren.',
+	'record.stillNone': 'Kein Bild — der Spielbildschirm gab keines her.',
+	'record.download': 'Bild herunterladen ({size})',
+	'record.videoTitle': 'Video',
+	'record.intro':
+		'Nimmt den Spielbildschirm als Video auf — Karte, Bedienleiste, Fenster und Mauszeiger, genau ' +
+		'so, wie sie gezeichnet werden. Die Aufnahme folgt dem Spiel: solange die Simulation ' +
+		'angehalten ist, entstehen keine Bilder.',
+	'record.toFile': 'Du wählst zuerst eine Datei; das Video wird während der Aufnahme hineingeschrieben.',
+	'record.toMemory':
+		'Dieser Browser kann während der Aufnahme nicht schreiben, das Video liegt darum im Speicher ' +
+		'und kommt am Ende als Download. Halte es kurz.',
+	'record.unsupported': 'Dieser Browser kann keinen Canvas aufnehmen.',
+	'record.start': 'Aufnahme starten',
+	'record.stop': 'Aufnahme beenden',
+	'record.progress': 'Aufnahme läuft — {frames} Bilder, etwa {seconds} s',
+	'record.needGame': 'Starte zuerst ein Spiel — es gibt noch nichts aufzunehmen.',
+	'record.done': '{name} — {frames} Bilder, {size}.',
 	'view.map':
 		'Kartenansicht (links: Zeiger setzen, links ziehen: Ansicht nachziehen, rechts halten: Ansicht schieben wie im Original, mittlere Taste halten: greifen und ziehen, rechts+links oder Umschalt/Alt+links: Spezialklick, Rad oder Zwei-Finger: Lupe)',
 	'view.buildMenu': 'Bau-Menü',
