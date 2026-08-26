@@ -269,10 +269,9 @@ function ejectHolderSerfs(state: GameState, bld: Building, oldFirstKnight: numbe
  * are easy to miss: {@link cancelTransportOnDelete} (@0x496eb) and, at the very end, the removal of a
  * flag that is left path-less (@0x49742).
  *
- * **Known ordering deviation:** the original calls the territory recolour (`FUN_00045a30`) **before**
- * the transport cancellation (@0x49035/@0x49066 against @0x496eb), this port afterwards. Both passes
- * read disjoint fields (owner bits against transport bookkeeping), and the flag removal is last in
- * either case.
+ * The territory recolour (`FUN_00045a30`) sits where the original has it — right after the gold
+ * subtraction and **before** the warehouse block, the ejection and the transport cancellation. It is
+ * gated exactly as in the binary; see the comment at the call site.
  */
 export function demolishBuilding(state: GameState, bld: Building): void {
   if (bld.burning) return; // already burning
@@ -296,6 +295,26 @@ export function demolishBuilding(state: GameState, bld: Building): void {
     state.header.mapGoldTotal = (state.header.mapGoldTotal - goldNibble) >>> 0; // @0x49057
   } else if (bld.type === 23) {
     state.header.mapGoldTotal = (state.header.mapGoldTotal - goldNibble) >>> 0; // @0x49361
+  }
+
+  // ── Recolour the territory (@0x49035 castle, @0x49066 hut/tower/fortress) ──
+  // The building is `burning` now, so it no longer projects influence and its land retreats. Two
+  // details that are easy to get wrong:
+  //
+  //  * The military branch is **gated on the garrison chain** (`mov 0xa(%ebx),%ax ; or %ax,%ax ;
+  //    je` @0x4905d): a building that never took a knight also never stamped influence, so there is
+  //    nothing to retreat. The castle branch has no such gate.
+  //  * The gate reads `bld+0xa` **while it still holds the knight chain**. Further down the same
+  //    union becomes the burn countdown, which is never 0 — reading it there would make the gate
+  //    always true and silently useless.
+  //
+  // The call belongs **here**, before the warehouse block and the ejection: the recolour can burn
+  // buildings on lost tiles, and those see this building with its stock and flag still attached.
+  const knightChain = bld.firstKnight ?? 0;
+  if (bld.col !== null && bld.row !== null) {
+    if (bld.type === 24 || (MILITARY_TYPES.has(bld.type) && knightChain !== 0)) {
+      recomputeTerritory(state, bld.col, bld.row);
+    }
   }
 
   // ── Warehouse/castle: cancel the out queue, subtract the gold, free the inventory slot ──
@@ -362,12 +381,6 @@ export function demolishBuilding(state: GameState, bld: Building): void {
   bld.stock[1] = { available: 0, requested: 0 }; // bld+9 = 0
   bld.firstKnight = burnTicks; // bld+10 (union => countdown), 0x1fff for the castle
   bld.level = state.gameTick & 0xffff; // bld+0xe = gameTick (union => burn tick)
-
-  // Recolour the territory: the building is `burning` now, so it is excluded from influence and its
-  // land retreats. Only military buildings project influence, so the call is skipped for other types.
-  if (MILITARY_TYPES.has(bld.type) && bld.col !== null && bld.row !== null) {
-    recomputeTerritory(state, bld.col, bld.row);
-  }
 
   // **The end of the tail** (@0x49742–@0x497a7): if the building's flag is left **path-less** and
   // still carries its flag object, it goes too. Both tests read the landscape bytes of the flag tile:

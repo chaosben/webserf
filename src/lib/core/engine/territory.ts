@@ -180,13 +180,26 @@ function lostTileHandler(state: GameState, col: number, row: number): void {
  * Recolour the territory around a centre — port of `FUN_00045a30`. Call after every event that changes
  * military influence.
  *
- * **Two phases, and the split matters.** Phase 1 stamps the influence winner of every window tile into
- * a **fixed** snapshot (the original fills its influence buffer first, then assigns). Phase 2 assigns
- * and fires {@link lostTileHandler} on every owner **loss** — **before** the new owner is written
- * (`FUN_00046207`: clear the owner byte, run the handler, set the new owner). The snapshot is
- * essential: if the handler burns a military building, that demolition triggers a **nested** recolour;
- * the outer loop then keeps working from its deliberately stable snapshot, exactly as the original does
- * with its pre-stamped buffer.
+ * **Two phases.** Phase 1 stamps the influence winner of every window tile into a snapshot, phase 2
+ * assigns and fires {@link lostTileHandler} on every owner **loss** — **before** the new owner is
+ * written (`FUN_00046207`: clear the owner byte, run the handler, set the new owner).
+ *
+ * **The snapshot is where this differs from the original, and the difference is bounded.** The
+ * original computes each winner inline from an influence buffer that is **global** — one block for
+ * the whole program, not one per call (`FUN_00045b06` takes its pointer from the game state). A
+ * **nested** recolour — the handler burns a military building, that demolition recolours again —
+ * therefore overwrites the buffer the outer pass is still reading, while this snapshot survives it.
+ * Two measurements say the difference has no observable residue: nesting needs a *garrisoned*
+ * military building to fall on a lost tile and was not observed at all over three long runs, and
+ * after such a run the owner map still equals a full recompute from all buildings in every one of
+ * the 4096 cells.
+ *
+ * **What must NOT be "fixed": the land score can be credited twice.** The assignment loop reads the
+ * owner *before* the handler and ORs the winner in *after* it without reading again, so a tile that
+ * a nested pass already handed to the winner is credited a second time. That is the original's own
+ * shape (there is no second read between the two), so a nested pass leaves the score one above the
+ * tile count. Do not add a re-read here — remove the *cause* of an unwanted nesting instead, as the
+ * demolition gate in {@link demolishBuilding} does.
  */
 export function recomputeTerritory(state: GameState, centerCol: number, centerRow: number): void {
   const geo = state.geo;
