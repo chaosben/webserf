@@ -133,12 +133,16 @@
     /** A save is loaded — A39 → disk menu → "AUSFUEHREN". */
     onload?: (save: SaveGameState, bytes: Uint8Array) => void;
     /**
-     * **The campaign progress brought along** (`gs+0x356`/`gs+0x358`), `null` = initial state.
+     * **The campaign progress brought along** (`gs+0x356`/`gs+0x358`/`gs+0x35a`), `null` = initial state.
      *
-     * In the original the two numbers are global memory and survive leaving a game by themselves.
-     * This component is rebuilt on return, so the initial value must come from outside; the page
-     * holds it. It is read ONCE on construction — what the menu makes of it afterwards (A2/A3,
+     * In the original these cells are global memory and survive leaving a game by themselves. This
+     * component is rebuilt on return, so the initial value must come from outside; the page holds it.
+     * It is read ONCE on construction — what the menu makes of it afterwards (A2/A3, typing a
      * password) is its own.
+     *
+     * Besides the two numbers it carries the password line (`gs+0x35a`): a won mission fills it with
+     * the password of the next level, so the player can write it down. The spread below applies it,
+     * which is why {@link CampaignProgress} leaves the key ABSENT when there is none.
      */
     campaign?: CampaignProgress | null;
   } = $props();

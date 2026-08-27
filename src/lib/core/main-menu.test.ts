@@ -923,6 +923,27 @@ describe('main menu — campaign progress (`action_quit_confirm` @0x2ebdb)', () 
   it('without `levelSetupShown` the played level applies', () => {
     expect(advanceCampaignProgress(h(0, 0, 4))).toEqual({ level: 5, unlockedLevel: 5 });
   });
+
+  it('the password rides along in every branch — this branch does not touch `gs+0x35a`', () => {
+    const pw = (gameType: number, winnerIndex: number, level: number, shown: number) =>
+      advanceCampaignProgress({ ...h(gameType, winnerIndex, level, shown), levelPassword: 'STATION ' });
+    expect(pw(0, 0, 3, 9)).toEqual({ level: 4, unlockedLevel: 9, password: 'STATION ' });
+    expect(pw(0, -1, 3, 9)).toEqual({ level: 3, unlockedLevel: 9, password: 'STATION ' });
+    expect(pw(0, 1, 3, 9)).toEqual({ level: 3, unlockedLevel: 9, password: 'STATION ' });
+    expect(pw(0, 0, CAMPAIGN_LEVEL_CAP, CAMPAIGN_LEVEL_CAP)).toEqual({
+      level: CAMPAIGN_LEVEL_CAP,
+      unlockedLevel: CAMPAIGN_LEVEL_CAP,
+      password: 'STATION ',
+    });
+  });
+
+  it('leaves the key ABSENT without a password — a present `undefined` would blank the menu line', () => {
+    const p = advanceCampaignProgress(h(0, 0, 3, 9));
+    expect(p).not.toBeNull();
+    expect('password' in p!).toBe(false);
+    // What the menu does with it: the spread must not overwrite the line.
+    expect({ ...initialMainMenuState(), ...p! }.password).toBe(initialMainMenuState().password);
+  });
 });
 
 describe('main menu — map preview (`gs+0x37e` Bit 1, Leisten-Slot 2)', () => {

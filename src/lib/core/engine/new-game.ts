@@ -139,6 +139,17 @@ export interface NewGameSetup {
    * {@link levelSetupIndex}, which would unlock only the level being played.
    */
   readonly levelSetupShown?: number;
+  /**
+   * The campaign password (`gs+0x35a`, `.DS`@128) the menu carried in. The game start does **not**
+   * write this cell in the original — it is global memory and simply still holds whatever the menu
+   * had — so in the port the menu value must travel along, otherwise the running header would lose it
+   * and a save would carry nothing.
+   *
+   * It is deliberately NOT derived from the level: two original saves prove the two can differ (level
+   * 6 with the password of level 29 — typed a password, then paged the level back down; the level
+   * choice A2/A3 has no writer for this cell).
+   */
+  readonly levelPassword?: string;
   /** Only `gameType > 1` (`gs+0x362`); with setup records the size is fixed at 3. */
   readonly mapSize?: number;
   /** Only `gameType > 1` (`gs+0x364..0x368`) — the raw seed BEFORE the XOR mask. */
@@ -941,6 +952,8 @@ function newGameHeader(
       setup.gameType === GAME_TYPE.Level
         ? (setup.levelSetupShown ?? setup.levelSetupIndex ?? 0)
         : undefined,
+    // `gs+0x35a` — same gate as @126 on loading (@0x47f0d covers both).
+    levelPassword: setup.gameType === GAME_TYPE.Level ? setup.levelPassword : undefined,
     mapGoldMoraleFactor: consts.mapGoldMoraleFactor,
     populationSpan: consts.populationSpan,
     populationBase: consts.populationBase,

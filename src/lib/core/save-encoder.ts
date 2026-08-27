@@ -7,6 +7,7 @@ import type {
   SaveGameState,
   SerfRecord,
 } from './types.js';
+import { PASSWORD_LENGTH } from './player-setup.js';
 import {
   PLAYER_AI_ATTACK_CHANCE_FACTOR_OFF,
   PLAYER_AI_ATTACK_CHANCE_OFF,
@@ -207,7 +208,6 @@ class Writer {
  * 0..66    22 fields `gs+0x00..0x42` plus `gs+0x60`, `gs+0x1c2`, `gs+0x1c4`, `gs+0x37e`
  * 67       computed: one flag per viewport (`+1` / `+2`, each `vp[0x87] & 1`)
  * 76       `gs+0x202` — lower half of the u32 whose upper half is `tick` @78
- * 128..135 `gs+0x35a` password
  * 164..173 `gs+0x172/0x176/0x17a` — parked cursor of the second splitscreen player
  * 206..209 `gs+0x10`
  */
@@ -249,7 +249,18 @@ function writeHeader(w: Writer, state: SaveGameState): void {
     w.seek(126);
     w.u16(h.levelSetupShown);
   }
-  // 128..135 — password; not modelled.
+  // 128..135 (gs+0x35a) — the campaign password. The original writes it WITHOUT a gate (@0x4745a has
+  // no branch) but loads it only for `gameType == 0` (@0x47f0d); our model keeps it under exactly that
+  // gate, as with @126. Eight bytes, padded with spaces — the buffer of the original is always full
+  // (the input blanks it with `mov $0x20202020` ×2, @0x50f18/@0x50f22), and a shorter write would
+  // shift @136.
+  if (h.levelPassword !== undefined) {
+    w.seek(128);
+    // Pad first, then write every position: a `|| 0x20` per character would turn a legitimate NUL
+    // byte into a space, and one of our own saves carries eight of them there.
+    const password = h.levelPassword.padEnd(PASSWORD_LENGTH, ' ');
+    for (let i = 0; i < PASSWORD_LENGTH; i++) w.u8(password.charCodeAt(i));
+  }
 
   // 136..143 the original writes **without** a gate (@0x470ce has no branch there) but reads only
   // for `gameType > 1`. Our model keeps both fields under exactly that gate, so for campaign/mission

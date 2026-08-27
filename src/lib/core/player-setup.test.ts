@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  FIRST_CAMPAIGN_RECORD,
   HUMAN_FACE,
+  LAST_CAMPAIGN_LEVEL,
   SETUP_OPPONENT_FACES,
+  SETUP_PASSWORD_BYTES,
   HUMAN_FACE_2,
+  campaignFollowUpPassword,
+  decodeSetupPassword,
   playerFaces,
   setupRecordIndex,
 } from './player-setup.js';
@@ -93,5 +98,49 @@ describe('player-setup — Gesichter', () => {
     );
     expect(numbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     expect(Math.max(...numbers)).toBeLessThan(HUMAN_FACE);
+  });
+});
+
+describe('player-setup — the follow-up level password', () => {
+  const won = (level: number) => ({ gameType: 0, winnerIndex: 0, levelSetupIndex: level });
+  const pw = (level: number) =>
+    decodeSetupPassword(SETUP_PASSWORD_BYTES[FIRST_CAMPAIGN_RECORD + level - 1]!);
+
+  it('shows the password of the NEXT level, not of the one played', () => {
+    // The counter-direction is the whole point: `+5` would be the running level, and both indices
+    // yield a valid-looking word, so only the comparison distinguishes them.
+    for (const level of [1, 7, 15, 29]) {
+      expect(campaignFollowUpPassword(won(level), SETUP_PASSWORD_BYTES)).toBe(pw(level + 1));
+      expect(campaignFollowUpPassword(won(level), SETUP_PASSWORD_BYTES)).not.toBe(pw(level));
+    }
+    expect(campaignFollowUpPassword(won(1), SETUP_PASSWORD_BYTES)).toBe('STATION ');
+  });
+
+  it('all three gates of the original close it', () => {
+    // Another game type (`gs+0x352 != 0`).
+    for (const gameType of [1, 2, 3, 4]) {
+      expect(
+        campaignFollowUpPassword({ gameType, winnerIndex: 0, levelSetupIndex: 5 }, SETUP_PASSWORD_BYTES),
+      ).toBeNull();
+    }
+    // Not won (`gs+0x5e != 0`) — defeat as well as a rival winning.
+    for (const winnerIndex of [-1, 1, 2, 3]) {
+      expect(
+        campaignFollowUpPassword({ gameType: 0, winnerIndex, levelSetupIndex: 5 }, SETUP_PASSWORD_BYTES),
+      ).toBeNull();
+    }
+    // The last level has no follow-up — record 36 does not exist.
+    expect(campaignFollowUpPassword(won(LAST_CAMPAIGN_LEVEL), SETUP_PASSWORD_BYTES)).toBeNull();
+    expect(SETUP_PASSWORD_BYTES[LAST_CAMPAIGN_LEVEL + FIRST_CAMPAIGN_RECORD]).toBeUndefined();
+  });
+
+  it('every password is eight characters long', () => {
+    for (let level = 1; level < LAST_CAMPAIGN_LEVEL; level++) {
+      expect(campaignFollowUpPassword(won(level), SETUP_PASSWORD_BYTES)).toHaveLength(8);
+    }
+  });
+
+  it('record 6 is the password of level 1 — the same eight characters the program init writes', () => {
+    expect(decodeSetupPassword(SETUP_PASSWORD_BYTES[FIRST_CAMPAIGN_RECORD]!)).toBe('START   ');
   });
 });

@@ -161,6 +161,21 @@ export interface SaveGameHeader {
    */
   readonly levelSetupShown?: number;
   /**
+   * **The campaign password** (offsets 128..135, gs+0x35a..0x361) — eight characters, space padded.
+   *
+   * The same cells are three things in the original: the input field of the password entry, the source
+   * of the main menu's `PASSWORT:` line, and this save field. It stands here because the buffer is
+   * GLOBAL memory there — the game start inherits whatever the menu held, `savegame_load_header`
+   * fetches it back (@0x47f3d), and the **mission end** overwrites it with the password of the level
+   * that follows the one just won (@0x38547).
+   *
+   * Loaded ONLY at `gameType == 0` (the write @0x47f3d sits behind `gs+0x352 == 0`); with other game
+   * types a residue stands in the file, hence `undefined`. When saving the original writes it without a
+   * gate (@0x4745a) — the encoder keeps it under the same gate as far as our model has the value, like
+   * {@link levelSetupShown}.
+   */
+  readonly levelPassword?: string;
+  /**
    * **The player settings of the main menu** (offsets 144..163, gs+0x36a..0x37d) — what was set at the
    * four columns in the menu before the game began. Loaded only at `gameType > 1` (`jb 0x48010`
    * @0x47f60); with level/mission the players come from the setup record instead and a residue stands

@@ -14,6 +14,7 @@ import type {
   SerfRecord,
   SerfStateFields,
 } from './types.js';
+import { PASSWORD_LENGTH } from './player-setup.js';
 
 /** Building type names (index 0..24); order confirmed against `SAVE0.DS`. */
 export const BUILDING_TYPE_NAMES: readonly string[] = [
@@ -432,7 +433,13 @@ export function parseSaveGame(buffer: ArrayBuffer | ArrayBufferView): SaveGameSt
  // same gate as 124, so only for `gameType == 0`; otherwise a leftover.
   const rawLevelShown = cur.u16(); // 126 (gs+0x358)
   const levelSetupShown = gameType === 0 ? rawLevelShown : undefined;
-  cur.skip(8); // 128..135 (gs+0x35a, password) — only used for `gameType == 0`
+ // 128..135 (gs+0x35a) — the campaign password. Not an analogous gate to 124/126 but the SAME one:
+ // the two loads @0x47f34/@0x47f3d and @0x47f46/@0x47f4f (two dwords) sit inside the very `jne
+ // 0x47f55` block @0x47f0d that guards the other two, so with another game type a residue stands here.
+ // Read through unchecked, as the original does — a file may carry anything in these eight bytes.
+  let rawPassword = '';
+  for (let i = 0; i < PASSWORD_LENGTH; i++) rawPassword += String.fromCharCode(cur.u8()); // 128..135
+  const levelPassword = gameType === 0 ? rawPassword : undefined;
  // 136..143 is loaded only for `gameType > 1`: the map size chosen in the menu and the map seed.
  // For level/mission both come from the setup record and a leftover stands here.
   const rawSizeChoice = cur.u16(); // 136 (gs+0x362)
@@ -532,6 +539,7 @@ export function parseSaveGame(buffer: ArrayBuffer | ArrayBufferView): SaveGameSt
     missionSetupIndex,
     levelSetupIndex,
     levelSetupShown,
+    levelPassword,
     mapSizeChoice,
     mapSeed,
     menuSetup,

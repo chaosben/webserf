@@ -41,6 +41,7 @@ import { SERF_TYPE_NAMES, SERF_STATE_NAMES } from '../save-parser.js';
 import { tickKnightShift } from './player-settings.js';
 import { mapObjectGrowth } from './map-growth.js';
 import { viewportAmbientAudio } from './ambient-sound.js';
+import { campaignFollowUpPassword, SETUP_PASSWORD_BYTES } from '../player-setup.js';
 
 const SERF_GENERIC = 21; // Serf-Typ 0x15
 const SERF_KNIGHT0 = 22; // Serf-Typ 0x16
@@ -126,6 +127,33 @@ export function missionEndScreenDue(state: GameState, gate: MissionEndGate): boo
   if (MISSION_END_BLOCKING_SCREENS.includes(gate.currentScreen)) return false;
   state.header.missionEndPending = 0;
   return true;
+}
+
+/**
+ * **The campaign password of the next level** — the one effect of the mission-end renderer
+ * `FUN_0003831d` that outlives its screen.
+ *
+ * Its loop @0x38518..@0x3854d writes each decoded character to two sinks: the text of the screen
+ * (`mov %al,(%ebx)` @0x3853b, into the literal `@0x38a51`) and the buffer `gs+0x35a` (@0x38547), which
+ * is at once the main menu's password line and the save field `.DS`@128. The first sink is a return
+ * value in the port (`missionEndPassword`), the second is state and therefore written here.
+ *
+ * Deliberately **not** folded into {@link missionEndScreenDue}: that predicate is part 0 of
+ * `FUN_0000eced`, this write belongs to another routine — and the predicate is exercised with a
+ * minimal state stub, which would silently run this write on an object without a game type.
+ *
+ * It has to be called from the tick path, not while drawing: `missionEndPassword` runs once per
+ * frame. Once is equivalent to the original's per-redraw write because the value depends only on
+ * `levelSetupIndex`, and that changes on leaving (@0x2ec48) — after the screen is gone.
+ *
+ * The original writes nothing when there is no follow-up password (defeat, level 30, another game
+ * type): it jumps past the block and leaves the cell as it was.
+ */
+export function writeMissionEndPassword(state: GameState): void {
+  const password = campaignFollowUpPassword(state.header, SETUP_PASSWORD_BYTES);
+  // A record beyond the table cannot occur — the cap `je 0x3879b` catches level 30, and 30 + 6 == 36
+  // is the first index the table lacks.
+  if (password !== null) state.header.levelPassword = password;
 }
 
 const SERVICE_HIT_LIMIT = 10; // `vreg2 = 10`: stop after 10 markers that were actually cleared

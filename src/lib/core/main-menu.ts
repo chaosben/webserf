@@ -24,7 +24,12 @@
 
 import { Rng } from './engine/rng.js';
 import { deriveMapSeed } from './engine/map-generator.js';
-import { PASSWORD_CHARS, SETUP_PASSWORD_BYTES, decodeSetupPassword } from './player-setup.js';
+import {
+  FIRST_CAMPAIGN_RECORD,
+  PASSWORD_CHARS,
+  SETUP_PASSWORD_BYTES,
+  decodeSetupPassword,
+} from './player-setup.js';
 import {
   TEXT_KEY_BACKSPACE,
   TEXT_KEY_COMMIT,
@@ -284,6 +289,15 @@ export interface CampaignProgress {
   readonly level: number;
   /** `gs+0x358` — the highest unlocked level. */
   readonly unlockedLevel: number;
+  /**
+   * `gs+0x35a` — the eight characters of the password line. In the original this is the very cell
+   * {@link MainMenuState.password} holds, so it travels with the two numbers; the mission end filled it
+   * with the password of the level that follows the one just won.
+   *
+   * **Absent** rather than `undefined` when the game carried none: the menu applies this object with a
+   * spread, and a present key would overwrite the line with nothing.
+   */
+  readonly password?: string;
 }
 
 /**
@@ -329,16 +343,26 @@ export function advanceCampaignProgress(header: {
   readonly winnerIndex: number;
   readonly levelSetupIndex: number;
   readonly levelSetupShown?: number;
+  readonly levelPassword?: string;
 }): CampaignProgress | null {
   if (header.gameType !== GAME_TYPE_LEVEL) return null; // @0x2ec1d
   const level = header.levelSetupIndex;
   // Without the second value, the level played is the highest we can prove.
   const unlockedLevel = header.levelSetupShown ?? level;
-  if (header.winnerIndex !== 0) return { level, unlockedLevel }; // @0x2ec29
-  if (level === CAMPAIGN_LEVEL_CAP) return { level, unlockedLevel }; // @0x2ec3c
+  // The password rides along in EVERY branch, including defeat and the cap: this branch does not touch
+  // `gs+0x35a` at all (surveyed — @0x2ec2b..@0x2ec6c has no access to it), the only writer for a won
+  // level is the mission end, and it has already run. Passing the unchanged field on is what "the cell
+  // keeps its value" means once menu and game are two states instead of one.
+  const password = header.levelPassword === undefined ? {} : { password: header.levelPassword };
+  if (header.winnerIndex !== 0) return { level, unlockedLevel, ...password }; // @0x2ec29
+  if (level === CAMPAIGN_LEVEL_CAP) return { level, unlockedLevel, ...password }; // @0x2ec3c
   const next = level + 1;
   // `jb` @0x2ec5c and `je` @0x2ec5e — the bound is only raised on a real increase.
-  return { level: next, unlockedLevel: next > unlockedLevel ? next : unlockedLevel };
+  return {
+    level: next,
+    unlockedLevel: next > unlockedLevel ? next : unlockedLevel,
+    ...password,
+  };
 }
 
 /**
@@ -1299,8 +1323,9 @@ export const PASSWORD_BLANK = '        ';
  */
 export const PASSWORD_REJECT = '-FEHLER-';
 
-/** First setup record with a password (`add $0xd8` == 6 · 0x24, @0x4f41e). */
-export const FIRST_CAMPAIGN_RECORD = 6;
+// The first setup record with a password (`add $0xd8` == 6 · 0x24, @0x4f41e) is a property of the
+// setup table and lives with it; re-exported because the check loop below is the other reader.
+export { FIRST_CAMPAIGN_RECORD } from './player-setup.js';
 
 /**
  * Number of records checked (`mov $0x1d,%eax` @0x4f430, then `subw $0x1 ; jae` ⇒ 30 rounds). Agrees

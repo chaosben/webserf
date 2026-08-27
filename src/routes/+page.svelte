@@ -390,6 +390,8 @@
 				gameType: menu.gameType,
 				levelSetupIndex: menu.level,
 				levelSetupShown: menu.unlockedLevel,
+				// `gs+0x35a` — the menu buffer and the game field are ONE cell in the original.
+				levelPassword: menu.password,
 				missionSetupIndex: menu.mission,
 				mapSize: menu.mapSizeChoice,
 				seed: menu.seed,

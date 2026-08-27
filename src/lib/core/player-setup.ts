@@ -74,6 +74,24 @@ export const SETUP_OPPONENT_FACES: readonly (readonly [number, number, number])[
 ];
 
 /**
+ * Last campaign level (30). The binary compares it against `gs[0x356]` at **two** places:
+ * `cmpw $0x1e` @0x384c4 (from here on there is no follow-up password — record 36 does not exist) and
+ * @0x38826 (from here on the end credits run). It stands here once so the two readers cannot drift
+ * apart.
+ */
+export const LAST_CAMPAIGN_LEVEL = 0x1e;
+
+/**
+ * First setup record that carries a password (`add $0xd8` == 6 · 0x24, @0x4f41e / @0x384e8). The
+ * password table therefore begins at `0x61442 + 0xd8 == 0x6151a`, and **record `k` holds the password
+ * of level `k + 1`**: record 6 decodes to `'START   '`, the same eight characters the program init
+ * writes into the buffer (@0xb432 ff.).
+ *
+ * A property of the setup table, so it lives here — `main-menu.ts` re-exports it for its own readers.
+ */
+export const FIRST_CAMPAIGN_RECORD = 6;
+
+/**
  * Character table of the password (`DAT_0004f37f` @0x4f37f, 27 bytes): the byte value of the setup
  * record is the index. Not an alphabet but a scrambling — which is exactly why "the decoded values
  * are words" is evidence and not a triviality.
@@ -82,14 +100,6 @@ export const SETUP_OPPONENT_FACES: readonly (readonly [number, number, number])[
  * password of the follow-up mission is shown, in the main menu the typed one is held against every
  * record. Both read the same table at the same address.
  */
-/**
- * Last campaign level (30). The binary compares it against `gs[0x356]` at **two** places:
- * `cmpw $0x1e` @0x384c4 (from here on there is no follow-up password — record 36 does not exist) and
- * @0x38826 (from here on the end credits run). It stands here once so the two readers cannot drift
- * apart.
- */
-export const LAST_CAMPAIGN_LEVEL = 0x1e;
-
 export const PASSWORD_CHARS = 'OUJFASXNHZEMYCTQKWGLIDVRPB ';
 
 /** Password length (`vreg0 = 7`, `subw $1 ; jae` => 8 passes, @0x38509/@0x38549). */
@@ -104,6 +114,46 @@ export function decodeSetupPassword(bytes: readonly number[]): string {
   let out = '';
   for (let i = 0; i < PASSWORD_LENGTH; i++) out += PASSWORD_CHARS[bytes[i] ?? 0] ?? ' ';
   return out;
+}
+
+/** `gameType == 0` — the level campaign, the only type that has passwords. */
+const GAME_TYPE_LEVEL = 0;
+
+/** What the follow-up password depends on: game type, winner and the level that just ended. */
+export interface CampaignOutcome {
+  /** `gs+0x352`. */
+  readonly gameType: number;
+  /** `gs+0x5e` — the winning slot, `-1` = nobody. */
+  readonly winnerIndex: number;
+  /** `gs+0x356` — the level that was played. */
+  readonly levelSetupIndex: number;
+}
+
+/**
+ * **The password of the FOLLOW-UP level**, or `null` when the original shows none.
+ *
+ * The loop `@0x38510..@0x3854d` decodes eight bytes of record `levelSetupIndex + FIRST_CAMPAIGN_RECORD`
+ * and writes each character to **two** sinks: the display literal `@0x38a51` and the buffer
+ * `gs+0x35a`, which is the main menu's password line and the save field `.DS`@128. The running level
+ * uses record `levelSetupIndex + 5`, one less — hence the NEXT level's password is shown.
+ *
+ * The three gates around the loop are part of the answer and therefore live here rather than in the
+ * two callers: level campaign (`gs+0x352 == 0`), slot 0 has won (`gs+0x5e == 0`, @0x384c0) and the
+ * level is not the last (`je 0x3879b` @0x384c8 — record 36 does not exist, the sound parameter table
+ * begins there).
+ *
+ * `records` comes in rather than being read from {@link SETUP_PASSWORD_BYTES} so a probe can hold the
+ * function against bytes taken straight from the binary.
+ */
+export function campaignFollowUpPassword(
+  outcome: CampaignOutcome,
+  records: readonly (readonly number[] | undefined)[],
+): string | null {
+  if (outcome.gameType !== GAME_TYPE_LEVEL || outcome.winnerIndex !== 0) return null;
+  if (outcome.levelSetupIndex === LAST_CAMPAIGN_LEVEL) return null; // je 0x3879b
+  const record = records[outcome.levelSetupIndex + FIRST_CAMPAIGN_RECORD];
+  if (record === undefined) return null;
+  return decodeSetupPassword(record);
 }
 
 /**

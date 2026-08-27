@@ -16,15 +16,16 @@
  * exist, the sound parameter table begins there.
  *
  * What the port keeps differently: the mood value lives in the step instead of a game-struct slot, the
- * password is returned instead of overwriting a string literal and the main menu's name buffer, and
- * the face table is passed in. The end credits are a full-screen sequence, not a popup renderer, and
- * live in their own module; only the branch into them is here. The SVGA branch is deliberately never
- * reproduced.
+ * password is returned instead of overwriting a string literal, and the face table is passed in. The
+ * original's SECOND sink for those eight characters — the campaign password buffer the main menu shows
+ * — is not written here but by the engine when this screen becomes due, because this module runs once
+ * per frame while that write is state. The end credits are a full-screen sequence, not a popup
+ * renderer, and live in their own module; only the branch into them is here. The SVGA branch is
+ * deliberately never reproduced.
  */
 
-import { PASSWORD_CHARS, PASSWORD_LENGTH } from './player-setup.js';
+import { campaignFollowUpPassword } from './player-setup.js';
 import { endCreditsDue } from './end-credits.js';
-import { LAST_CAMPAIGN_LEVEL } from './player-setup.js';
 import {
   blitSprite,
   drawPanelIcon,
@@ -234,24 +235,17 @@ export function missionEndBonusMood(view: MissionEndView): number | null {
  *
  * `records` are the first {@link PASSWORD_LENGTH} bytes per setup record — table `@0x61442`, record
  * `level + 6`.
+ *
+ * The decoding itself lives with the setup records, because the original's loop has a **second sink**
+ * besides the text on this screen: it writes the same eight characters into the campaign password
+ * buffer, and that one is written from the engine (see `engine/economy.ts`). One function, so display
+ * and stored value cannot drift apart.
  */
 export function missionEndPassword(
   view: MissionEndView,
   records: readonly (readonly number[] | undefined)[],
 ): string | null {
-  if (view.gameType !== GAME_TYPE_CAMPAIGN || view.winnerIndex !== 0) return null;
-  if (view.levelSetupIndex === LAST_CAMPAIGN_LEVEL) return null; // je 0x3879b
-  const record = records[view.levelSetupIndex + 6];
-  if (record === undefined) return null;
-  let out = '';
-  for (let i = 0; i < PASSWORD_LENGTH; i++) {
-    // The original reads the index signed (`movswl` @0x38527) and without a range check, so a value
-    // beyond the table would be a foreign byte. Here it falls back to the filler character rather
-    // than showing an invented number.
-    const idx = record[i] ?? 0;
-    out += PASSWORD_CHARS[idx] ?? ' ';
-  }
-  return out;
+  return campaignFollowUpPassword(view, records);
 }
 
 /** One step of the sequence; every click advances to the next. */

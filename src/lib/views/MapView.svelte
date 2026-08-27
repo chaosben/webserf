@@ -95,7 +95,7 @@
   import { metrics } from './render-metrics.js';
   import { settings, ticksPerSecondOf } from '../settings/settings.svelte.js';
   import { logicFrame, runTicks } from '../core/engine/tick.js';
-  import { missionEndScreenDue } from '../core/engine/economy.js';
+  import { missionEndScreenDue, writeMissionEndPassword } from '../core/engine/economy.js';
   import {
     drawMissionEndPopup,
     missionEndPassword,
@@ -2689,6 +2689,10 @@
     // "none", as in the original.
     const gate = { roadBuilding: roadBuild().active, currentScreen: menuScreen ?? 0 };
     if (!missionEndScreenDue(engineState, gate)) return;
+    // The sink of the renderer that outlives the screen (@0x384f7): the password of the next level
+    // into `header.levelPassword`, from where it reaches the menu line. Here and not while drawing,
+    // because drawing runs once per frame.
+    writeMissionEndPassword(engineState);
     missionEndStep = 0;
   }
 

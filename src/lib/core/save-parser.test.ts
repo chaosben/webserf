@@ -139,6 +139,8 @@ interface Fixture {
   gameType: number;
   /** Menu player settings `.DS`@144..163 (loaded only for `gameType > 1`). */
   menuBytes?: number[];
+  /** Campaign password `.DS`@128..135 (loaded only for `gameType == 0`). */
+  password?: string;
   tick: number;
   random: [number, number, number];
   maxFlagIndex: number;
@@ -198,6 +200,9 @@ function buildSave(fx: Fixture): Uint8Array {
 
   dv.setUint16(74, fx.gameType, true);
   if (fx.menuBytes) buf.set(fx.menuBytes, 144);
+  if (fx.password !== undefined) {
+    for (let i = 0; i < 8; i++) buf[128 + i] = fx.password.charCodeAt(i);
+  }
   dv.setUint16(78, fx.tick, true);
   dv.setUint16(84, fx.random[0], true);
   dv.setUint16(86, fx.random[1], true);
@@ -460,6 +465,26 @@ describe('parseSaveGame — menu player settings (.DS@144..163)', () => {
     const state = parseSaveGame(buildSave({ ...baseFixture, gameType: 2, menuBytes: MENU }));
     expect(state.header.maxInventoryIndex).toBe(1);
     expect(state.header.mapSize).toBe(3);
+  });
+});
+
+describe('parseSaveGame — campaign password (.DS@128..135)', () => {
+  it('decodes the eight bytes at game type 0', () => {
+    const state = parseSaveGame(buildSave({ ...baseFixture, gameType: 0, password: 'PASSIVE ' }));
+    expect(state.header.levelPassword).toBe('PASSIVE ');
+  });
+
+  it('does NOT carry the field beyond game type 0 — the load gate @0x47f0d covers @128 too', () => {
+    for (const gameType of [1, 2, 3, 4]) {
+      const state = parseSaveGame(buildSave({ ...baseFixture, gameType, password: 'PASSIVE ' }));
+      expect(state.header.levelPassword, `gameType ${gameType}`).toBeUndefined();
+    }
+  });
+
+  it('reads the bytes through unchecked, as the original does', () => {
+    // One of our own saves carries eight NUL bytes there; that must parse, not throw.
+    const state = parseSaveGame(buildSave({ ...baseFixture, gameType: 0, password: '\0'.repeat(8) }));
+    expect(state.header.levelPassword).toHaveLength(8);
   });
 });
 
