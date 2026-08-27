@@ -106,9 +106,17 @@ export const maskOf = (indices: readonly number[]): number =>
 export const maskHas = (mask: number, index: number): boolean => (mask & (1 << index)) !== 0;
 export const maskToggled = (mask: number, index: number): number => mask ^ (1 << index);
 
-/** A useful starting selection — the first switch-on must not show an empty box. */
-export const STOCK_GOODS_DEFAULT = maskOf([7, 9, 12, 10, 14, 5]); // plank, stone, coal, iron ore, gold bar, bread
-export const STOCK_SERFS_DEFAULT = maskOf([21, 3, 2]); // settlers, builder, digger
+/**
+ * NOTHING is selected to begin with, and since the selection is the switch, that is the readout
+ * switched off.
+ *
+ * An earlier version started with a handful of useful goods on the grounds that the first switch-on
+ * must not show an empty box. That was the wrong trade: an addition of ours has no business
+ * appearing over the game screen before anyone asked for it. It holds for every enhancement, not
+ * just this one — see `registry.ts`.
+ */
+export const STOCK_GOODS_DEFAULT = 0;
+export const STOCK_SERFS_DEFAULT = 0;
 
 // --- the view ---------------------------------------------------------------------------------
 

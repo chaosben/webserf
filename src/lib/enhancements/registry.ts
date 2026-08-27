@@ -9,6 +9,10 @@
  * the right carries the tabs of the open one alone. That is why the strip cannot overflow as the
  * list grows — it never holds more than one enhancement's worth.
  *
+ * **Every enhancement ships switched OFF.** An addition of ours has no counterpart in the original,
+ * so it must not appear over the game screen until someone asks for it; whoever adds one here gives
+ * it a default that shows nothing.
+ *
  * Tab ids stay unique across the whole list all the same (`stock.goods`), and the switch-over
  * fallback falls out of that for free: after changing enhancement the remembered id belongs to
  * another one, so {@link enhancementTabFor} lands on the new first tab without any reset code.

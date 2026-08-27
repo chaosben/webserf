@@ -67,13 +67,25 @@ describe('selection masks', () => {
   it('stays inside the range the shift and the validator allow', () => {
     expect(SERF_SLOTS).toBeLessThanOrEqual(30);
     expect(GOOD_SLOTS).toBeLessThanOrEqual(30);
-    for (const [name, mask, slots] of [
-      ['goods', STOCK_GOODS_DEFAULT, GOOD_SLOTS],
-      ['serfs', STOCK_SERFS_DEFAULT, SERF_SLOTS],
+    // The FULL selection is the case that would overflow, so it is the one to build.
+    for (const [name, slots] of [
+      ['goods', GOOD_SLOTS],
+      ['serfs', SERF_SLOTS],
     ] as const) {
-      expect(mask, name).toBeGreaterThan(0);
-      expect(mask, name).toBeLessThan(2 ** slots);
+      const all = maskOf(Array.from({ length: slots }, (_, i) => i));
+      expect(all, name).toBeGreaterThan(0);
+      expect(all, name).toBe(2 ** slots - 1);
     }
+  });
+
+  /**
+   * An addition of ours must not stand over the game screen before anyone asked for it — and since
+   * the selection IS the switch, "off" means an empty selection. The rule holds for every
+   * enhancement, so a new one that ships visible should break a line like this of its own.
+   */
+  it('starts with nothing selected, which is the readout switched off', () => {
+    expect(STOCK_GOODS_DEFAULT).toBe(0);
+    expect(STOCK_SERFS_DEFAULT).toBe(0);
   });
 });
 

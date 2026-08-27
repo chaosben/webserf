@@ -228,8 +228,9 @@ const EN = {
 		'have”, not “how would they divide up”.',
 	'enh.view.title': 'The readout',
 	'enh.view.emptyNote':
-		'There is no separate switch: what is ticked under “Goods” and “Settlers” is shown. Choose ' +
-		'“None” in both and the readout disappears. It is drawn over the game screen, not into it — a ' +
+		'There is no separate switch: what is ticked under “Goods” and “Settlers” is shown. Nothing is ' +
+		'ticked to begin with — an addition of ours does not stand over the game screen unasked. ' +
+		'Choose “None” in both and the readout disappears again. It is drawn over the game screen, not into it — a ' +
 		'screenshot and a video recording therefore do not contain it.',
 	'enh.view.corner': 'Corner',
 	'enh.view.perRow': 'Entries per row',
@@ -447,7 +448,8 @@ const DE: Record<ShellKey, string> = {
 	'enh.view.title': 'Die Anzeige',
 	'enh.view.emptyNote':
 		'Es gibt keinen eigenen Schalter: gezeigt wird, was unter „Waren“ und „Siedler“ angehakt ist. ' +
-		'Wählen Sie in beiden „Keine“, verschwindet die Anzeige. Sie liegt über dem Spielbildschirm, ' +
+		'Zu Beginn ist nichts angehakt — eine Zutat von uns steht nicht ungefragt über dem ' +
+		'Spielbildschirm. Wählen Sie in beiden „Keine“, verschwindet die Anzeige wieder. Sie liegt über dem Spielbildschirm, ' +
 		'nicht darin — ein Bildschirmfoto und eine Videoaufnahme enthalten sie deshalb nicht.',
 	'enh.view.corner': 'Ecke',
 	'enh.view.perRow': 'Einträge je Zeile',
