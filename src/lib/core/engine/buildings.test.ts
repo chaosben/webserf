@@ -401,6 +401,82 @@ describe('razing a building', () => {
     expect(state.mapTiles[POS].owner).toBe(0); // land retracted (no other military buildings)
   });
 
+ // ── `bld[4] & 0xfc` keeps bit 7, so a **site** matches none of the comparison values ──
+ // The four constants the original compares against (@0x49019..@0x4902e, @0x49338) are the type
+ // shifted left by two **without** the construction bit: 0x2c hut, 0x54 tower, 0x58 fortress,
+ // 0x60 castle, 0x5c gold smelter. A site carries bit 7 (0xac/0xd4/0xd8/0xe0/0xdc) and falls
+ // through both blocks. That matters twice: during construction `bld+9` is the **stone** nibble,
+ // and `bld+0xa` holds the requested **builder**, so the garrison gate alone would not stop it.
+
+  it('a military building site leaves mapGoldTotal alone — the stock nibble is stone, not gold', () => {
+    const b = forester({
+      type: 11, constructing: true, firstKnight: 399,
+      stock: [{ available: 2, requested: 0 }, { available: 3, requested: 0 }], // 2 planks, 3 stone
+    });
+    const { state } = razeState(b, 43508);
+    demolishBuilding(state, b);
+    expect(state.header.mapGoldTotal).toBe(1000);
+  });
+
+  it('...while a finished military building still hands its gold nibble back to the map', () => {
+    const b = forester({
+      type: 11, active: true,
+      stock: [{ available: 0, requested: 0 }, { available: 3, requested: 0 }], // 3 gold
+    });
+    const { state } = razeState(b, 43508);
+    demolishBuilding(state, b);
+    expect(state.header.mapGoldTotal).toBe(997);
+  });
+
+  it('the same for the gold smelter: site 0xdc keeps the map gold, finished 0x5c pays it back', () => {
+    const site = forester({
+      type: 23, constructing: true, firstKnight: 399,
+      stock: [{ available: 0, requested: 0 }, { available: 3, requested: 0 }],
+    });
+    const a = razeState(site, 43508);
+    demolishBuilding(a.state, site);
+    expect(a.state.header.mapGoldTotal).toBe(1000);
+
+    const done = forester({
+      type: 23,
+      stock: [{ available: 0, requested: 0 }, { available: 3, requested: 0 }],
+    });
+    const c = razeState(done, 43508);
+    demolishBuilding(c.state, done);
+    expect(c.state.header.mapGoldTotal).toBe(997);
+  });
+
+  it('a military building site does not recolour the territory, builder in bld+0xa or not', () => {
+ // The counter case is the test above: a **finished** hut retracts its land to owner 0. Here the
+ // same footprint must stay untouched — otherwise the recolour runs nested inside the collateral
+ // fire of `lost_tile_handler` and books the land score twice.
+    const b = forester({ type: 11, constructing: true, firstKnight: 399 });
+    const { state } = razeState(b, 43508);
+    state.mapTiles[POS].owner = 1;
+    demolishBuilding(state, b);
+    expect(b.burning).toBe(true);
+    expect(state.mapTiles[POS].owner).toBe(1);
+  });
+
+  it('a castle under construction keeps its inventory record (coded 0xe0 matches 0x60 nor 0x28)', () => {
+ // A castle is `active` and owns an inventory from the founding tick on, so the `active` test alone
+ // does not keep a castle **site** out of the warehouse block — only the type byte does. The
+ // original leaves the record behind (@0x49070/@0x49077 both miss, the finale frees nothing); that
+ // is its own leak and is reproduced, not repaired.
+    const b = forester({ type: 24, constructing: true, active: true, inventoryIndex: 0 });
+    const { state } = razeState(b, 43508);
+    (state.inventories as unknown[])[0] = {
+      index: 0, resources: new Array(26).fill(0),
+      outQueue: [{ type: -1, dest: 0 }, { type: -1, dest: 0 }],
+    };
+    (state.inventories[0] as { resources: number[] }).resources[13] = 4; // gold ore
+    (state.inventories[0] as { resources: number[] }).resources[14] = 2; // gold bars
+    state.blockMeta.inventories.maxIndex = 1;
+    demolishBuilding(state, b);
+    expect(state.inventories[0]).not.toBeNull();
+    expect(state.header.mapGoldTotal).toBe(1000);
+  });
+
   it('finale on the highest slot: maxBuildingIndex follows', () => {
     const b = forester({ index: 75, burning: true, firstKnight: 0, level: 100, holder: false });
     const { state } = razeState(b, 100);

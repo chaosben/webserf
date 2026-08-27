@@ -24,9 +24,6 @@ import { cancelTransitResource, demolishFlag } from './road-teardown.js';
 import { constructionDemand } from './building-construction.js';
 import { clearFlagAcceptBytes } from './flag-accept.js';
 
-/** Military building types (hut/tower/fortress/castle) — these project territory influence. */
-const MILITARY_TYPES = new Set([11, 21, 22, 24]);
-
 /**
  * `LAB_000132e2` **phase B** — material request priority, taken byte for byte from the per-type
  * handlers. For each input stock slot of an **occupied** production building it sets the priority on
@@ -284,6 +281,19 @@ export function demolishBuilding(state: GameState, bld: Building): void {
   const flagTile = state.mapTiles[flagPos];
   flagTile.paths &= ~(1 << Direction.UpLeft); // flag -> building (bit 4)
 
+  // ── The masked type byte `bld[4] & 0xfc` (@0x49013) ──
+  // **Every type comparison below is against this value, not against `bld.type`.** The mask keeps
+  // bit 7, so a building **under construction** (`0xac` hut, `0xd4` tower, `0xd8` fortress, `0xdc`
+  // gold smelter, `0xe0` castle) matches none of the comparison values, and the original therefore
+  // does neither the gold subtraction nor the recolour for a site. Both would be wrong: during
+  // construction `bld+9` is the **stone** nibble, not the gold nibble, and a site never stamped any
+  // influence to retreat. The counterpart is `andw $0x7c` (e.g. @0x3290f), which drops bit 7 where a
+  // site is meant to count — the mask, not the type, decides.
+  const typeByte = ((bld.constructing ? 0x80 : 0) | ((bld.type & 0x1f) << 2)) & 0xfc;
+  const isMilitary = typeByte === 0x2c || typeByte === 0x54 || typeByte === 0x58; // hut/tower/fortress
+  const isCastle = typeByte === 0x60;
+  const isWarehouse = typeByte === 0x28;
+
   // ── Gold leaves the world with the building (@0x4903c / @0x49338 / @0x4914e) ──
   // `mapGoldTotal` (gs+0x4c) is the **denominator of knight morale**: how much gold the map still
   // holds at all. If a building that holds gold burns down, it must fall too — otherwise every
@@ -291,10 +301,10 @@ export function demolishBuilding(state: GameState, bld: Building): void {
   // emptied further down: military buildings and the gold smelter keep their gold in the **high nibble
   // of `bld+9`**, a warehouse or castle in its inventory.
   const goldNibble = bld.stock[1].available & 0xf;
-  if (MILITARY_TYPES.has(bld.type) && bld.type !== 24) {
+  if (isMilitary) {
     state.header.mapGoldTotal = (state.header.mapGoldTotal - goldNibble) >>> 0; // @0x49057
-  } else if (bld.type === 23) {
-    state.header.mapGoldTotal = (state.header.mapGoldTotal - goldNibble) >>> 0; // @0x49361
+  } else if (typeByte === 0x5c) {
+    state.header.mapGoldTotal = (state.header.mapGoldTotal - goldNibble) >>> 0; // gold smelter, @0x49361
   }
 
   // ── Recolour the territory (@0x49035 castle, @0x49066 hut/tower/fortress) ──
@@ -307,12 +317,14 @@ export function demolishBuilding(state: GameState, bld: Building): void {
   //  * The gate reads `bld+0xa` **while it still holds the knight chain**. Further down the same
   //    union becomes the burn countdown, which is never 0 — reading it there would make the gate
   //    always true and silently useless.
+  //  * A **site** reaches neither branch (see the masked type byte above). Its `bld+0xa` is not empty
+  //    either — it holds the requested builder — so the gate alone would not stop it.
   //
   // The call belongs **here**, before the warehouse block and the ejection: the recolour can burn
   // buildings on lost tiles, and those see this building with its stock and flag still attached.
   const knightChain = bld.firstKnight ?? 0;
   if (bld.col !== null && bld.row !== null) {
-    if (bld.type === 24 || (MILITARY_TYPES.has(bld.type) && knightChain !== 0)) {
+    if (isCastle || (isMilitary && knightChain !== 0)) {
       recomputeTerritory(state, bld.col, bld.row);
     }
   }
@@ -323,7 +335,7 @@ export function demolishBuilding(state: GameState, bld: Building): void {
   // looked at (`je 0x49138` @0x49104 skips both). Reproduced faithfully, even though it looks like an
   // original oversight.
   const inv = bld.inventoryIndex != null ? state.inventories[bld.inventoryIndex] : null;
-  if (bld.active && (bld.type === 24 || bld.type === 10) && inv) {
+  if (bld.active && (isCastle || isWarehouse) && inv) {
     if (inv.outQueue[0].type >= 0) {
       cancelTransitResource(state, inv.outQueue[0].type + 1, inv.outQueue[0].dest);
       if (inv.outQueue[1].type >= 0) {
@@ -334,9 +346,10 @@ export function demolishBuilding(state: GameState, bld: Building): void {
     state.header.mapGoldTotal =
       (state.header.mapGoldTotal - (inv.resources[13] ?? 0) - (inv.resources[14] ?? 0)) >>> 0;
     freeInventorySlot(state, inv.index); // `call 0x456cd` @0x49163
-  } else if (bld.type !== 24 && bld.type !== 10) {
-    // The branch @0x49364 that only **non**-inventory types reach: `btr $0x4` on `bld+5`. Warehouse and
-    // castle keep their `active` bit — as in the original, whose path never comes past here.
+  } else if (!isCastle && !isWarehouse) {
+    // The branch @0x49364 that only **non**-inventory types reach: `btr $0x4` on `bld+5`. A
+    // **finished** warehouse or castle keeps its `active` bit — its path never comes past here. A
+    // castle **site** does reach it: `0xe0` misses both comparisons above and falls through.
     (bld as { active: boolean }).active = false;
   }
 
