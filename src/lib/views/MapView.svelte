@@ -42,6 +42,19 @@
   } from '../core/ui-sound.js';
   import { demolishOutcomeAt } from '../core/engine/demolish.js';
   import EndCreditsView from './EndCreditsView.svelte';
+  import StockOverlay from '../enhancements/StockOverlay.svelte';
+  import {
+    buildStockView,
+    stockRefreshDue,
+    stockScaleFactor,
+    type StockSelection,
+    type StockView,
+  } from '../enhancements/stock-overview.js';
+  import {
+    createStockTrends,
+    stockTrendTicks,
+    type StockTrend,
+  } from '../enhancements/stock-trend.js';
   import { SfxPlayer } from './sfx-player.js';
   import { TerrainSurface } from './terrain-surface.js';
   import {
@@ -868,6 +881,88 @@
     if (!playing && !engineDirty) return save;
     void frameVersion; // pro Frame / nach Aktionen neu rechnen
     return snapshot(engineState);
+  });
+
+  // --- stock overview (OUR OWN ADDITION, no original counterpart) -------------------------------
+
+  /**
+   * The shown set of numbers, and when it was built. Plain `let`s on purpose — the same idiom as
+   * `lastGroundSig` and `lastSoundFrame` below: they are bookkeeping of the draw path, not state
+   * anybody renders from.
+   */
+  let stockShown: StockView | null = null;
+  let stockShownAt = Number.NEGATIVE_INFINITY;
+  let stockShownSel: StockSelection | null = null;
+  let stockShownSpan = -1;
+  let stockTrendsShown: ReadonlyMap<number, StockTrend> | null = null;
+  /**
+   * Measures the trend itself, because there is nothing to read: the game keeps no history of stock
+   * levels — see `stock-trend.ts`. It is fed inside the throttle, not per frame: it needs the
+   * numbers, and those are only rebuilt there.
+   */
+  const stockTrendMem = createStockTrends();
+
+  /**
+   * The selection IS the switch: nothing chosen means nothing shown. There is no separate one, so
+   * that a tick in the dialog shows its effect straight away.
+   */
+  const stockSelection = $derived.by((): StockSelection | null => {
+    const goods = settings.value.stockGoods;
+    const serfs = settings.value.stockSerfs;
+    if (goods === 0 && serfs === 0) return null;
+    return { goods, serfs, mode: settings.value.stockSerfMode };
+  });
+
+  /**
+   * **The early return has to come BEFORE `void frameVersion`.** Dependencies are collected afresh
+   * on every run, so while nothing is selected this derived depends on nothing and is not run per
+   * frame at all — rather than running and returning null quickly. Swap the two lines and it is
+   * called up to a hundred times a second for nothing.
+   *
+   * The throttle is display only and touches no logic. It is dropped as soon as the SELECTION
+   * changes (`stockSelection` is a fresh object then), because a tick in the dialog that takes a
+   * fifth of a second to show up reads as a fault.
+   */
+  const stockView = $derived.by((): StockView | null => {
+    const sel = stockSelection;
+    if (sel === null) return null;
+    void frameVersion;
+    // Read BEFORE the throttle, and part of what drops it: otherwise a change of step would take a
+    // fifth of a second to show, and the derived would stop depending on the setting at all.
+    const spanTicks = stockTrendTicks(settings.value.stockTrend);
+    const now = performance.now();
+    if (
+      sel === stockShownSel &&
+      spanTicks === stockShownSpan &&
+      !stockRefreshDue(now, stockShownAt, playing)
+    ) {
+      return stockShown;
+    }
+    const p = engineState.players[buildPlayer];
+    stockShown = p && p.active ? buildStockView(engineState, p, sel) : null;
+    stockTrendsShown =
+      stockShown === null || spanTicks === 0
+        ? null
+        : stockTrendMem.observe({
+            // `engineState` is the identity of the running game: a different object means a
+            // different world, and comparing numbers across it would be nonsense.
+            game: engineState,
+            selection: sel,
+            gameTick: engineState.gameTick,
+            nowMs: now,
+            view: stockShown,
+            spanTicks,
+          });
+    stockShownAt = now;
+    stockShownSel = sel;
+    stockShownSpan = spanTicks;
+    return stockShown;
+  });
+
+  /** Trends belonging to {@link stockView}; `null` while the window is off. */
+  const stockTrends = $derived.by((): ReadonlyMap<number, StockTrend> | null => {
+    void stockView; // the trends are built there — this only reads them back out
+    return stockTrendsShown;
   });
 
   // --- building (original: build popup selection `gs+0x27a` × map cursor) ------------------------
@@ -4369,6 +4464,17 @@
          a screen recording show the game rather than just the map, and it puts the stacking order
          into the code instead of into the document order. -->
     <canvas bind:this={host}></canvas>
+    <!-- Our own readout, and the one thing to know about it: it is a DOM layer, so it is NOT in a
+         screenshot or a screen recording, which see the canvas alone. It sits before the end
+         credits so that those, which take the whole stage, cover it. -->
+    <StockOverlay
+      view={stockView}
+      trends={stockTrends}
+      corner={settings.value.stockCorner}
+      opacity={settings.value.stockOpacity}
+      perRow={settings.value.stockPerRow}
+      scale={stockScaleFactor(settings.value.stockScale, uiScale)}
+    />
     {#if showEndCredits && archive !== null}
       <!-- The end credits (`run_end_credits` @0x38b55): a full-screen sequence on a 352 × 240 surface
            of its own, not abortable, about 75 seconds. It covers the whole game screen because the

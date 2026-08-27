@@ -21,10 +21,15 @@
 	import RecordingPanel from '$lib/shell/RecordingPanel.svelte';
 	import InfoPanel from '$lib/shell/InfoPanel.svelte';
 	import SavesPanel from '$lib/shell/SavesPanel.svelte';
+	import EnhancementsPanel from '$lib/enhancements/EnhancementsPanel.svelte';
+	import EnhancementNav from '$lib/enhancements/EnhancementNav.svelte';
+	import { ENHANCEMENTS, enhancementFor, enhancementTabFor } from '$lib/enhancements/registry.js';
+	import { provideIconSource } from '$lib/enhancements/icon-images.svelte.js';
 	import IconSettings from '~icons/material-symbols-light/settings-outline';
 	import IconTransfer from '~icons/material-symbols-light/swap-vert';
 	import IconBug from '~icons/material-symbols-light/bug-report-outline';
 	import IconRecord from '~icons/material-symbols-light/videocam-outline';
+	import IconEnhance from '~icons/material-symbols-light/extension-outline';
 	import IconInfo from '~icons/material-symbols-light/info-outline';
 	import { recordings } from '$lib/shell/recording.svelte.js';
 	import { log } from '$lib/shell/log.js';
@@ -51,6 +56,7 @@
 		{ id: 'io', icon: IconTransfer, labelKey: 'group.io' },
 		{ id: 'bug', icon: IconBug, labelKey: 'group.bug' },
 		{ id: 'record', icon: IconRecord, labelKey: 'group.record' },
+		{ id: 'enhance', icon: IconEnhance, labelKey: 'group.enhance' },
 		{ id: 'info', icon: IconInfo, labelKey: 'group.info' }
 	];
 
@@ -141,6 +147,17 @@
 	 * days ago.
 	 */
 	let ioTab = $state<string>(IO_TABS[0]!.id);
+	/**
+	 * Same reasoning for the enhancements panel, on both of its levels: which enhancement and which
+	 * of its tabs are open is not worth persisting.
+	 *
+	 * Switching enhancement needs no reset of `enhanceTab`: tab ids are unique across the whole
+	 * registry, so the remembered one no longer belongs to the new enhancement and
+	 * `enhancementTabFor` falls back to its first — the same rule the panel applies when marking.
+	 */
+	let enhanceId = $state<string>(ENHANCEMENTS[0]!.id);
+	let enhanceTab = $state<string>(ENHANCEMENTS[0]!.tabs[0]!.id);
+	const enhancement = $derived(enhancementFor(enhanceId));
 
 	const palette = $derived(palettes[GAME_PALETTE_INDEX] ?? null);
 	/**
@@ -148,6 +165,15 @@
 	 * visible nowhere else: it hangs off the content of the archive, not off its filename, and it
 	 * determines every string of the interface.
 	 */
+	/**
+	 * The original icons for the enhancement screens. Registered HERE and not in the game view: the
+	 * dialog is reachable from the main menu too, where no game view exists.
+	 */
+	$effect(() => {
+		if (archive === null || palette === null) return;
+		return provideIconSource(archive, palette);
+	});
+
 	const archiveInfo = $derived(
 		archive === null
 			? null
@@ -566,6 +592,23 @@
 		{:else if activeGroup === 'record'}
 			<OverlayPanel title={st('group.record')} onclose={() => settings.set('drawerGroup', null)}>
 				<RecordingPanel />
+			</OverlayPanel>
+		{:else if activeGroup === 'enhance'}
+			<OverlayPanel
+				title={st('group.enhance')}
+				tabs={enhancement.tabs}
+				tab={enhancementTabFor(enhancement, enhanceTab).id}
+				ontab={(id) => (enhanceTab = id)}
+				onclose={() => settings.set('drawerGroup', null)}
+			>
+				{#snippet nav()}
+					<EnhancementNav
+						enhancements={ENHANCEMENTS}
+						active={enhancement.id}
+						onselect={(id) => (enhanceId = id)}
+					/>
+				{/snippet}
+				<EnhancementsPanel {enhancement} tab={enhanceTab} />
 			</OverlayPanel>
 		{:else if activeGroup === 'info'}
 			<OverlayPanel title={st('group.info')} onclose={() => settings.set('drawerGroup', null)}>

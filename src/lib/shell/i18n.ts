@@ -67,6 +67,7 @@ const EN = {
 	'group.io': 'Import & export',
 	'group.bug': 'Report a bug',
 	'group.record': 'Record',
+	'group.enhance': 'Enhancements',
 	'group.info': 'About webserf',
 	'overlay.close': 'Close',
 	'page.loading': 'Loading…',
@@ -200,6 +201,60 @@ const EN = {
 	'info.log.note':
 		'Log output lands in the browser console — open the devtools and filter by category (assets, engine, menu, game). Render timings are collected in the background and ride along in a bug report.',
 
+	// -- Enhancements: additions of ours with no counterpart in the original --------------------
+	'enh.stock.name': 'Stock overview',
+	'enh.tab.goods': 'Goods',
+	'enh.tab.serfs': 'Settlers',
+	'enh.tab.view': 'Display',
+	'enh.overlay.aria': 'Stock overview',
+	'enh.intro':
+		'A readout over the game surface showing what your warehouses hold. The original has no such ' +
+		'thing — it shows these numbers only inside windows that cover half the map.',
+	'enh.pick.all': 'All',
+	'enh.pick.none': 'None',
+	'enh.pick.count': '{on} of {all} selected',
+	'enh.pick.noIcons': 'Load an archive to see the pictures.',
+	'enh.goods.title': 'Which goods',
+	'enh.goods.note':
+		'Counted over all your warehouses, plus the building reserve the castle parks at its founding — ' +
+		'the same sum the storage statistics show.',
+	'enh.serfs.title': 'Which settlers',
+	'enh.serfs.mode': 'Count as',
+	'enh.serfs.modeIdle': 'Resting in a store',
+	'enh.serfs.modeAvailable': 'Could be made',
+	'enh.serfs.modeNote':
+		'“Could be made” adds the unemployed settlers to every profession whose tool lies in the store. ' +
+		'One settler therefore counts in several rows — the question is “how many of these could I ' +
+		'have”, not “how would they divide up”.',
+	'enh.view.title': 'The readout',
+	'enh.view.emptyNote':
+		'There is no separate switch: what is ticked under “Goods” and “Settlers” is shown. Choose ' +
+		'“None” in both and the readout disappears. It is drawn over the game screen, not into it — a ' +
+		'screenshot and a video recording therefore do not contain it.',
+	'enh.view.corner': 'Corner',
+	'enh.view.perRow': 'Entries per row',
+	'enh.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
+	'enh.view.size': 'Size',
+	'enh.view.sizeAuto': 'Auto',
+	'enh.view.sizeNote':
+		'“Auto” follows the game interface, so the readout grows and shrinks with the zoom; a fixed ' +
+		'step stays put.',
+	'enh.view.opacity': 'Opacity',
+	'enh.view.trend': 'Trend',
+	'enh.view.trendNote':
+		'An arrow before the number says whether there is more or less of it than there was. The ' +
+		'window counts in GAME time, so the arrow means the same at every speed and stands still ' +
+		'while paused. After switching on, the first window shows nothing: what has not been ' +
+		'measured is not claimed.',
+	'enh.trend.off': 'Off',
+	'enh.trend.short': 'Short',
+	'enh.trend.medium': 'Medium',
+	'enh.trend.long': 'Long',
+	'enh.corner.tl': 'Top left',
+	'enh.corner.tr': 'Top right',
+	'enh.corner.bl': 'Bottom left',
+	'enh.corner.br': 'Bottom right',
+
 	// -- Screen-reader labels for the game surfaces --------------------------------------------
 	// These are OURS, not the original's: the original has none. That is why they live here and not
 	// with the original strings — and why they have to follow the shell language.
@@ -244,6 +299,7 @@ const DE: Record<ShellKey, string> = {
 	'group.io': 'Import & Export',
 	'group.bug': 'Fehler melden',
 	'group.record': 'Aufnehmen',
+	'group.enhance': 'Verbesserungen',
 	'group.info': 'Über webserf',
 	'overlay.close': 'Schließen',
 	'page.loading': 'Lädt…',
@@ -362,6 +418,60 @@ const DE: Record<ShellKey, string> = {
 	'info.log.title': 'Log-Ausgaben',
 	'info.log.note':
 		'Log-Ausgaben landen in der Browser-Konsole — Devtools öffnen und nach Kategorie filtern (assets, engine, menu, game). Die Zeichen-Messung läuft im Hintergrund mit und fährt in einem Fehlerbericht mit.',
+
+	// -- Verbesserungen ------------------------------------------------------------------------
+	'enh.stock.name': 'Lager-Übersicht',
+	'enh.tab.goods': 'Waren',
+	'enh.tab.serfs': 'Siedler',
+	'enh.tab.view': 'Darstellung',
+	'enh.overlay.aria': 'Lager-Übersicht',
+	'enh.intro':
+		'Eine Anzeige über der Spielfläche, die zeigt, was in Ihren Lagern liegt. Das Original hat so ' +
+		'etwas nicht — es zeigt diese Zahlen nur in Fenstern, die die halbe Karte verdecken.',
+	'enh.pick.all': 'Alle',
+	'enh.pick.none': 'Keine',
+	'enh.pick.count': '{on} von {all} ausgewählt',
+	'enh.pick.noIcons': 'Laden Sie ein Archiv, um die Bilder zu sehen.',
+	'enh.goods.title': 'Welche Waren',
+	'enh.goods.note':
+		'Gezählt über alle Ihre Lager, dazu die Bau-Reserve, die das Schloss bei der Gründung ' +
+		'zurücklegt — dieselbe Summe, die auch die Lager-Statistik zeigt.',
+	'enh.serfs.title': 'Welche Siedler',
+	'enh.serfs.mode': 'Gezählt wird',
+	'enh.serfs.modeIdle': 'Wer im Lager ruht',
+	'enh.serfs.modeAvailable': 'Wer daraus werden könnte',
+	'enh.serfs.modeNote':
+		'„Wer daraus werden könnte“ rechnet die freien Siedler jedem Beruf zu, dessen Werkzeug im Lager ' +
+		'liegt. Ein Siedler zählt damit in mehreren Zeilen — gefragt ist „wie viele davon könnte ich ' +
+		'haben“, nicht „wie würden sie sich aufteilen“.',
+	'enh.view.title': 'Die Anzeige',
+	'enh.view.emptyNote':
+		'Es gibt keinen eigenen Schalter: gezeigt wird, was unter „Waren“ und „Siedler“ angehakt ist. ' +
+		'Wählen Sie in beiden „Keine“, verschwindet die Anzeige. Sie liegt über dem Spielbildschirm, ' +
+		'nicht darin — ein Bildschirmfoto und eine Videoaufnahme enthalten sie deshalb nicht.',
+	'enh.view.corner': 'Ecke',
+	'enh.view.perRow': 'Einträge je Zeile',
+	'enh.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
+	'enh.view.size': 'Größe',
+	'enh.view.sizeAuto': 'Auto',
+	'enh.view.sizeNote':
+		'„Auto“ folgt der Spiel-Oberfläche, die Anzeige wächst und schrumpft also mit dem Zoom; eine ' +
+		'feste Stufe bleibt unverändert.',
+	'enh.view.opacity': 'Deckkraft',
+	'enh.view.trend': 'Tendenz',
+	'enh.view.trendNote':
+		'Ein Pfeil vor der Zahl sagt, ob es mehr oder weniger geworden ist. Der Zeitraum zählt in ' +
+		'SPIELZEIT, der Pfeil bedeutet also bei jedem Tempo dasselbe und steht bei Pause still. ' +
+		'Nach dem Einschalten zeigt der erste Zeitraum nichts: was nicht gemessen ist, wird nicht ' +
+		'behauptet.',
+	'enh.trend.off': 'Aus',
+	'enh.trend.short': 'Kurz',
+	'enh.trend.medium': 'Mittel',
+	'enh.trend.long': 'Lang',
+	'enh.corner.tl': 'Oben links',
+	'enh.corner.tr': 'Oben rechts',
+	'enh.corner.bl': 'Unten links',
+	'enh.corner.br': 'Unten rechts',
 
 	'record.stillTitle': 'Bildschirmfoto',
 	'record.stillNote':

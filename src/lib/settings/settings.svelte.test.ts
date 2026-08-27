@@ -33,7 +33,7 @@ describe('settings store', () => {
 
 	it('accepts valid values and writes them back', async () => {
 		const { settings, box } = await load({
-			v: 3,
+			v: 5,
 			data: { volume: 12, music: false, sfx: false, speedFactor: 4, viewOptions: [0x25, 0x39] }
 		});
 		expect(settings.value.volume).toBe(12);
@@ -57,7 +57,7 @@ describe('settings store', () => {
 	 */
 	it('does not resurrect fields of a removed panel', async () => {
 		const { settings } = await load({
-			v: 3,
+			v: 5,
 			data: { consoleOpen: true, consoleHeight: 400, logLevel: 'debug', volume: 12 }
 		});
 		expect(Object.keys(settings.value)).not.toContain('consoleOpen');
@@ -77,16 +77,49 @@ describe('settings store', () => {
 		['viewOptions as an object', { viewOptions: { 0: 1, 1: 2 } }, 'viewOptions'],
 		['viewOptions too short', { viewOptions: [0x39] }, 'viewOptions'],
 		['viewOptions not a byte', { viewOptions: [0x39, 300] }, 'viewOptions'],
-		['drawer group as a number', { drawerGroup: 7 }, 'drawerGroup']
+		['drawer group as a number', { drawerGroup: 7 }, 'drawerGroup'],
+		// The stock overview. Every one of these would slip through `typeof v === 'number'` or
+		// `=== 'string'` — the shortcut the comment above `CHECK` rules out.
+		['a negative goods mask', { stockGoods: -1 }, 'stockGoods'],
+		['a fractional goods mask', { stockGoods: 1.5 }, 'stockGoods'],
+		['a goods mask past the last good', { stockGoods: 2 ** 26 }, 'stockGoods'],
+		['a serf mask past the last profession', { stockSerfs: 2 ** 27 }, 'stockSerfs'],
+		['a corner that does not exist', { stockCorner: 'middle' }, 'stockCorner'],
+		['an unknown serf mode', { stockSerfMode: 'total' }, 'stockSerfMode'],
+		['an opacity outside 0.2..1', { stockOpacity: 5 }, 'stockOpacity'],
+		['no entry per row at all', { stockPerRow: 0 }, 'stockPerRow'],
+		['more entries per row than offered', { stockPerRow: 13 }, 'stockPerRow'],
+		['a fractional row width', { stockPerRow: 1.5 }, 'stockPerRow'],
+		['a size step that does not exist', { stockScale: '5' }, 'stockScale'],
+		['the size as a number instead of a step', { stockScale: 2 }, 'stockScale'],
+		['a trend window that does not exist', { stockTrend: 'week' }, 'stockTrend'],
+		['the trend window as a number', { stockTrend: 2 }, 'stockTrend']
 	])('rejects %s', async (_name, data, key) => {
-		const { settings, defaults } = await load({ v: 3, data });
+		const { settings, defaults } = await load({ v: 5, data });
 		expect(settings.value[key as keyof typeof defaults]).toEqual(
 			defaults[key as keyof typeof defaults]
 		);
 	});
 
+	/**
+	 * A field ADDED later must not cost the user their other settings. The reader checks the version
+	 * and then validates field by field, so an entry written before the field existed keeps
+	 * everything it does carry — which is why adding one needs no version bump. Whoever adds a bump
+	 * anyway breaks this line, and that is the point of it.
+	 */
+	it('loads a stored entry that predates a field and gives that one field its default', async () => {
+		const { settings, defaults } = await load({
+			v: 5,
+			data: { volume: 12, stockCorner: 'br', stockPerRow: 4 }
+		});
+		expect(settings.value.stockTrend).toBe(defaults.stockTrend);
+		expect(settings.value.volume).toBe(12);
+		expect(settings.value.stockCorner).toBe('br');
+		expect(settings.value.stockPerRow).toBe(4);
+	});
+
 	it('a damaged field costs only itself, not the others', async () => {
-		const { settings } = await load({ v: 3, data: { volume: 1000, music: false } });
+		const { settings } = await load({ v: 5, data: { volume: 1000, music: false } });
 		expect(settings.value.volume).toBe(75); // default
 		expect(settings.value.music).toBe(false); // kept
 	});

@@ -11,6 +11,10 @@
 	 *
 	 * Keyboard handling sits on the bar, not on the window: arrow keys otherwise belong to the game
 	 * surface. Escape closes — the only key the panel claims globally.
+	 *
+	 * A `nav` SNIPPET is optional too: a column to the left of tab bar and body, for a panel whose
+	 * content has a level above its tabs. Without it nothing about the panel changes, which is why
+	 * the other callers stay untouched.
 	 */
 	import type { Snippet } from 'svelte';
 	import type { OverlayTab } from './drawer.js';
@@ -22,6 +26,7 @@
 		tabs,
 		tab,
 		ontab,
+		nav,
 		children
 	}: {
 		title: string;
@@ -31,6 +36,8 @@
 		/** The open tab. */
 		tab?: string | null;
 		ontab?: (id: string) => void;
+		/** Optional column to the left of tab bar and body. */
+		nav?: Snippet;
 		children: Snippet;
 	} = $props();
 
@@ -75,46 +82,53 @@
 />
 
 <div class="overlay">
-	<div class="panel">
+	<div class="panel" class:wide={nav !== undefined}>
 		<header>
 			<h2>{title}</h2>
 			<button type="button" onclick={onclose} aria-label={st('overlay.close')}>×</button>
 		</header>
 
-		{#if strip !== null}
-			<div class="tabs" role="tablist" aria-label={title}>
-				{#each strip as t (t.id)}
-					<button
-						type="button"
-						role="tab"
-						id="{uid}-tab-{t.id}"
-						aria-controls="{uid}-panel"
-						aria-selected={t.id === current?.id}
-						tabindex={t.id === current?.id ? 0 : -1}
-						class:active={t.id === current?.id}
-						onclick={() => ontab?.(t.id)}
-						{onkeydown}
-					>
-						{st(t.labelKey)}
-					</button>
-				{/each}
-			</div>
-		{/if}
+		<div class="main" class:split={nav !== undefined}>
+			{#if nav !== undefined}
+				<div class="nav">{@render nav()}</div>
+			{/if}
+			<div class="stack">
+				{#if strip !== null}
+					<div class="tabs" role="tablist" aria-label={title}>
+						{#each strip as t (t.id)}
+							<button
+								type="button"
+								role="tab"
+								id="{uid}-tab-{t.id}"
+								aria-controls="{uid}-panel"
+								aria-selected={t.id === current?.id}
+								tabindex={t.id === current?.id ? 0 : -1}
+								class:active={t.id === current?.id}
+								onclick={() => ontab?.(t.id)}
+								{onkeydown}
+							>
+								{st(t.labelKey)}
+							</button>
+						{/each}
+					</div>
+				{/if}
 
-		{#if strip === null}
-			<div class="body">
-				{@render children()}
+				{#if strip === null}
+					<div class="body">
+						{@render children()}
+					</div>
+				{:else}
+					<div
+						class="body"
+						id="{uid}-panel"
+						role="tabpanel"
+						aria-labelledby="{uid}-tab-{current?.id}"
+					>
+						{@render children()}
+					</div>
+				{/if}
 			</div>
-		{:else}
-			<div
-				class="body"
-				id="{uid}-panel"
-				role="tabpanel"
-				aria-labelledby="{uid}-tab-{current?.id}"
-			>
-				{@render children()}
-			</div>
-		{/if}
+		</div>
 	</div>
 </div>
 
@@ -193,5 +207,26 @@
 		padding: 0.75rem;
 		display: grid;
 		gap: 0.75rem;
+	}
+
+	/* A panel with a navigation column needs room for two of them. */
+	.panel.wide {
+		width: min(46rem, 100%);
+	}
+
+	/* `auto 1fr`: the column stays as narrow as its longest entry, the rest is the body's. */
+	.main.split {
+		display: grid;
+		grid-template-columns: auto 1fr;
+	}
+
+	.main.split .nav {
+		border-right: 1px solid var(--line);
+		background: var(--bg-sunken);
+	}
+
+	/* Without `min-width: 0` a wide body would push the grid past the panel instead of scrolling. */
+	.main.split .stack {
+		min-width: 0;
 	}
 </style>

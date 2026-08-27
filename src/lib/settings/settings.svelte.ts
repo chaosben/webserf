@@ -23,14 +23,38 @@ import {
 } from '../core/engine/view-options.js';
 import { SFX_DEFAULT } from '../core/options-popup.js';
 import { DEFAULT_TICKS_PER_SECOND } from '../core/engine/scheduler.js';
+import {
+	GOOD_SLOTS,
+	SERF_SLOTS,
+	STOCK_CORNERS,
+	STOCK_GOODS_DEFAULT,
+	STOCK_OPACITY_DEFAULT,
+	STOCK_OPACITY_MAX,
+	STOCK_OPACITY_MIN,
+	STOCK_PER_ROW_DEFAULT,
+	STOCK_PER_ROW_MAX,
+	STOCK_PER_ROW_MIN,
+	STOCK_SCALES,
+	STOCK_SERFS_DEFAULT,
+	STOCK_SERF_MODES,
+	type StockCorner,
+	type StockScale,
+	type StockSerfMode
+} from '../enhancements/stock-overview.js';
+import { STOCK_TREND_SPANS, type StockTrendSpan } from '../enhancements/stock-trend.js';
 
 const KEY = 'webserf.settings';
 
 /**
  * Bump whenever the shape changes; a stored entry of another version then falls back to the
- * defaults. Version 3 == without the three console fields of the removed in-page console.
+ * defaults. Version 5 == the stock overview without its own switch, with row width and size.
+ *
+ * A purely ADDITIVE field needs no bump, and adding one must not take it: the reader checks the
+ * version and then validates FIELD BY FIELD, so a stored version 5 entry that predates a new field
+ * passes the version gate, fails that field's check and keeps its default. Everything else the user
+ * had set survives. A removed or reinterpreted field is the case that does need the bump.
  */
-const VERSION = 3;
+const VERSION = 5;
 
 /**
  * Selectable game speeds as a multiple of the original tick rate (100 ticks/s, measured on the
@@ -53,6 +77,27 @@ export interface SettingsShape {
 	volume: number;
 	/** Per-screen-half control options (`.DS`@72/73) as the starting value of a new game. */
 	viewOptions: [number, number];
+
+	// -- Stock overview. Our own addition; the original has no permanent readout of this kind. ----
+	/**
+	 * Which goods it lists — bit i = resource type i. Together with {@link stockSerfs} this IS the
+	 * on/off switch: an empty selection shows nothing.
+	 */
+	stockGoods: number;
+	/** Which professions it lists — bit i = serf type i. */
+	stockSerfs: number;
+	/** Which corner of the game surface it sits in. */
+	stockCorner: StockCorner;
+	/** What the serf numbers mean: resting in a store, or what could be made of the unemployed. */
+	stockSerfMode: StockSerfMode;
+	/** How opaque the backing plate is. */
+	stockOpacity: number;
+	/** How many entries stand side by side — the choice between a column and a strip. */
+	stockPerRow: number;
+	/** Size of its pictures: following the game interface, or a fixed whole step. */
+	stockScale: StockScale;
+	/** How far back the trend arrows compare — `off` leaves the arrow column out entirely. */
+	stockTrend: StockTrendSpan;
 }
 
 const DEFAULTS: SettingsShape = {
@@ -61,7 +106,15 @@ const DEFAULTS: SettingsShape = {
 	music: MUSIC_DEFAULT,
 	sfx: SFX_DEFAULT,
 	volume: VOLUME_DEFAULT,
-	viewOptions: [VIEW_OPTIONS_DEFAULT, VIEW_OPTIONS_DEFAULT]
+	viewOptions: [VIEW_OPTIONS_DEFAULT, VIEW_OPTIONS_DEFAULT],
+	stockGoods: STOCK_GOODS_DEFAULT,
+	stockSerfs: STOCK_SERFS_DEFAULT,
+	stockCorner: 'tl',
+	stockSerfMode: 'idle',
+	stockOpacity: STOCK_OPACITY_DEFAULT,
+	stockPerRow: STOCK_PER_ROW_DEFAULT,
+	stockScale: 'auto',
+	stockTrend: 'short'
 };
 
 /**
@@ -73,6 +126,13 @@ function fresh(): SettingsShape {
 }
 
 const isByte = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 255;
+
+/** A selection mask: a non-negative integer below `2 ** slots` — see `stock-overview.ts`. */
+const isMask = (v: unknown, slots: number): boolean =>
+	typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 2 ** slots;
+
+const isOneOf = <T extends string>(v: unknown, values: readonly T[]): v is T =>
+	typeof v === 'string' && (values as readonly string[]).includes(v);
 
 /**
  * One validator per field. Deliberately spelled out instead of `typeof v === typeof DEFAULTS[k]`:
@@ -87,7 +147,20 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	sfx: (v): v is boolean => typeof v === 'boolean',
 	volume: (v): v is number =>
 		typeof v === 'number' && Number.isInteger(v) && v >= VOLUME_MIN && v <= VOLUME_MAX,
-	viewOptions: (v): v is [number, number] => Array.isArray(v) && v.length === 2 && v.every(isByte)
+	viewOptions: (v): v is [number, number] => Array.isArray(v) && v.length === 2 && v.every(isByte),
+	stockGoods: (v): v is number => isMask(v, GOOD_SLOTS),
+	stockSerfs: (v): v is number => isMask(v, SERF_SLOTS),
+	stockCorner: (v): v is StockCorner => isOneOf(v, STOCK_CORNERS),
+	stockSerfMode: (v): v is StockSerfMode => isOneOf(v, STOCK_SERF_MODES),
+	stockOpacity: (v): v is number =>
+		typeof v === 'number' && v >= STOCK_OPACITY_MIN && v <= STOCK_OPACITY_MAX,
+	stockPerRow: (v): v is number =>
+		typeof v === 'number' &&
+		Number.isInteger(v) &&
+		v >= STOCK_PER_ROW_MIN &&
+		v <= STOCK_PER_ROW_MAX,
+	stockScale: (v): v is StockScale => isOneOf(v, STOCK_SCALES),
+	stockTrend: (v): v is StockTrendSpan => isOneOf(v, STOCK_TREND_SPANS)
 };
 
 function read(): SettingsShape {

@@ -40,6 +40,14 @@
 		--amber: #d7a03c;
 		--danger: #c9583f;
 		--overlay: rgb(6 8 6 / 82%);
+		/*
+		 * Rising and falling. Tokens of their own although the green matches `--accent`: that one
+		 * means "touched/active" everywhere else, and a shared token would tie two unrelated
+		 * meanings together. The red is lighter than `--danger`, because a single glyph on a dark
+		 * plate needs more luminance than a button label does.
+		 */
+		--trend-up: #86c06a;
+		--trend-down: #d9705a;
 
 		color-scheme: dark;
 		background: var(--bg);
