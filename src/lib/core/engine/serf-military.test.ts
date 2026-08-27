@@ -645,6 +645,85 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     expect(state.mapTiles[farPos].owner).toBe(2); // outside the radius -> unchanged, no recolour
   });
 
+  /**
+   * The footprint block @0x16d28..@0x16e46: the building tile and its six hex neighbours go to the
+   * winner, and five of them (everything except the building itself and its flag) additionally run
+   * through `clearTileRoadsAndFlag` (@0x1725e). Without that half a foreign flag next to the captured
+   * building survives on ground that now belongs to the winner — the tile never changes owner, so
+   * nothing else would ever remove it.
+   */
+  describe('52: der Footprint-Abriss (@0x16d28..@0x16e46)', () => {
+    /** Plant a free-standing flag of the OLD owner on `pos` and return its slot. */
+    function plantFlag(state: GameState, pos: number, index: number): void {
+      state.flags[index] = {
+        index,
+        owner: 1,
+        paths: new Array(6).fill(false),
+        transporters: new Array(6).fill(false),
+        length: new Array(6).fill(0),
+        otherEndDir: new Array(6).fill(0),
+        stockPriority: [0, 0],
+        connections: new Array(6).fill(null),
+        hasBuilding: false,
+        acceptsSerfs: false,
+        acceptsResources: false,
+        resourceSlots: new Array(8).fill(-1),
+        slotDir: new Array(8).fill(-1),
+        slotDest: new Array(8).fill(0),
+        scheduled: new Array(6).fill(false),
+        scheduledSlot: new Array(6).fill(0),
+        hasResources: false,
+      } as unknown as Flag;
+      state.blockMeta.flags.maxIndex = Math.max(state.blockMeta.flags.maxIndex, index + 1);
+      state.mapTiles[pos].object = 1;
+      state.mapTiles[pos].objIndex = index;
+    }
+
+    it('a foreign flag on a neighbour tile is torn down — the reported case', () => {
+      const { state, knight, bldPos } = mkOccupyState(0);
+      const leftPos = neighbor(bldPos, Direction.Left, geo);
+      plantFlag(state, leftPos, 4);
+      knightOccupyEnemyBuilding(state, knight);
+      expect(state.flags[4]).toBeNull();
+      expect(state.mapTiles[leftPos].object).toBe(0);
+      expect(state.mapTiles[leftPos].owner).toBe(1); // and the tile belongs to the winner
+    });
+
+    it('all five neighbours outside the flag tile are cleared', () => {
+      const { state, knight, bldPos } = mkOccupyState(0);
+      const dirs = [Direction.Down, Direction.Left, Direction.Right, Direction.Up, Direction.UpLeft];
+      dirs.forEach((d, i) => plantFlag(state, neighbor(bldPos, d, geo), 4 + i));
+      knightOccupyEnemyBuilding(state, knight);
+      for (let i = 0; i < dirs.length; i++) expect(state.flags[4 + i]).toBeNull();
+    });
+
+    it('the captured flag itself SURVIVES and changes owner — the counter direction', () => {
+      const { state, knight, flag, flagPos } = mkOccupyState(0);
+      knightOccupyEnemyBuilding(state, knight);
+      expect(state.flags[3]).toBe(flag);
+      expect(state.mapTiles[flagPos].object).toBe(1);
+      expect(flag.owner).toBe(0);
+    });
+
+    it('a flag one ring further out is out of reach', () => {
+      const { state, knight, bldPos } = mkOccupyState(0);
+      const farPos = neighbor(neighbor(bldPos, Direction.Left, geo), Direction.Left, geo);
+      plantFlag(state, farPos, 4);
+      knightOccupyEnemyBuilding(state, knight);
+      expect(state.flags[4]).not.toBeNull();
+      expect(state.mapTiles[farPos].object).toBe(1);
+    });
+
+    it('the owner of all seven footprint tiles goes to the winner', () => {
+      const { state, knight, bldPos, flagPos } = mkOccupyState(0);
+      knightOccupyEnemyBuilding(state, knight);
+      const all = [bldPos, flagPos, ...[
+        Direction.Right, Direction.Down, Direction.Left, Direction.UpLeft, Direction.Up,
+      ].map((d) => neighbor(bldPos, d, geo))];
+      for (const p of all) expect(state.mapTiles[p].owner).toBe(1);
+    });
+  });
+
  /**
   * A **castle** is not taken over but burned down (`cmpw $0x60` @0x16b8d). The branch
   * joins the only two writers of the **castle balance** (block 478): `+1` for the winner here,

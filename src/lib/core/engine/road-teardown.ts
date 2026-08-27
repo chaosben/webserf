@@ -7,8 +7,10 @@
  *   `paths` bits up to the far flag, and tidy that flag's record bits for the reverse direction.
  * - {@link demolishFlag}: remove a flag completely — clear its roads, cancel serf destinations, return
  *   resources, clear the map object and free the flag slot.
+ *
+ * On top of those two sits {@link clearTileRoadsAndFlag} (@0x1725e), which applies them to ONE tile.
  */
-import { Direction, oppositeDir, neighbor, posOf } from './position.js';
+import { Direction, oppositeDir, neighbor, posOf, colOf, rowOf } from './position.js';
 // Runtime cycle with `road-building.ts`, which takes `isRoadSegmentClearable`/`lengthToCategory` from
 // here: the two call each other only at runtime, mirroring the mutual `call`s of the original.
 import { cancelRoadBuilding } from './road-building.js';
@@ -774,4 +776,57 @@ export function demolishFlag(state: GameState, flagIdx: number, col: number, row
   tile.serfIndex = 0;
 
   freeFlagSlot(state, flagIdx);
+}
+
+/**
+ * @0x1725e — tear down whatever road network sits on ONE tile. Two branches, decided by the flag
+ * marker of the tile's first landscape byte (`js` @0x172cc, bit 7):
+ * - no flag: if the tile carries path bits at all, {@link clearRoadPaths} on it (@0x172e3).
+ * - a flag: for each of the six directions, if the NEIGHBOUR has the path bit pointing back at the
+ *   centre, {@link clearRoadPaths} on that neighbour (six `bt` 3/4/5/0/1/2 with their own call), then
+ *   {@link demolishFlag} on the centre (@0x174c7).
+ *
+ * The flag marker is bit 7 of the path byte and the closing test reads the object byte instead
+ * (`andb $0x7f; cmpb $0x1` @0x174a8) — in the decoded model both are `object === 1`. They stay two
+ * separate live reads, as in the original: the second one is what makes a flag that a neighbour's
+ * teardown already removed a no-op rather than a crash.
+ *
+ * Called from exactly five places, all in the capture branch of serf state 52 (@0x16d7f, @0x16da7,
+ * @0x16dee, @0x16e16, @0x16e42) — the five footprint tiles of a captured military building that keep
+ * neither the building nor its flag.
+ *
+ * `lostTileHandler` (`FUN_0004641a`, in `territory.ts`) has the same shape but is a SEPARATE body in
+ * the binary: there the building demolition is interleaved into the same loop, and the flag marker is
+ * read once at the top. Deliberately duplicated rather than shared — a common helper would have to
+ * reorder those side effects.
+ */
+export function clearTileRoadsAndFlag(state: GameState, col: number, row: number): void {
+  const geo = state.geo;
+  const pos = posOf(col, row, geo);
+  const tile = state.mapTiles[pos];
+
+  if (tile.object !== 1) {
+ // No flag here: `paths` already carries only the six direction bits (the parser splits bit 6
+ // `blocked` and bit 7 `flag` off), so the original's `andb $0x3f` @0x172d9 needs no counterpart.
+    if ((tile.paths & 0x3f) !== 0) clearRoadPaths(state, col, row);
+    return;
+  }
+
+ // A flag: clear every road that ends here, seen from the neighbour tile — same walk and same order
+ // as the lost-tile handler.
+  for (const dir of [
+    Direction.Right,
+    Direction.DownRight,
+    Direction.Down,
+    Direction.Left,
+    Direction.UpLeft,
+    Direction.Up,
+  ] as const) {
+    const npos = neighbor(pos, dir, geo);
+    if ((state.mapTiles[npos].paths & (1 << oppositeDir(dir))) === 0) continue;
+    clearRoadPaths(state, colOf(npos, geo), rowOf(npos, geo));
+  }
+
+ // The second read (@0x174a2): a merge in one of the six teardowns above may have taken the flag.
+  if (tile.object === 1) demolishFlag(state, tile.objIndex, col, row);
 }

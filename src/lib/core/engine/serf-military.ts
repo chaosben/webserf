@@ -39,7 +39,11 @@ import { freeWalkingCommon } from './serf-free-walking.js';
 import { recomputeTerritory } from './territory.js';
 import { demolishBuilding } from './buildings.js';
 import { cancelTransportOnDelete } from './transport-cancel.js';
-import { clearRoadPaths, returnTransitResourceToStock } from './road-teardown.js';
+import {
+  clearRoadPaths,
+  clearTileRoadsAndFlag,
+  returnTransitResourceToStock,
+} from './road-teardown.js';
 
 const KNIGHT0 = 22; // serf type Knight0 (rank = type - 22)
 const MAX_RANK = 4; // Knight4 (type 26) — the rank-4 handler is a no-op
@@ -735,6 +739,58 @@ function burnSurroundingRing(state: GameState, center: number): void {
     if (bld) demolishBuilding(state, bld); // @0x16d1c
   }
 }
+/**
+ * @0x16d28..@0x16e46 — hand the captured building's footprint to the winner and clear it.
+ *
+ * The original walks seven tiles as a CHAIN, starting from `serf[4]`, the flag tile of the captured
+ * building (@0x16d28); the building itself sits at flag + UpLeft. Each tile gets the owner byte
+ * (`landscape[pos+1] &= 0x1f; |= ((owner & 3) << 5) | 0x80`), and five of them additionally get
+ * {@link clearTileRoadsAndFlag}:
+ *
+ * | tile (relative to the building) | step        | teardown |
+ * |---|---|---|
+ * | DownRight (the flag tile)       | `serf[4]`   | —                  |
+ * | Down                            | `+gs[0x60]` | `call` @0x16d7f    |
+ * | Left                            | `+gs[0x14]` | @0x16da7           |
+ * | the building itself             | `+4`        | —                  |
+ * | Right                           | `+4`        | @0x16dee           |
+ * | Up                              | `+gs[0x14]` | @0x16e16           |
+ * | UpLeft                          | `+gs[0x60]` | @0x16e42           |
+ *
+ * The step deltas are pinned by `FUN_0004641a`, which uses the same `gs` fields next to the back
+ * pointer bit it tests (`+4` next to `bt 3`, `gs[0xc]` next to `bt 4`, `gs[0x60]` next to `bt 5`,
+ * `gs[0x14]` next to `bt 0`) — so `+4` is Right, `gs[0x60]` is Left and `gs[0x14]` is UpLeft.
+ *
+ * **The owner half protects the capture.** After it the recolour no longer sees an owner LOSS on these
+ * seven tiles, so the lost-tile handler does not burn down the building that was just taken. It is also
+ * why the ±7 of the land score (@0x16c1d/@0x16c64) is booked by hand: the recolour will not count them.
+ *
+ * **The teardown half is what keeps the map clean.** Without it an enemy flag next to the captured
+ * building survives on ground that now belongs to the winner — the tile never changes owner, so nothing
+ * else ever removes it.
+ *
+ * **The order is semantics, not cosmetics**, and so is the position of the whole block: tearing a
+ * neighbour down also clears its road to the captured flag, so the flag block that follows
+ * (@0x16e47) sees fewer roads.
+ */
+function claimCaptureFootprint(state: GameState, bldPos: number, owner: number): void {
+  const geo = state.geo;
+  const walk: readonly (readonly [Direction | null, boolean])[] = [
+    [Direction.DownRight, false], // the flag tile — it is taken over, not torn down
+    [Direction.Down, true],
+    [Direction.Left, true],
+    [null, false], // the building tile itself
+    [Direction.Right, true],
+    [Direction.Up, true],
+    [Direction.UpLeft, true],
+  ];
+  for (const [dir, teardown] of walk) {
+    const p = dir === null ? bldPos : neighbor(bldPos, dir, geo);
+    state.mapTiles[p].owner = owner + 1; // `tile.owner` is 1-based
+    if (teardown) clearTileRoadsAndFlag(state, colOf(p, geo), rowOf(p, geo));
+  }
+}
+
 const MILITARY_TYPES: ReadonlySet<number> = new Set([11, 21, 22, 24]); // hut/tower/fortress/castle
 
 /** The tick prologue; true means the counter has not run out yet and the handler is done. */
@@ -921,6 +977,8 @@ export const knightOccupyEnemyBuilding = (state: GameState, serf: Serf): void =>
 
   burnSurroundingRing(state, bldPos);
 
+  claimCaptureFootprint(state, bldPos, serf.owner);
+
   const flag = state.flags[bld.flag];
   if (flag) {
     flag.owner = serf.owner; // @0x16e9b
@@ -962,27 +1020,10 @@ export const knightOccupyEnemyBuilding = (state: GameState, serf: Serf): void =>
  // OPEN: the exact entry slope animation and counter, and the firstKnight/holder wiring.
   serf.counter = 0;
 
- // **Before** the recolour the original writes the owner byte of the building tile and its six hex
- // neighbours directly to the new owner. That **protects the captured building and its ring** from
- // being seen as an owner LOSS by the recolour and burned down by the lost-tile handler: after the
- // pre-write their old owner already is the new one, so no loss event occurs. Without it the lost-tile
- // handler burns down the building that was just captured. `tile.owner` is 1-based.
-  const geo = state.geo;
-  const footprint = [
-    bldPos,
-    neighbor(bldPos, Direction.Right, geo),
-    neighbor(bldPos, Direction.DownRight, geo),
-    neighbor(bldPos, Direction.Down, geo),
-    neighbor(bldPos, Direction.Left, geo),
-    neighbor(bldPos, Direction.UpLeft, geo),
-    neighbor(bldPos, Direction.Up, geo),
-  ];
-  for (const p of footprint) state.mapTiles[p].owner = serf.owner + 1;
-
  // The territory recolour, centred on the building. It re-stamps the influence of every active
  // military building — the captured one now with its new owner — and reassigns `tile.owner` in the
  // 16x16 window, which is what makes the takeover visible.
-  recomputeTerritory(state, colOf(bldPos, geo), rowOf(bldPos, geo));
+  recomputeTerritory(state, colOf(bldPos, state.geo), rowOf(bldPos, state.geo));
 
  // The AI loss register (@0x171a3). Right behind the recolour the original tests `player+2` bit 7 of
  // the **old** owner and, for an AI loser, records the map spot in the first free of the eight slots
@@ -995,8 +1036,8 @@ export const knightOccupyEnemyBuilding = (state: GameState, serf: Serf): void =>
     if (reg !== undefined) {
       for (const slot of reg) {
         if ((slot.row & 0x8000) === 0) continue; // @0x171e6 — occupied
-        slot.col = colOf(bldPos, geo); // @0x17238
-        slot.row = rowOf(bldPos, geo); // @0x17242
+        slot.col = colOf(bldPos, state.geo); // @0x17238
+        slot.row = rowOf(bldPos, state.geo); // @0x17242
         break;
       }
     }

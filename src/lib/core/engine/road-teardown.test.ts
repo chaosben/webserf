@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { clearRoadPaths, demolishFlag, isRoadSegmentClearable, lengthToCategory } from './road-teardown.js';
+import {
+  clearRoadPaths,
+  clearTileRoadsAndFlag,
+  demolishFlag,
+  isRoadSegmentClearable,
+  lengthToCategory,
+} from './road-teardown.js';
 import { mapGeometry, posOf, Direction } from './position.js';
 import type { GameState, Tile, Flag } from './state.js';
 
@@ -308,6 +314,44 @@ describe('road-teardown', () => {
     expect(s.stateData[0]).toBe(0xfe); // destination-gone marker
     expect(s.stateData[1]).toBe(0); // field_0xc cleared
     expect(st.flags[A]!.length[Direction.Right] & 0x80).toBe(0);
+  });
+
+  // --- clearTileRoadsAndFlag (@0x1725e) -------------------------------------------------------
+
+  it('clearTileRoadsAndFlag on a ROAD tile takes the road (the no-flag branch @0x172e3)', () => {
+    const { st, A, B } = roadState();
+    clearTileRoadsAndFlag(st, 11, 10);
+    expect(pathAt(st, 11, 10)).toBe(0);
+    expect(pathAt(st, 12, 10)).toBe(0);
+    expect(pathAt(st, 10, 10)).toBe(0);
+    expect(pathAt(st, 13, 10)).toBe(0);
+    // The flags themselves stay — only their roads are gone.
+    expect(st.flags[A]).not.toBeNull();
+    expect(st.flags[B]).not.toBeNull();
+  });
+
+  it('clearTileRoadsAndFlag on a FLAG takes the roads pointing at it AND the flag', () => {
+    const { st, A, B } = roadState();
+    clearTileRoadsAndFlag(st, 10, 10);
+    expect(st.flags[A]).toBeNull();
+    expect(st.mapTiles[posOf(10, 10, GEO)].object).toBe(0);
+    expect(pathAt(st, 11, 10)).toBe(0);
+    expect(st.flags[B]!.paths[Direction.Left]).toBe(false); // the far flag was tidied up too
+  });
+
+  it('clearTileRoadsAndFlag on a bare tile does nothing', () => {
+    const { st, A, B } = roadState();
+    clearTileRoadsAndFlag(st, 30, 30);
+    expect(st.flags[A]).not.toBeNull();
+    expect(st.flags[B]).not.toBeNull();
+    expect(pathAt(st, 11, 10)).toBe(R | L); // road untouched
+  });
+
+  it('clearTileRoadsAndFlag is idempotent — the recolour may hit the same tile many times', () => {
+    const { st, A } = roadState();
+    clearTileRoadsAndFlag(st, 10, 10);
+    expect(() => clearTileRoadsAndFlag(st, 10, 10)).not.toThrow();
+    expect(st.flags[A]).toBeNull();
   });
 
   it('lengthToCategory maps the step count onto the original categories (FUN_0002bbc1)', () => {
