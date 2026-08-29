@@ -51,21 +51,15 @@ export const STOCK_PER_ROW_MAX = 12;
 export const STOCK_PER_ROW_DEFAULT = 1;
 
 /**
- * Size of the pictures and numbers, as a whole multiple of the original's own pixels.
+ * THE SIZE IS NOT A SETTING. The readout takes the scale of the control bar below — `uiScaleFor`,
+ * a plain `min(zoom, …)` without rounding — so it grows and shrinks with the map exactly as the bar
+ * does, steplessly and without anyone choosing anything.
  *
- * `auto` follows the game interface, so the readout grows and shrinks with it; a fixed step keeps
- * it put while zooming. Strings rather than a number with 0 as a special value: that way the
- * settings validator stays the one-line `isOneOf` form.
+ * A fractional factor survives because the pictures are not re-blitted at it: they are rendered at
+ * step 1 and given an explicit, whole-pixel size on the `<img>`, which the browser then scales
+ * nearest-neighbour. That is the same treatment the bar gets on the canvas, and the rounding is the
+ * same rule as `originBoxRect`.
  */
-export const STOCK_SCALES = ['auto', '1', '2', '3', '4'] as const;
-export type StockScale = (typeof STOCK_SCALES)[number];
-export const STOCK_SCALE_MAX = 4;
-
-/** Whole steps only — a fractional factor would interpolate the pixel art into mush. */
-export function stockScaleFactor(pref: StockScale, uiScale: number): number {
-  if (pref !== 'auto') return Number(pref);
-  return Math.max(1, Math.min(STOCK_SCALE_MAX, Math.round(uiScale)));
-}
 
 export const STOCK_OPACITY_MIN = 0.2;
 export const STOCK_OPACITY_MAX = 1;

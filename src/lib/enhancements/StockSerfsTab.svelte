@@ -8,13 +8,13 @@
   import { st } from '../shell/i18n.js';
 
   const MODE_LABEL = {
-    idle: 'enh.serfs.modeIdle',
-    available: 'enh.serfs.modeAvailable'
+    idle: 'enh.stock.serfs.modeIdle',
+    available: 'enh.stock.serfs.modeAvailable'
   } as const satisfies Record<StockSerfMode, Parameters<typeof st>[0]>;
 </script>
 
 <section>
-  <h3>{st('enh.serfs.title')}</h3>
+  <h3>{st('enh.stock.serfs.title')}</h3>
   <IconPicker
     order={SERF_ORDER}
     mask={settings.value.stockSerfs}
@@ -25,7 +25,7 @@
 </section>
 
 <section>
-  <h3>{st('enh.serfs.mode')}</h3>
+  <h3>{st('enh.stock.serfs.mode')}</h3>
   <div class="row">
     {#each STOCK_SERF_MODES as mode (mode)}
       <button
@@ -38,7 +38,7 @@
       </button>
     {/each}
   </div>
-  <p class="note">{st('enh.serfs.modeNote')}</p>
+  <p class="note">{st('enh.stock.serfs.modeNote')}</p>
 </section>
 
 <style>

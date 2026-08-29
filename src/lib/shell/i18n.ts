@@ -202,55 +202,46 @@ const EN = {
 		'Log output lands in the browser console — open the devtools and filter by category (assets, engine, menu, game). Render timings are collected in the background and ride along in a bug report.',
 
 	// -- Enhancements: additions of ours with no counterpart in the original --------------------
+	// ONE NAMESPACE PER ENHANCEMENT. There will be more than one of them (see `registry.ts`), so
+	// anything belonging to a single enhancement is prefixed with its id — `enh.stock.…` here. Only
+	// what SHARED code says stays unprefixed: `enh.pick.…` is the icon picker both selection tabs
+	// use, `enh.corner.…` is the corner vocabulary any future overlay would reuse. A second
+	// enhancement therefore adds `enh.<its id>.…` and collides with nothing.
 	'enh.stock.name': 'Stock overview',
-	'enh.tab.goods': 'Goods',
-	'enh.tab.serfs': 'Settlers',
-	'enh.tab.view': 'Display',
-	'enh.overlay.aria': 'Stock overview',
-	'enh.intro':
+	'enh.stock.tab.goods': 'Goods',
+	'enh.stock.tab.serfs': 'Settlers',
+	'enh.stock.tab.view': 'Display',
+	'enh.stock.aria': 'Stock overview',
+	'enh.stock.intro':
 		'A readout over the game surface showing what your warehouses hold. The original has no such ' +
 		'thing — it shows these numbers only inside windows that cover half the map.',
 	'enh.pick.all': 'All',
 	'enh.pick.none': 'None',
 	'enh.pick.count': '{on} of {all} selected',
 	'enh.pick.noIcons': 'Load an archive to see the pictures.',
-	'enh.goods.title': 'Which goods',
-	'enh.goods.note':
+	'enh.stock.goods.title': 'Which goods',
+	'enh.stock.goods.note':
 		'Counted over all your warehouses, plus the building reserve the castle parks at its founding — ' +
 		'the same sum the storage statistics show.',
-	'enh.serfs.title': 'Which settlers',
-	'enh.serfs.mode': 'Count as',
-	'enh.serfs.modeIdle': 'Resting in a store',
-	'enh.serfs.modeAvailable': 'Could be made',
-	'enh.serfs.modeNote':
+	'enh.stock.serfs.title': 'Which settlers',
+	'enh.stock.serfs.mode': 'Count as',
+	'enh.stock.serfs.modeIdle': 'Resting in a store',
+	'enh.stock.serfs.modeAvailable': 'Could be made',
+	'enh.stock.serfs.modeNote':
 		'“Could be made” adds the unemployed settlers to every profession whose tool lies in the store. ' +
 		'One settler therefore counts in several rows — the question is “how many of these could I ' +
 		'have”, not “how would they divide up”.',
-	'enh.view.title': 'The readout',
-	'enh.view.emptyNote':
+	'enh.stock.view.title': 'The readout',
+	'enh.stock.view.emptyNote':
 		'There is no separate switch: what is ticked under “Goods” and “Settlers” is shown. Nothing is ' +
 		'ticked to begin with — an addition of ours does not stand over the game screen unasked. ' +
-		'Choose “None” in both and the readout disappears again. It is drawn over the game screen, not into it — a ' +
-		'screenshot and a video recording therefore do not contain it.',
-	'enh.view.corner': 'Corner',
-	'enh.view.perRow': 'Entries per row',
-	'enh.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
-	'enh.view.size': 'Size',
-	'enh.view.sizeAuto': 'Auto',
-	'enh.view.sizeNote':
-		'“Auto” follows the game interface, so the readout grows and shrinks with the zoom; a fixed ' +
-		'step stays put.',
-	'enh.view.opacity': 'Opacity',
-	'enh.view.trend': 'Trend',
-	'enh.view.trendNote':
-		'An arrow before the number says whether there is more or less of it than there was. The ' +
-		'window counts in GAME time, so the arrow means the same at every speed and stands still ' +
-		'while paused. After switching on, the first window shows nothing: what has not been ' +
-		'measured is not claimed.',
-	'enh.trend.off': 'Off',
-	'enh.trend.short': 'Short',
-	'enh.trend.medium': 'Medium',
-	'enh.trend.long': 'Long',
+		'Choose “None” in both and the readout disappears again. Its size is not set here: it follows ' +
+		'the control bar below and so grows and shrinks with the zoom. It is drawn over the game ' +
+		'screen, not into it — a screenshot and a video recording therefore do not contain it.',
+	'enh.stock.view.corner': 'Corner',
+	'enh.stock.view.perRow': 'Entries per row',
+	'enh.stock.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
+	'enh.stock.view.opacity': 'Opacity',
 	'enh.corner.tl': 'Top left',
 	'enh.corner.tr': 'Top right',
 	'enh.corner.bl': 'Bottom left',
@@ -422,54 +413,41 @@ const DE: Record<ShellKey, string> = {
 
 	// -- Verbesserungen ------------------------------------------------------------------------
 	'enh.stock.name': 'Lager-Übersicht',
-	'enh.tab.goods': 'Waren',
-	'enh.tab.serfs': 'Siedler',
-	'enh.tab.view': 'Darstellung',
-	'enh.overlay.aria': 'Lager-Übersicht',
-	'enh.intro':
+	'enh.stock.tab.goods': 'Waren',
+	'enh.stock.tab.serfs': 'Siedler',
+	'enh.stock.tab.view': 'Darstellung',
+	'enh.stock.aria': 'Lager-Übersicht',
+	'enh.stock.intro':
 		'Eine Anzeige über der Spielfläche, die zeigt, was in Ihren Lagern liegt. Das Original hat so ' +
 		'etwas nicht — es zeigt diese Zahlen nur in Fenstern, die die halbe Karte verdecken.',
 	'enh.pick.all': 'Alle',
 	'enh.pick.none': 'Keine',
 	'enh.pick.count': '{on} von {all} ausgewählt',
 	'enh.pick.noIcons': 'Laden Sie ein Archiv, um die Bilder zu sehen.',
-	'enh.goods.title': 'Welche Waren',
-	'enh.goods.note':
+	'enh.stock.goods.title': 'Welche Waren',
+	'enh.stock.goods.note':
 		'Gezählt über alle Ihre Lager, dazu die Bau-Reserve, die das Schloss bei der Gründung ' +
 		'zurücklegt — dieselbe Summe, die auch die Lager-Statistik zeigt.',
-	'enh.serfs.title': 'Welche Siedler',
-	'enh.serfs.mode': 'Gezählt wird',
-	'enh.serfs.modeIdle': 'Wer im Lager ruht',
-	'enh.serfs.modeAvailable': 'Wer daraus werden könnte',
-	'enh.serfs.modeNote':
+	'enh.stock.serfs.title': 'Welche Siedler',
+	'enh.stock.serfs.mode': 'Gezählt wird',
+	'enh.stock.serfs.modeIdle': 'Wer im Lager ruht',
+	'enh.stock.serfs.modeAvailable': 'Wer daraus werden könnte',
+	'enh.stock.serfs.modeNote':
 		'„Wer daraus werden könnte“ rechnet die freien Siedler jedem Beruf zu, dessen Werkzeug im Lager ' +
 		'liegt. Ein Siedler zählt damit in mehreren Zeilen — gefragt ist „wie viele davon könnte ich ' +
 		'haben“, nicht „wie würden sie sich aufteilen“.',
-	'enh.view.title': 'Die Anzeige',
-	'enh.view.emptyNote':
+	'enh.stock.view.title': 'Die Anzeige',
+	'enh.stock.view.emptyNote':
 		'Es gibt keinen eigenen Schalter: gezeigt wird, was unter „Waren“ und „Siedler“ angehakt ist. ' +
 		'Zu Beginn ist nichts angehakt — eine Zutat von uns steht nicht ungefragt über dem ' +
-		'Spielbildschirm. Wählen Sie in beiden „Keine“, verschwindet die Anzeige wieder. Sie liegt über dem Spielbildschirm, ' +
-		'nicht darin — ein Bildschirmfoto und eine Videoaufnahme enthalten sie deshalb nicht.',
-	'enh.view.corner': 'Ecke',
-	'enh.view.perRow': 'Einträge je Zeile',
-	'enh.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
-	'enh.view.size': 'Größe',
-	'enh.view.sizeAuto': 'Auto',
-	'enh.view.sizeNote':
-		'„Auto“ folgt der Spiel-Oberfläche, die Anzeige wächst und schrumpft also mit dem Zoom; eine ' +
-		'feste Stufe bleibt unverändert.',
-	'enh.view.opacity': 'Deckkraft',
-	'enh.view.trend': 'Tendenz',
-	'enh.view.trendNote':
-		'Ein Pfeil vor der Zahl sagt, ob es mehr oder weniger geworden ist. Der Zeitraum zählt in ' +
-		'SPIELZEIT, der Pfeil bedeutet also bei jedem Tempo dasselbe und steht bei Pause still. ' +
-		'Nach dem Einschalten zeigt der erste Zeitraum nichts: was nicht gemessen ist, wird nicht ' +
-		'behauptet.',
-	'enh.trend.off': 'Aus',
-	'enh.trend.short': 'Kurz',
-	'enh.trend.medium': 'Mittel',
-	'enh.trend.long': 'Lang',
+		'Spielbildschirm. Wählen Sie in beiden „Keine“, verschwindet die Anzeige wieder. Ihre Größe ' +
+		'wird nicht eingestellt: sie folgt der Bedienleiste unten und wächst und schrumpft also mit ' +
+		'dem Zoom. Sie liegt über dem Spielbildschirm, nicht darin — ein Bildschirmfoto und eine ' +
+		'Videoaufnahme enthalten sie deshalb nicht.',
+	'enh.stock.view.corner': 'Ecke',
+	'enh.stock.view.perRow': 'Einträge je Zeile',
+	'enh.stock.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
+	'enh.stock.view.opacity': 'Deckkraft',
 	'enh.corner.tl': 'Oben links',
 	'enh.corner.tr': 'Oben rechts',
 	'enh.corner.bl': 'Unten links',

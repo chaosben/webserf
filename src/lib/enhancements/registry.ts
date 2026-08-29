@@ -41,9 +41,9 @@ export const ENHANCEMENTS: readonly Enhancement[] = [
     id: 'stock',
     labelKey: 'enh.stock.name',
     tabs: [
-      { id: 'stock.goods', labelKey: 'enh.tab.goods', panel: StockGoodsTab },
-      { id: 'stock.serfs', labelKey: 'enh.tab.serfs', panel: StockSerfsTab },
-      { id: 'stock.view', labelKey: 'enh.tab.view', panel: StockDisplayTab },
+      { id: 'stock.goods', labelKey: 'enh.stock.tab.goods', panel: StockGoodsTab },
+      { id: 'stock.serfs', labelKey: 'enh.stock.tab.serfs', panel: StockSerfsTab },
+      { id: 'stock.view', labelKey: 'enh.stock.tab.view', panel: StockDisplayTab },
     ],
   },
 ];

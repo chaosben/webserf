@@ -1,16 +1,13 @@
 <script lang="ts">
-  /** Where the stock overview sits, how wide it runs and how big it is. */
+  /** Where the stock overview sits, how wide it runs and how far it shows through. */
   import {
     STOCK_CORNERS,
     STOCK_OPACITY_MAX,
     STOCK_OPACITY_MIN,
     STOCK_PER_ROW_MAX,
     STOCK_PER_ROW_MIN,
-    STOCK_SCALES,
-    type StockCorner,
-    type StockScale
+    type StockCorner
   } from './stock-overview.js';
-  import { STOCK_TREND_SPANS, type StockTrendSpan } from './stock-trend.js';
   import { settings } from '../settings/settings.svelte.js';
   import { st } from '../shell/i18n.js';
 
@@ -21,27 +18,17 @@
     br: 'enh.corner.br'
   } as const satisfies Record<StockCorner, Parameters<typeof st>[0]>;
 
-  const TREND_LABEL = {
-    off: 'enh.trend.off',
-    short: 'enh.trend.short',
-    medium: 'enh.trend.medium',
-    long: 'enh.trend.long'
-  } as const satisfies Record<StockTrendSpan, Parameters<typeof st>[0]>;
-
   const percent = $derived(Math.round(settings.value.stockOpacity * 100));
-
-  /** `auto` gets a word, the whole steps their multiplier — there is nothing else to say. */
-  const scaleLabel = (s: StockScale): string => (s === 'auto' ? st('enh.view.sizeAuto') : `${s}×`);
 </script>
 
 <section>
-  <h3>{st('enh.view.title')}</h3>
-  <p class="note">{st('enh.intro')}</p>
-  <p class="note">{st('enh.view.emptyNote')}</p>
+  <h3>{st('enh.stock.view.title')}</h3>
+  <p class="note">{st('enh.stock.intro')}</p>
+  <p class="note">{st('enh.stock.view.emptyNote')}</p>
 </section>
 
 <section>
-  <h3>{st('enh.view.corner')}</h3>
+  <h3>{st('enh.stock.view.corner')}</h3>
   <div class="row">
     {#each STOCK_CORNERS as corner (corner)}
       <button
@@ -57,7 +44,7 @@
 </section>
 
 <section>
-  <h3>{st('enh.view.perRow')}</h3>
+  <h3>{st('enh.stock.view.perRow')}</h3>
   <div class="row">
     <input
       type="range"
@@ -65,50 +52,16 @@
       max={STOCK_PER_ROW_MAX}
       step="1"
       value={settings.value.stockPerRow}
-      aria-label={st('enh.view.perRow')}
+      aria-label={st('enh.stock.view.perRow')}
       oninput={(e) => settings.set('stockPerRow', Number(e.currentTarget.value))}
     />
     <span class="note">{settings.value.stockPerRow}</span>
   </div>
-  <p class="note">{st('enh.view.perRowNote')}</p>
+  <p class="note">{st('enh.stock.view.perRowNote')}</p>
 </section>
 
 <section>
-  <h3>{st('enh.view.size')}</h3>
-  <div class="row">
-    {#each STOCK_SCALES as scale (scale)}
-      <button
-        type="button"
-        class:on={settings.value.stockScale === scale}
-        aria-pressed={settings.value.stockScale === scale}
-        onclick={() => settings.set('stockScale', scale)}
-      >
-        {scaleLabel(scale)}
-      </button>
-    {/each}
-  </div>
-  <p class="note">{st('enh.view.sizeNote')}</p>
-</section>
-
-<section>
-  <h3>{st('enh.view.trend')}</h3>
-  <div class="row">
-    {#each STOCK_TREND_SPANS as span (span)}
-      <button
-        type="button"
-        class:on={settings.value.stockTrend === span}
-        aria-pressed={settings.value.stockTrend === span}
-        onclick={() => settings.set('stockTrend', span)}
-      >
-        {st(TREND_LABEL[span])}
-      </button>
-    {/each}
-  </div>
-  <p class="note">{st('enh.view.trendNote')}</p>
-</section>
-
-<section>
-  <h3>{st('enh.view.opacity')}</h3>
+  <h3>{st('enh.stock.view.opacity')}</h3>
   <div class="row">
     <input
       type="range"
@@ -116,7 +69,7 @@
       max={STOCK_OPACITY_MAX}
       step="0.05"
       value={settings.value.stockOpacity}
-      aria-label={st('enh.view.opacity')}
+      aria-label={st('enh.stock.view.opacity')}
       oninput={(e) => settings.set('stockOpacity', Number(e.currentTarget.value))}
     />
     <span class="note">{percent} %</span>

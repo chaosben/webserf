@@ -46,8 +46,6 @@
 		 * meanings together. The red is lighter than `--danger`, because a single glyph on a dark
 		 * plate needs more luminance than a button label does.
 		 */
-		--trend-up: #86c06a;
-		--trend-down: #d9705a;
 
 		color-scheme: dark;
 		background: var(--bg);

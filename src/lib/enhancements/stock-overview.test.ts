@@ -13,10 +13,7 @@ import {
   STOCK_PER_ROW_DEFAULT,
   STOCK_PER_ROW_MAX,
   STOCK_PER_ROW_MIN,
-  STOCK_SCALES,
-  STOCK_SCALE_MAX,
   stockRefreshDue,
-  stockScaleFactor,
   type StockSelection,
 } from './stock-overview.js';
 import { GOOD_ORDER } from './ui-icons.js';
@@ -89,35 +86,7 @@ describe('selection masks', () => {
   });
 });
 
-describe('stockScaleFactor', () => {
-  it('ignores the interface when a step was chosen', () => {
-    for (const zoom of [0.08, 1, 3, 8]) {
-      expect(stockScaleFactor('2', zoom)).toBe(2);
-      expect(stockScaleFactor('4', zoom)).toBe(4);
-    }
-  });
-
-  it('rounds to a whole step in auto', () => {
-    expect(stockScaleFactor('auto', 2.4)).toBe(2);
-    expect(stockScaleFactor('auto', 2.6)).toBe(3);
-    expect(stockScaleFactor('auto', 3)).toBe(3);
-  });
-
-  /** Zoomed right out the interface scale drops below one; zoomed right in it runs past four. */
-  it('clamps at both ends in auto', () => {
-    expect(stockScaleFactor('auto', 0.08)).toBe(1);
-    expect(stockScaleFactor('auto', 8)).toBe(STOCK_SCALE_MAX);
-  });
-
-  it('yields a usable whole number for every offered step', () => {
-    for (const pref of STOCK_SCALES) {
-      const f = stockScaleFactor(pref, 1);
-      expect(Number.isInteger(f)).toBe(true);
-      expect(f).toBeGreaterThanOrEqual(1);
-      expect(f).toBeLessThanOrEqual(STOCK_SCALE_MAX);
-    }
-  });
-
+describe('layout bounds', () => {
   it('offers a row width that spans column and strip', () => {
     expect(STOCK_PER_ROW_MIN).toBe(1);
     expect(STOCK_PER_ROW_MAX).toBeGreaterThan(STOCK_PER_ROW_MIN);

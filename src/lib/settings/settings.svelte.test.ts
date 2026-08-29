@@ -33,7 +33,7 @@ describe('settings store', () => {
 
 	it('accepts valid values and writes them back', async () => {
 		const { settings, box } = await load({
-			v: 5,
+			v: 6,
 			data: { volume: 12, music: false, sfx: false, speedFactor: 4, viewOptions: [0x25, 0x39] }
 		});
 		expect(settings.value.volume).toBe(12);
@@ -57,7 +57,7 @@ describe('settings store', () => {
 	 */
 	it('does not resurrect fields of a removed panel', async () => {
 		const { settings } = await load({
-			v: 5,
+			v: 6,
 			data: { consoleOpen: true, consoleHeight: 400, logLevel: 'debug', volume: 12 }
 		});
 		expect(Object.keys(settings.value)).not.toContain('consoleOpen');
@@ -89,13 +89,9 @@ describe('settings store', () => {
 		['an opacity outside 0.2..1', { stockOpacity: 5 }, 'stockOpacity'],
 		['no entry per row at all', { stockPerRow: 0 }, 'stockPerRow'],
 		['more entries per row than offered', { stockPerRow: 13 }, 'stockPerRow'],
-		['a fractional row width', { stockPerRow: 1.5 }, 'stockPerRow'],
-		['a size step that does not exist', { stockScale: '5' }, 'stockScale'],
-		['the size as a number instead of a step', { stockScale: 2 }, 'stockScale'],
-		['a trend window that does not exist', { stockTrend: 'week' }, 'stockTrend'],
-		['the trend window as a number', { stockTrend: 2 }, 'stockTrend']
+		['a fractional row width', { stockPerRow: 1.5 }, 'stockPerRow']
 	])('rejects %s', async (_name, data, key) => {
-		const { settings, defaults } = await load({ v: 5, data });
+		const { settings, defaults } = await load({ v: 6, data });
 		expect(settings.value[key as keyof typeof defaults]).toEqual(
 			defaults[key as keyof typeof defaults]
 		);
@@ -109,17 +105,17 @@ describe('settings store', () => {
 	 */
 	it('loads a stored entry that predates a field and gives that one field its default', async () => {
 		const { settings, defaults } = await load({
-			v: 5,
+			v: 6,
 			data: { volume: 12, stockCorner: 'br', stockPerRow: 4 }
 		});
-		expect(settings.value.stockTrend).toBe(defaults.stockTrend);
+		expect(settings.value.stockSerfMode).toBe(defaults.stockSerfMode);
 		expect(settings.value.volume).toBe(12);
 		expect(settings.value.stockCorner).toBe('br');
 		expect(settings.value.stockPerRow).toBe(4);
 	});
 
 	it('a damaged field costs only itself, not the others', async () => {
-		const { settings } = await load({ v: 5, data: { volume: 1000, music: false } });
+		const { settings } = await load({ v: 6, data: { volume: 1000, music: false } });
 		expect(settings.value.volume).toBe(75); // default
 		expect(settings.value.music).toBe(false); // kept
 	});

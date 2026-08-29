@@ -34,27 +34,25 @@ import {
 	STOCK_PER_ROW_DEFAULT,
 	STOCK_PER_ROW_MAX,
 	STOCK_PER_ROW_MIN,
-	STOCK_SCALES,
 	STOCK_SERFS_DEFAULT,
 	STOCK_SERF_MODES,
 	type StockCorner,
-	type StockScale,
 	type StockSerfMode
 } from '../enhancements/stock-overview.js';
-import { STOCK_TREND_SPANS, type StockTrendSpan } from '../enhancements/stock-trend.js';
 
 const KEY = 'webserf.settings';
 
 /**
  * Bump whenever the shape changes; a stored entry of another version then falls back to the
- * defaults. Version 5 == the stock overview without its own switch, with row width and size.
+ * defaults. Version 6 == the stock overview without trend arrows and without a size of its own —
+ * it follows the control bar.
  *
  * A purely ADDITIVE field needs no bump, and adding one must not take it: the reader checks the
  * version and then validates FIELD BY FIELD, so a stored version 5 entry that predates a new field
  * passes the version gate, fails that field's check and keeps its default. Everything else the user
  * had set survives. A removed or reinterpreted field is the case that does need the bump.
  */
-const VERSION = 5;
+const VERSION = 6;
 
 /**
  * Selectable game speeds as a multiple of the original tick rate (100 ticks/s, measured on the
@@ -94,10 +92,6 @@ export interface SettingsShape {
 	stockOpacity: number;
 	/** How many entries stand side by side — the choice between a column and a strip. */
 	stockPerRow: number;
-	/** Size of its pictures: following the game interface, or a fixed whole step. */
-	stockScale: StockScale;
-	/** How far back the trend arrows compare — `off` leaves the arrow column out entirely. */
-	stockTrend: StockTrendSpan;
 }
 
 const DEFAULTS: SettingsShape = {
@@ -112,9 +106,7 @@ const DEFAULTS: SettingsShape = {
 	stockCorner: 'tl',
 	stockSerfMode: 'idle',
 	stockOpacity: STOCK_OPACITY_DEFAULT,
-	stockPerRow: STOCK_PER_ROW_DEFAULT,
-	stockScale: 'auto',
-	stockTrend: 'short'
+	stockPerRow: STOCK_PER_ROW_DEFAULT
 };
 
 /**
@@ -158,9 +150,7 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 		typeof v === 'number' &&
 		Number.isInteger(v) &&
 		v >= STOCK_PER_ROW_MIN &&
-		v <= STOCK_PER_ROW_MAX,
-	stockScale: (v): v is StockScale => isOneOf(v, STOCK_SCALES),
-	stockTrend: (v): v is StockTrendSpan => isOneOf(v, STOCK_TREND_SPANS)
+		v <= STOCK_PER_ROW_MAX
 };
 
 function read(): SettingsShape {

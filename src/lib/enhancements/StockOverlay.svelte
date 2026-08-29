@@ -10,15 +10,13 @@
    * gets ready-made rows and draws them; everything that decides WHAT is listed lives in
    * `stock-overview.ts`, where it can be tested.
    */
-  import { iconUrl } from './icon-images.svelte.js';
+  import { iconImage } from './icon-images.svelte.js';
   import { goodName, serfName } from './entity-names.js';
   import { st } from '../shell/i18n.js';
   import type { StockCorner, StockRow, StockView } from './stock-overview.js';
-  import { trendKey, type StockTrend } from './stock-trend.js';
 
   let {
     view,
-    trends,
     corner,
     opacity,
     perRow,
@@ -26,13 +24,14 @@
   }: {
     /** `null` = nothing selected, or no player to show. */
     view: StockView | null;
-    /** `null` = trend switched off; then the arrow column is not built at all. */
-    trends: ReadonlyMap<number, StockTrend> | null;
     corner: StockCorner;
     opacity: number;
     /** How many entries stand side by side before the list wraps. */
     perRow: number;
-    /** Whole multiple of the original's pixels — see `stockScaleFactor`. */
+    /**
+     * The control bar's own scale (`uiScaleFor`), passed straight through: the readout is sized
+     * like the bar below and by nothing else — stepless, and not a setting.
+     */
     scale: number;
   } = $props();
 
@@ -50,6 +49,24 @@
     if (view.serfs.length > 0) out.push({ key: 'serfs', rows: view.serfs });
     return out;
   });
+
+  /**
+   * The picture comes at step 1 and gets its size here, rounded to WHOLE pixels.
+   *
+   * That is what makes the readout stepless: `spriteCanvas` can only blit whole factors, so a
+   * fractional one has to be the browser's job — `image-rendering: pixelated` on an `<img>` of an
+   * explicit pixel size is nearest-neighbour, the same treatment the control bar gets when it is
+   * blitted at a fractional `uiScale`. Rounding the destination is the same rule as `originBoxRect`.
+   */
+  const sized = (icon: number): { url: string; w: number; h: number } | null => {
+    const img = iconImage(icon);
+    if (img === null) return null;
+    return {
+      url: img.url,
+      w: Math.max(1, Math.round(img.width * scale)),
+      h: Math.max(1, Math.round(img.height * scale))
+    };
+  };
 </script>
 
 {#if groups.length > 0}
@@ -60,28 +77,20 @@
     style:--plate-opacity={opacity}
     style:--per-row={perRow}
     style:--stock-scale={scale}
-    aria-label={st('enh.overlay.aria')}
+    aria-label={st('enh.stock.aria')}
   >
     {#each groups as group (group.key)}
       <ul>
         {#each group.rows as row (row.icon)}
-          {@const url = iconUrl(row.icon, scale)}
+          {@const pic = sized(row.icon)}
           {@const name = nameOf(row)}
-          {@const trend = trends?.get(trendKey(row.kind, row.type)) ?? 0}
           <li>
-            {#if url === null}
+            {#if pic === null}
               <span class="name">{name}</span>
             {:else}
-              <img src={url} alt={name} title={name} />
+              <img src={pic.url} alt={name} title={name} width={pic.w} height={pic.h} />
             {/if}
-            {#if trends !== null}
-              <!-- `aria-hidden`: the readout is deliberately not announced (see above), and a lone
-                   arrow glyph in the reading flow would be noise either way. -->
-              <span class="trend" class:up={trend === 1} class:down={trend === -1} aria-hidden="true"
-                >{trend === 1 ? '▲' : trend === -1 ? '▼' : ''}</span
-              >
-            {/if}
-            <span class="value" class:up={trend === 1} class:down={trend === -1}>{row.value}</span>
+            <span class="value">{row.value}</span>
           </li>
         {/each}
       </ul>
@@ -93,16 +102,19 @@
   /*
    * `pointer-events: none` is not cosmetic: the viewport underneath carries panning, zoom and every
    * click. Without it the overlay would eat clicks in its corner and one could not build there.
+   *
+   * Padding and gaps are in the same factor as the pictures, so the plate grows as ONE piece rather
+   * than as icons drifting apart inside a frame that stays put.
    */
   .overview {
     position: absolute;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: calc(0.4rem * var(--stock-scale));
     /* Wide enough for a full strip at twelve entries; beyond that the plate would be cut off. */
     max-width: 92%;
     max-height: 80%;
-    padding: 0.35rem 0.45rem;
+    padding: calc(0.35rem * var(--stock-scale)) calc(0.45rem * var(--stock-scale));
     background: color-mix(in srgb, var(--bg-sunken) calc(var(--plate-opacity) * 100%), transparent);
     border: 1px solid color-mix(in srgb, var(--line) calc(var(--plate-opacity) * 100%), transparent);
     pointer-events: none;
@@ -134,30 +146,30 @@
   ul {
     display: grid;
     grid-template-columns: repeat(var(--per-row), max-content);
-    gap: 0.15rem 0.6rem;
+    gap: calc(0.15rem * var(--stock-scale)) calc(0.6rem * var(--stock-scale));
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   ul + ul {
-    padding-top: 0.35rem;
+    padding-top: calc(0.35rem * var(--stock-scale));
     border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
   }
 
   li {
     display: flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: calc(0.2rem * var(--stock-scale));
   }
 
   /*
-   * No width: the picture is rendered at its step and stands on whole pixels already. The icons are
-   * pixel art; a browser asked to scale them would interpolate them into mush.
+   * The size comes from the `width`/`height` attributes, which are whole pixels. `pixelated` is what
+   * keeps a fractional factor sharp: the icons are pixel art, and a browser left to interpolate
+   * would turn them into mush.
    */
   img {
     display: block;
-    object-fit: contain;
     image-rendering: pixelated;
   }
 
@@ -175,28 +187,5 @@
     color: var(--fg);
     font-size: calc(1rem * var(--stock-scale));
     font-variant-numeric: tabular-nums;
-  }
-
-  /*
-   * The width stays even when the glyph is empty. The grid measures `max-content`, so a vanishing
-   * arrow would pull the whole plate narrower and back again on every change.
-   *
-   * Shape carries, colour reinforces: red/green is the most common colour blindness, and at low
-   * plate opacity the map shows through — a green number over grass and a red one over desert both
-   * lose contrast.
-   */
-  .trend {
-    width: 1ch;
-    color: var(--fg-dim);
-    font-size: calc(0.75rem * var(--stock-scale));
-    line-height: 1;
-  }
-
-  .up {
-    color: var(--trend-up);
-  }
-
-  .down {
-    color: var(--trend-down);
   }
 </style>

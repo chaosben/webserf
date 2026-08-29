@@ -8,7 +8,7 @@
 </script>
 
 <section>
-  <h3>{st('enh.goods.title')}</h3>
+  <h3>{st('enh.stock.goods.title')}</h3>
   <IconPicker
     order={GOOD_ORDER}
     mask={settings.value.stockGoods}
@@ -16,7 +16,7 @@
     name={goodName}
     onchange={(mask) => settings.set('stockGoods', mask)}
   />
-  <p class="note">{st('enh.goods.note')}</p>
+  <p class="note">{st('enh.stock.goods.note')}</p>
 </section>
 
 <style>
