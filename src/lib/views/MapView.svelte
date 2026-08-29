@@ -4397,6 +4397,11 @@
 </script>
 
 <section class="map">
+  <!-- `application` is the right role here and the rule below does not know it: the game screen is
+       a canvas that handles mouse and keyboard itself, and the role is what tells a screen reader to
+       pass the keys through rather than read the page. The rule only knows the widget roles and
+       would have us put a button here. -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="viewport"
     bind:this={viewportEl}
