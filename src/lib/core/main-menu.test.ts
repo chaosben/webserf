@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   advanceCampaignProgress,
+  applyLoadedSaveToMenu,
   applyMainMenuAction,
   applyMainMenuKey,
   CAMPAIGN_LEVEL_CAP,
@@ -29,6 +30,7 @@ import {
   MENU_PANEL_ICON_IDLE,
   MENU_PANEL_ICON_PREVIEW,
   MENU_PREVIEW_DISCARD_SOUND,
+  menuFieldsFromLoadedSave,
   menuPanelIcons,
   MENU_GLYPH_SHADOW_OFFSET,
   MENU_ICON_CANCEL,
@@ -943,6 +945,108 @@ describe('main menu — campaign progress (`action_quit_confirm` @0x2ebdb)', () 
     expect('password' in p!).toBe(false);
     // What the menu does with it: the spread must not overwrite the line.
     expect({ ...initialMainMenuState(), ...p! }.password).toBe(initialMainMenuState().password);
+  });
+});
+
+describe('main menu — a loaded save writes the menu cells (`savegame_load_header` @0x47ba8)', () => {
+  /** A menu state that differs from every value the tests load, so a missing write shows. */
+  const before = (): MainMenuState => ({
+    ...initialMainMenuState(),
+    gameType: GAME_TYPE_DEMO,
+    level: 4,
+    unlockedLevel: 7,
+    mission: 2,
+    password: 'OLDPASS ',
+    mapSizeChoice: 5,
+    seed: [1, 2, 3],
+    face: [1, 1, 1, 1],
+    intelligence: [1, 1, 1, 1],
+    supply: [1, 1, 1, 1],
+    reproduction: [1, 1, 1, 1],
+    humanSupply: [1, 1],
+    humanReproduction: [1, 1],
+  });
+
+  const level = {
+    gameType: 0,
+    missionSetupIndex: 3,
+    levelSetupIndex: 12,
+    levelSetupShown: 17,
+    levelPassword: 'PASSIVE ',
+  };
+  const mission = { gameType: 1, missionSetupIndex: 3, levelSetupIndex: 12 };
+  const free = {
+    gameType: 2,
+    missionSetupIndex: 3,
+    levelSetupIndex: 12,
+    mapSizeChoice: 8,
+    mapSeed: [0xcec9, 0x00f1, 0xe8e4] as const,
+    menuSetup: {
+      face: [12, 3, 0, 0] as const,
+      intelligence: [40, 22, 0, 0] as const,
+      supply: [15, 23, 0, 0] as const,
+      reproduction: [24, 28, 0, 0] as const,
+      humanSupply: [15, 30] as const,
+      humanReproduction: [24, 30] as const,
+    },
+  };
+
+  it('always takes the game type over (@0x47d67 — unconditional)', () => {
+    for (const h of [level, mission, free]) {
+      expect(applyLoadedSaveToMenu(before(), h).gameType).toBe(h.gameType);
+    }
+  });
+
+  it('level, bound and password only at game type 0 (@0x47f0d)', () => {
+    const s = applyLoadedSaveToMenu(before(), level);
+    expect([s.level, s.unlockedLevel, s.password]).toEqual([12, 17, 'PASSIVE ']);
+    // The gate is the LOADED type, not the one the menu had — `before()` is a demo state.
+    expect(menuFieldsFromLoadedSave(mission)).not.toHaveProperty('level');
+    expect(menuFieldsFromLoadedSave(free)).not.toHaveProperty('password');
+  });
+
+  it('the mission only at game type 1 (@0x47eed)', () => {
+    expect(applyLoadedSaveToMenu(before(), mission).mission).toBe(3);
+    // Same field in the header, and the level branch must NOT take it — that is what the gate does.
+    expect(applyLoadedSaveToMenu(before(), level).mission).toBe(before().mission);
+    expect(applyLoadedSaveToMenu(before(), free).mission).toBe(before().mission);
+  });
+
+  it('map size, seed and the four opponent columns only from game type 2 on (@0x47f60)', () => {
+    const s = applyLoadedSaveToMenu(before(), free);
+    expect(s.mapSizeChoice).toBe(8);
+    expect(s.seed).toEqual([0xcec9, 0x00f1, 0xe8e4]);
+    expect(s.face).toEqual([12, 3, 0, 0]);
+    expect(s.intelligence).toEqual([40, 22, 0, 0]);
+    expect(s.supply).toEqual([15, 23, 0, 0]);
+    expect(s.reproduction).toEqual([24, 28, 0, 0]);
+    expect(s.humanSupply).toEqual([15, 30]);
+    expect(s.humanReproduction).toEqual([24, 30]);
+    // `jb 0x48010` — the campaign types skip the whole block.
+    const l = applyLoadedSaveToMenu(before(), level);
+    expect([l.mapSizeChoice, l.seed, l.face]).toEqual([5, [1, 2, 3], [1, 1, 1, 1]]);
+  });
+
+  it('covers game types 3 and 4 as well — the `jb` is a lower bound', () => {
+    for (const gameType of [3, 4]) {
+      expect(applyLoadedSaveToMenu(before(), { ...free, gameType }).seed).toEqual(free.mapSeed);
+    }
+  });
+
+  it('touches nothing the load chain does not write', () => {
+    const s0 = { ...before(), splitscreen: true, previewGenerated: true, loadedGamePending: false };
+    const s1 = applyLoadedSaveToMenu(s0, free);
+    // `gs+0x37e` bit 0/1 and `gs+0x1c8` bit 6 have their own writers; bit 6 is the caller's.
+    expect([s1.splitscreen, s1.previewGenerated, s1.loadedGamePending]).toEqual([true, true, false]);
+    expect(s1.maxMapSize).toBe(s0.maxMapSize);
+  });
+
+  it('ends a running input — its buffer IS the cell the load overwrote (@0x50f03)', () => {
+    const typing = {
+      ...before(),
+      textInput: { field: 'password' as const, text: 'HALF    ', cursor: 4, digitsOnly: false },
+    };
+    expect(applyLoadedSaveToMenu(typing, level).textInput).toBeNull();
   });
 });
 

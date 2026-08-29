@@ -45,6 +45,7 @@
     MENU_PANEL_ICON_IDLE,
     MENU_PANEL_ICON_PREVIEW,
     MENU_SURFACE,
+    applyLoadedSaveToMenu,
     applyMainMenuAction,
     applyMainMenuKey,
     drawMainMenu,
@@ -634,8 +635,13 @@
           // `gs+0x37e` bit 1 decides between `0x50340` (0x13) and `0x503b3` (0x0a). This is why
           // `panelIcon2` is a stored byte and not derived — it does NOT ask for the game type,
           // while every other writer does.
+          // The load is at the same time a write INTO THE MENU: `savegame_load_header` fills
+          // `gs+0x352`..`gs+0x37d`, i.e. exactly the cells the menu columns show (game type, level
+          // + password, map size, seed, the four opponent columns). In the original that needs no
+          // code because menu and game share the cells; here both states are separate, so the
+          // fields stood stale behind the "GELADEN." window.
           menu = {
-            ...menu,
+            ...applyLoadedSaveToMenu(menu, pendingSave.save.header),
             loadedGamePending: true,
             panelIcon2: menu.previewGenerated ? MENU_PANEL_ICON_PREVIEW : MENU_PANEL_ICON_IDLE,
           };

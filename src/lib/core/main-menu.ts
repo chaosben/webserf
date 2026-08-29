@@ -366,6 +366,107 @@ export function advanceCampaignProgress(header: {
 }
 
 /**
+ * **The menu fields a LOADED save overwrites** — the second half of `savegame_load_header` @0x47ba8,
+ * `.DS`@74/122/124/126/128/136/138/144..163 → `gs+0x352`..`gs+0x37d`.
+ *
+ * The original keeps the menu selection and the running game in the SAME cells, so loading a save is
+ * at the same time a write into the main menu: after it the menu shows the game type, the level with
+ * its password, the map size, the seed and the four opponent columns of the loaded game. In this port
+ * menu and game are two states, which is why the write has to be repeated here — without it the menu
+ * behind the "GELADEN." window still shows what stood there before the load.
+ *
+ * **The three gates read the LOADED game type**, not the one the menu had: `gs+0x352` is written
+ * unconditionally @0x47d67, and all three tests below happen after it.
+ *
+ * ```
+ * 47d67  gs[0x352] = buf[0x4a]                      ; always
+ * 47ee5  if (gs[0x352] == 1)  gs[0x354] = buf[0x7a] ; mission
+ * 47f03  if (gs[0x352] == 0)  gs[0x356] = buf[0x7c] ; level
+ *                             gs[0x358] = buf[0x7e] ; unlocked
+ *                             gs[0x35a] = buf[0x80] ; password, 8 bytes
+ * 47f58  if (gs[0x352] >= 2)  gs[0x362] = buf[0x88] ; map size
+ *                             gs[0x364] = buf[0x8a] ; seed, 3 u16
+ *                             gs[0x36a] = buf[0x90] ; face      \
+ *                             gs[0x36e] = buf[0x94] ; intelligence > four u32, one per slot
+ *                             gs[0x372] = buf[0x98] ; supply     /
+ *                             gs[0x376] = buf[0x9c] ; reproduction
+ *                             gs[0x37a] = buf[0xa0] ; supply of the two humans
+ *                             gs[0x37c] = buf[0xa2] ; reproduction of the two humans
+ * ```
+ *
+ * The parser applies exactly the same gates, so the optional header fields are present precisely in
+ * the branch that reads them; the fallbacks below are for the type checker, not for a case the
+ * original knows.
+ *
+ * NOT part of this: `gs+0x37e` (split-screen wish, `gs+0x1c8` bit 6) — the load chain touches neither.
+ * Bit 6 is set by the SUCCESS path (@0x46f39) and is {@link MainMenuState.loadedGamePending}, which
+ * the caller sets beside this.
+ */
+export function menuFieldsFromLoadedSave(header: {
+  readonly gameType: number;
+  readonly missionSetupIndex: number;
+  readonly levelSetupIndex: number;
+  readonly levelSetupShown?: number;
+  readonly levelPassword?: string;
+  readonly mapSizeChoice?: number;
+  readonly mapSeed?: readonly [number, number, number];
+  readonly menuSetup?: {
+    readonly face: readonly [number, number, number, number];
+    readonly intelligence: readonly [number, number, number, number];
+    readonly supply: readonly [number, number, number, number];
+    readonly reproduction: readonly [number, number, number, number];
+    readonly humanSupply: readonly [number, number];
+    readonly humanReproduction: readonly [number, number];
+  };
+}): Partial<MainMenuState> {
+  const gameType = header.gameType;
+  if (gameType === GAME_TYPE_MISSION) {
+    return { gameType, mission: header.missionSetupIndex }; // @0x47eed
+  }
+  if (gameType === GAME_TYPE_LEVEL) {
+    const level = header.levelSetupIndex;
+    return {
+      gameType,
+      level,
+      unlockedLevel: header.levelSetupShown ?? level,
+      ...(header.levelPassword === undefined ? {} : { password: header.levelPassword }),
+    };
+  }
+  // @0x47f60 `jb` — game types 2..4 share the free-play block.
+  const m = header.menuSetup;
+  return {
+    gameType,
+    ...(header.mapSizeChoice === undefined ? {} : { mapSizeChoice: header.mapSizeChoice }),
+    ...(header.mapSeed === undefined ? {} : { seed: header.mapSeed }),
+    ...(m === undefined
+      ? {}
+      : {
+          face: m.face,
+          intelligence: m.intelligence,
+          supply: m.supply,
+          reproduction: m.reproduction,
+          humanSupply: m.humanSupply,
+          humanReproduction: m.humanReproduction,
+        }),
+  };
+}
+
+/**
+ * {@link menuFieldsFromLoadedSave} applied — the whole menu state after a load.
+ *
+ * A standing text input is ended, and that is a decision rather than a reading: in the original the
+ * password input has NO buffer of its own, it writes straight into `gs+0x35a` (@0x50f03) — the very
+ * cell the load overwrites. This port holds a copy in {@link MenuTextInput.text}, so an input left
+ * running would go on showing what was typed before the load and write it back on the next key.
+ */
+export function applyLoadedSaveToMenu(
+  state: MainMenuState,
+  header: Parameters<typeof menuFieldsFromLoadedSave>[0],
+): MainMenuState {
+  return { ...state, ...menuFieldsFromLoadedSave(header), textInput: null };
+}
+
+/**
  * The state with which the original enters the menu. The slider defaults are deliberately NOT
  * guessed: they stand as menu values in no init routine we have read — hence the values of the first
  * setup record (level 1) stand here, which the menu shows immediately anyway.
