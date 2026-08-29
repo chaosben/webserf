@@ -42,6 +42,7 @@
   } from '../core/ui-sound.js';
   import { demolishOutcomeAt } from '../core/engine/demolish.js';
   import EndCreditsView from './EndCreditsView.svelte';
+  import TextEntryField from './TextEntryField.svelte';
   import StockOverlay from '../enhancements/StockOverlay.svelte';
   import {
     buildStockView,
@@ -80,13 +81,6 @@
     enterDiskMenu,
     type DiskMenuState,
   } from '../core/disk-menu.js';
-  import {
-    TEXT_KEY_BACKSPACE,
-    TEXT_KEY_COMMIT,
-    TEXT_KEY_CURSOR_LEFT,
-    TEXT_KEY_CURSOR_RIGHT,
-    TEXT_KEY_DELETE,
-  } from '../core/text-input.js';
   import { encodeSaveGame } from '../core/save-encoder.js';
   import { parseSaveGame } from '../core/save-parser.js';
   import type { SaveStore } from '../core/save-store.js';
@@ -1599,6 +1593,7 @@
     const r = applyDiskMenuAction(s0, action);
     playUiSound(r.sound);
     disk = r.state;
+    keepEntryFocus();
     switch (r.effect.kind) {
       case 'redraw':
         menuScreen = DISK_SCREEN_LIST_REDRAW;
@@ -1681,27 +1676,23 @@
    * the SAME routine in the original (`input_buffer_putchar` @0xd073). Without a running input the
    * handler stays silent and without `preventDefault`: then the keys belong to the browser.
    */
-  function handleDiskKey(e: KeyboardEvent): void {
+  function runDiskKey(code: number): void {
     const s0 = disk;
     if (s0 === null || s0.nameInput === null) return;
-    let code: number | null = null;
-    if (e.key === 'ArrowLeft') code = TEXT_KEY_CURSOR_LEFT;
-    else if (e.key === 'ArrowRight') code = TEXT_KEY_CURSOR_RIGHT;
-    else if (e.key === 'Backspace') code = TEXT_KEY_BACKSPACE;
-    else if (e.key === 'Delete') code = TEXT_KEY_DELETE;
-    else if (e.key === 'Enter' || e.key === 'Escape') code = TEXT_KEY_COMMIT;
-    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey)
-      code = e.key.toUpperCase().charCodeAt(0);
-    if (code === null) return;
-    e.preventDefault();
     disk = applyDiskMenuKey(s0, code);
   }
 
-  // As soon as the name input runs, the canvas must have the focus — otherwise the user types into
-  // nothing, and without a hint that it is not something else.
-  $effect(() => {
-    if (disk?.nameInput != null) viewportEl?.focus();
-  });
+  let entryField = $state<TextEntryField | null>(null);
+
+  /**
+   * As soon as the name entry runs, the focus belongs to the entry field — otherwise the user types
+   * into nothing, and without a hint that it is not something else. It is asked for INSIDE the tap
+   * that started the entry, because several mobile browsers open their keyboard only for a
+   * `focus()` a user gesture caused.
+   */
+  function keepEntryFocus(): void {
+    if (disk?.nameInput != null) entryField?.focusEntry();
+  }
 
   // --- special-click windows (popup screens 0x2a / 0x28 / 0x27 / 0x29) ---------------------------
 
@@ -4413,7 +4404,6 @@
     onpointercancel={onPointerCancel}
     onpointerleave={onPointerLeave}
     onwheel={onWheel}
-    onkeydown={handleDiskKey}
     oncontextmenu={(e) => e.preventDefault()}
     style:cursor={cursorStyle}
     role="application"
@@ -4426,6 +4416,13 @@
          a screen recording show the game rather than just the map, and it puts the stacking order
          into the code instead of into the document order. -->
     <canvas bind:this={host}></canvas>
+    <!-- Where the keys of the save-game name really arrive: the canvas cannot take a focus, so on a
+         phone it cannot bring up a keyboard. -->
+    <TextEntryField
+      bind:this={entryField}
+      active={disk?.nameInput != null}
+      onkey={runDiskKey}
+    />
     <!-- Our own readout, and the one thing to know about it: it is a DOM layer, so it is NOT in a
          screenshot or a screen recording, which see the canvas alone. It sits before the end
          credits so that those, which take the whole stage, cover it. -->
@@ -4485,9 +4482,8 @@
     cursor: grabbing;
   }
   /*
-   * The viewport takes the keyboard focus while the save-game name is being typed — it is the only
-   * element left that can. No focus ring: it is the whole playing field, and the original draws its
-   * own text cursor into the window.
+   * No focus ring: the viewport is the whole playing field, not one control among several. The
+   * keyboard focus while a name is typed sits on the entry field, not here.
    */
   .viewport:focus,
   .viewport:focus-visible {

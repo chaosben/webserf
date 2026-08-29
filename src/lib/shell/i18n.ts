@@ -279,7 +279,10 @@ const EN = {
 	'view.missionEnd': 'Mission end',
 	'view.object': 'Object window',
 	'view.overview': 'Overview map',
-	'view.controlPanel': 'Control panel'
+	'view.controlPanel': 'Control panel',
+	// The invisible field that holds the focus while the original asks for text, so that a phone
+	// brings up its keyboard — see `views/TextEntryField.svelte`.
+	'view.textEntry': 'Text entry'
 } as const;
 
 export type ShellKey = keyof typeof EN;
@@ -482,7 +485,8 @@ const DE: Record<ShellKey, string> = {
 	'view.missionEnd': 'Missions-Ende',
 	'view.object': 'Objekt-Fenster',
 	'view.overview': 'Übersichtskarte',
-	'view.controlPanel': 'Bedienleiste'
+	'view.controlPanel': 'Bedienleiste',
+	'view.textEntry': 'Texteingabe'
 };
 
 const TABLES: Readonly<Record<ShellLanguage, Readonly<Record<ShellKey, string>>>> = { de: DE, en: EN };

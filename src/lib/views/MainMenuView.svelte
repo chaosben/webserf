@@ -37,11 +37,6 @@
   import {
     GAME_TYPE_LEVEL,
     GAME_TYPE_MISSION,
-    MENU_KEY_BACKSPACE,
-    MENU_KEY_COMMIT,
-    MENU_KEY_CURSOR_LEFT,
-    MENU_KEY_CURSOR_RIGHT,
-    MENU_KEY_DELETE,
     MENU_PANEL_ICON_IDLE,
     MENU_PANEL_ICON_PREVIEW,
     MENU_SURFACE,
@@ -59,6 +54,7 @@
     type MainMenuState,
     type MenuTarget,
   } from '../core/main-menu.js';
+  import TextEntryField from './TextEntryField.svelte';
   import { fitScale, pinchZoom, wheelZoomFactor } from './zoom-gesture.js';
   import { TOUCH_IDLE, touchDown, touchMove, touchUp } from './touch-gesture.js';
   import {
@@ -667,8 +663,7 @@
     // Tail of a touch gesture. It stands before the credits branch on purpose: a pinch must not
     // skip the opening sequence.
     if (touch.phase === 'spent') return;
-    // Take focus, so typing works right after "PASSWORT" — `onkeydown` needs it.
-    canvas?.focus();
+    keepEntryFocus();
     // The opening credits abort on the LEFT mouse button only (@0x46ba tests `0x1f56`); `onclick`
     // fires only for it anyway.
     resumeAudio();
@@ -694,6 +689,7 @@
       menuRng.next(),
     );
     menu = result.state;
+    keepEntryFocus();
     // The zone walker sounds on EVERY hit (`mov $0x8` @0x4f8b4), the action puts its own sound
     // beside it — see {@link playUiSounds} and `MainMenuResult.sound`.
     playUiSounds(UI_SOUND_PANEL_BUTTON, result.sound, result.extraSound);
@@ -722,27 +718,25 @@
     if (result.effect.kind === 'quit') location.reload();
   }
 
+  let entryField = $state<TextEntryField | null>(null);
+
   /**
-   * Key press → character code for `input_buffer_putchar` (@0xd073): printable characters as their
-   * code, plus the five special keys `0xfb..0xff`. Without a running entry the handler stays silent
-   * and without `preventDefault` — then the keys belong to the browser.
+   * Keep the focus on the entry field while an entry runs. Called from the click handler because a
+   * tap on the canvas takes the focus away, which on a phone closes the keyboard mid-word — and
+   * because several mobile browsers open the keyboard only for a `focus()` inside a user gesture,
+   * so the tap that starts the entry is the moment to ask for it.
    */
-  function handleKey(e: KeyboardEvent): void {
+  function keepEntryFocus(): void {
+    if (menu.textInput !== null) entryField?.focusEntry();
+  }
+
+  /**
+   * One key press of a running entry, in the coding of `input_buffer_putchar` (@0xd073). The
+   * translation from a keyboard or on-screen keyboard event happens in {@link TextEntryField}, which
+   * also holds the focus — a canvas takes none, so on a phone no keyboard would come up.
+   */
+  function runMenuKey(code: number): void {
     if (menu.textInput === null) return;
-    let code: number | null = null;
-    if (e.key === 'ArrowLeft') code = MENU_KEY_CURSOR_LEFT;
-    else if (e.key === 'ArrowRight') code = MENU_KEY_CURSOR_RIGHT;
-    else if (e.key === 'Backspace') code = MENU_KEY_BACKSPACE;
-    else if (e.key === 'Delete') code = MENU_KEY_DELETE;
-    else if (e.key === 'Enter') code = MENU_KEY_COMMIT;
-    // Escape is an addition: the original has no cancel, and without it an accidentally opened
-    // entry could not be left.
-    else if (e.key === 'Escape') code = MENU_KEY_COMMIT;
-    // With Ctrl/Alt/Meta it is a browser shortcut, not a character.
-    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey)
-      code = e.key.toUpperCase().charCodeAt(0);
-    if (code === null) return;
-    e.preventDefault();
     const r = applyMainMenuKey(menu, code);
     menu = r.state;
     // No walker sound: the two closing branches @0x4f39a/@0x4f537 hang on the frame run, not on a
@@ -995,15 +989,16 @@
   bind:clientWidth={availWidth}
   bind:clientHeight={availHeight}
 >
-  <!-- `tabindex` only so `onkeydown` fires at all — the original has no focus concept. -->
-  <canvas
-    bind:this={canvas}
-    tabindex="0"
-    onclick={handleClick}
-    onkeydown={handleKey}
-    onwheel={handleWheel}
-    style:cursor={cursorStyle}
+  <canvas bind:this={canvas} onclick={handleClick} onwheel={handleWheel} style:cursor={cursorStyle}
   ></canvas>
+  <!-- Where the keys really arrive: the canvas cannot take a focus, so it cannot bring up a
+       keyboard on a phone. -->
+  <TextEntryField
+    bind:this={entryField}
+    active={menu.textInput !== null}
+    digitsOnly={menu.textInput?.digitsOnly ?? false}
+    onkey={runMenuKey}
+  />
 
 </div>
 
@@ -1029,12 +1024,5 @@
     max-height: 100%;
     background: #000;
     cursor: pointer;
-  }
-  /* No focus ring. The canvas is focusable only so that `onkeydown` fires at all (password entry);
-     it is the WHOLE surface and not one control among several, so a ring shows nothing the user
-     does not already see. What is removed is the indicator, not the focus. */
-  canvas:focus,
-  canvas:focus-visible {
-    outline: none;
   }
 </style>
