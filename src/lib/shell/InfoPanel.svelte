@@ -7,9 +7,9 @@
 	 * what am I looking at, who made it, and where is the source. The log hint survives as the last
 	 * paragraph — it costs one line and helps exactly the person who now has to write a report.
 	 */
-	import { commitDateText, commitUrl, shortCommit } from './build-info.js';
-	import { shellLanguage, st } from './i18n.js';
-	import { PROJECT_REPO, PROJECT_URL } from './project.js';
+	import { commitDateText, commitUrl, shortCommit } from "./build-info.js";
+	import { shellLanguage, st } from "./i18n.js";
+	import { PROJECT_REPO, PROJECT_URL } from "./project.js";
 
 	const commit = shortCommit();
 	const commitLink = commitUrl();
@@ -17,24 +17,24 @@
 </script>
 
 <section>
-	<h3>{st('info.about.title')}</h3>
-	<p class="note">{st('info.about.what')}</p>
-	<p class="note">{st('info.about.assets')}</p>
+	<h3>{st("info.about.title")}</h3>
+	<p class="note">{st("info.about.what")}</p>
+	<p class="note">{st("info.about.assets")}</p>
 </section>
 
 <section>
-	<h3>{st('info.source.title')}</h3>
+	<h3>{st("info.source.title")}</h3>
 	<p class="note">
 		<a href={PROJECT_URL} target="_blank" rel="noreferrer noopener">{PROJECT_REPO}</a>
 	</p>
-	<p class="note">{st('info.source.note')}</p>
+	<p class="note">{st("info.source.note")}</p>
 </section>
 
 <section>
-	<h3>{st('info.build.title')}</h3>
+	<h3>{st("info.build.title")}</h3>
 	<p class="note">
 		{#if commit === null}
-			{st('info.build.unknown')}
+			{st("info.build.unknown")}
 		{:else}
 			<!--
 				A DIRTY BUILD IS NOT THAT COMMIT, so it carries no link: the page on the forge would
@@ -47,29 +47,24 @@
 				<a href={commitLink} target="_blank" rel="noreferrer noopener"><code>{commit}</code></a>
 			{/if}
 			{#if commitDate !== null}&nbsp;· {commitDate}{/if}
-			{#if commitLink === null}&nbsp;— {st('info.build.modified')}{/if}
+			{#if commitLink === null}&nbsp;— {st("info.build.modified")}{/if}
 		{/if}
 	</p>
 </section>
 
 <section>
-	<h3>{st('info.original.title')}</h3>
+	<h3>{st("info.original.title")}</h3>
 	<p class="note">
-		{st('info.original.note')}
-		<a href={st('link.store')} target="_blank" rel="noreferrer noopener">
-			{st('info.original.link')}
+		{st("info.original.note")}
+		<a href={st("link.store")} target="_blank" rel="noreferrer noopener">
+			{st("info.original.link")}
 		</a>
 	</p>
 </section>
 
 <section>
-	<h3>{st('info.legal.title')}</h3>
-	<p class="note">{st('info.legal.note')}</p>
-</section>
-
-<section>
-	<h3>{st('info.log.title')}</h3>
-	<p class="note">{st('info.log.note')}</p>
+	<h3>{st("info.legal.title")}</h3>
+	<p class="note">{st("info.legal.note")}</p>
 </section>
 
 <style>

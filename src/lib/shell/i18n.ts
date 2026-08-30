@@ -196,10 +196,7 @@ const EN = {
 	'info.original.link': 'The Settlers History Edition (Ubisoft)',
 	'info.legal.title': 'Legal',
 	'info.legal.note':
-		'“The Settlers” and everything in it belong to Blue Byte / Ubisoft. This here is an independent hobby project with no connection to them — built out of admiration, and out of a slight inability to let 1993 go.',
-	'info.log.title': 'Log output',
-	'info.log.note':
-		'Log output lands in the browser console — open the devtools and filter by category (assets, engine, menu, game). Render timings are collected in the background and ride along in a bug report.',
+		'“The Settlers” and everything in it belong to Blue Byte / Ubisoft. This here is an independent hobby project with no connection to them — built out of admiration, and out of a slight inability to let 1993 go.',	
 
 	// -- Enhancements: additions of ours with no counterpart in the original --------------------
 	// ONE NAMESPACE PER ENHANCEMENT. There will be more than one of them (see `registry.ts`), so
@@ -212,9 +209,6 @@ const EN = {
 	'enh.stock.tab.serfs': 'Settlers',
 	'enh.stock.tab.view': 'Display',
 	'enh.stock.aria': 'Stock overview',
-	'enh.stock.intro':
-		'A readout over the game surface showing what your warehouses hold. The original has no such ' +
-		'thing — it shows these numbers only inside windows that cover half the map.',
 	'enh.pick.all': 'All',
 	'enh.pick.none': 'None',
 	'enh.pick.count': '{on} of {all} selected',
@@ -230,15 +224,8 @@ const EN = {
 	'enh.stock.serfs.modeNote':
 		'“Could be made” adds the unemployed settlers to every profession whose tool lies in the store. ' +
 		'One settler therefore counts in several rows — the question is “how many of these could I ' +
-		'have”, not “how would they divide up”.',
-	'enh.stock.view.title': 'The readout',
-	'enh.stock.view.emptyNote':
-		'There is no separate switch: what is ticked under “Goods” and “Settlers” is shown. Nothing is ' +
-		'ticked to begin with — an addition of ours does not stand over the game screen unasked. ' +
-		'Choose “None” in both and the readout disappears again. Its size is not set here: it follows ' +
-		'the control bar below and so grows and shrinks with the zoom. It is drawn over the game ' +
-		'screen, not into it — a screenshot and a video recording therefore do not contain it.',
-	'enh.stock.view.corner': 'Corner',
+		'have”, not “how would they divide up”.',	
+	'enh.stock.view.corner': 'Position',
 	'enh.stock.view.perRow': 'Entries per row',
 	'enh.stock.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
 	'enh.stock.view.opacity': 'Opacity',
@@ -410,19 +397,13 @@ const DE: Record<ShellKey, string> = {
 	'info.legal.title': 'Rechtliches',
 	'info.legal.note':
 		'„Die Siedler“ und alles darin gehören Blue Byte / Ubisoft. Dies hier ist ein unabhängiges Hobby-Projekt ohne jede Verbindung dorthin — entstanden aus Bewunderung und aus einer gewissen Unfähigkeit, 1993 loszulassen.',
-	'info.log.title': 'Log-Ausgaben',
-	'info.log.note':
-		'Log-Ausgaben landen in der Browser-Konsole — Devtools öffnen und nach Kategorie filtern (assets, engine, menu, game). Die Zeichen-Messung läuft im Hintergrund mit und fährt in einem Fehlerbericht mit.',
 
 	// -- Verbesserungen ------------------------------------------------------------------------
 	'enh.stock.name': 'Lager-Übersicht',
 	'enh.stock.tab.goods': 'Waren',
 	'enh.stock.tab.serfs': 'Siedler',
 	'enh.stock.tab.view': 'Darstellung',
-	'enh.stock.aria': 'Lager-Übersicht',
-	'enh.stock.intro':
-		'Eine Anzeige über der Spielfläche, die zeigt, was in Ihren Lagern liegt. Das Original hat so ' +
-		'etwas nicht — es zeigt diese Zahlen nur in Fenstern, die die halbe Karte verdecken.',
+	'enh.stock.aria': 'Lager-Übersicht',	
 	'enh.pick.all': 'Alle',
 	'enh.pick.none': 'Keine',
 	'enh.pick.count': '{on} von {all} ausgewählt',
@@ -438,16 +419,8 @@ const DE: Record<ShellKey, string> = {
 	'enh.stock.serfs.modeNote':
 		'„Wer daraus werden könnte“ rechnet die freien Siedler jedem Beruf zu, dessen Werkzeug im Lager ' +
 		'liegt. Ein Siedler zählt damit in mehreren Zeilen — gefragt ist „wie viele davon könnte ich ' +
-		'haben“, nicht „wie würden sie sich aufteilen“.',
-	'enh.stock.view.title': 'Die Anzeige',
-	'enh.stock.view.emptyNote':
-		'Es gibt keinen eigenen Schalter: gezeigt wird, was unter „Waren“ und „Siedler“ angehakt ist. ' +
-		'Zu Beginn ist nichts angehakt — eine Zutat von uns steht nicht ungefragt über dem ' +
-		'Spielbildschirm. Wählen Sie in beiden „Keine“, verschwindet die Anzeige wieder. Ihre Größe ' +
-		'wird nicht eingestellt: sie folgt der Bedienleiste unten und wächst und schrumpft also mit ' +
-		'dem Zoom. Sie liegt über dem Spielbildschirm, nicht darin — ein Bildschirmfoto und eine ' +
-		'Videoaufnahme enthalten sie deshalb nicht.',
-	'enh.stock.view.corner': 'Ecke',
+		'haben“, nicht „wie würden sie sich aufteilen“.',	
+	'enh.stock.view.corner': 'Position',
 	'enh.stock.view.perRow': 'Einträge je Zeile',
 	'enh.stock.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
 	'enh.stock.view.opacity': 'Deckkraft',
