@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { u16, addU16, subU16, i16, ror16, rol16 } from './int.js';
 
-describe('int — u16/i16-Wraparound', () => {
+describe('int - u16/i16 wraparound', () => {
   it('u16 masks to 16 bits', () => {
     expect(u16(0)).toBe(0);
     expect(u16(0xffff)).toBe(0xffff);
@@ -12,7 +12,7 @@ describe('int — u16/i16-Wraparound', () => {
   it('addU16 wraps on overflow', () => {
     expect(addU16(0xffff, 1)).toBe(0);
     expect(addU16(0x8000, 0x8000)).toBe(0);
-    expect(addU16(40744, 3072)).toBe(43816); // Beispiel aus SAVE3→SAVE4
+    expect(addU16(40744, 3072)).toBe(43816); // example from SAVE3 -> SAVE4
   });
 
   it('subU16 wraps on underflow (register semantics)', () => {
@@ -28,9 +28,9 @@ describe('int — u16/i16-Wraparound', () => {
     expect(i16(0xffff)).toBe(-1);
   });
 
-  it('ror16 rotiert nach rechts um 1', () => {
+  it('ror16 rotates right by 1', () => {
     expect(ror16(2)).toBe(1);
-    expect(ror16(1)).toBe(0x8000); // Bit 0 wandert nach Bit 15
+    expect(ror16(1)).toBe(0x8000); // bit 0 moves to bit 15
     expect(ror16(0x8006)).toBe(0x4003);
     expect(ror16(5)).toBe(0x8002);
   });

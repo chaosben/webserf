@@ -86,9 +86,9 @@ export interface MapGenBuffer {
   readonly down: number;
   /** `gs+0x10`, or `gs+0x60` in word form — direction Left. */
   readonly left: number;
- /** `gs+0x14` — Richtung UpLeft. */
+ /** `gs+0x14` — direction UpLeft. */
   readonly upLeft: number;
- /** `gs+0x18` — Richtung Up. */
+ /** `gs+0x18` — direction Up. */
   readonly up: number;
  /** `gs+0x1c` — direction UpRight (`up | right`, @0x7c8a); closes the 3x3 walk of stage 10. */
   readonly upRight: number;
@@ -255,7 +255,7 @@ export function refineHeights(buf: MapGenBuffer, rng: () => number): void {
     let offset = 0;
     do {
       do {
- // Beide Register bekommen nur ihr **unteres Byte** gesetzt (@0x80c8/@0x80fd/@0x8154/@0x81cb).
+ // Both registers only get their **low byte** set (@0x80c8/@0x80fd/@0x8154/@0x81cb).
         vreg6 = (vreg6 & 0xff00) | (buf.bytes[offset + 1] ?? 0);
         const colOnce = wrap16(buf, offset + colStep);
         const right = wrap16(buf, colOnce + colStep);

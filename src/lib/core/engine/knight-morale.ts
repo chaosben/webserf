@@ -29,11 +29,11 @@
 
 import type { GameState, Player } from './state.js';
 
-/** Basis-Moral ohne jedes Gold-Depot (`addw $0x400` @0x11845). */
+/** Base morale without any gold deposit (`addw $0x400` @0x11845). */
 export const MORALE_BASE = 0x400;
-/** Moral bei einer Karte ganz ohne Gold (`mov $0x1000` @0x117da). */
+/** Morale on a map without any gold at all (`mov $0x1000` @0x117da). */
 export const MORALE_NO_GOLD = 0x1000;
-/** Abzug je verlorenem Schloss (`subw $0x3ff` @0x1186e), Untergrenze 1 (`mov $0x1` @0x11879). */
+/** Penalty per lost castle (`subw $0x3ff` @0x1186e), lower bound 1 (`mov $0x1` @0x11879). */
 export const MORALE_CASTLE_PENALTY = 0x3ff;
 
 /** The four player slots in the order `@0x11752` works through them. */

@@ -50,7 +50,7 @@ import { aiProbeMap } from './ai-probe.js';
 
 /** Slots of the loss register (block 572). */
 export const AI_LOSS_SLOTS = 8;
-/** Start-Budget eines Termins — `mov $0x3e8,%ax` @0x5155b. */
+/** Start budget of one appointment — `mov $0x3e8,%ax` @0x5155b. */
 export const AI_NET_BUDGET = 1000;
 /** Rings searched around a loss position for an own flag — `cmpw $0x10` @0x5165b. */
 export const AI_NET_SEARCH_RINGS = 16;
@@ -58,9 +58,9 @@ export const AI_NET_SEARCH_RINGS = 16;
 export const AI_NET_NEAR_RINGS = 8;
 /** Spiral positions around the midpoint — `mov $0x24` @0x51794, so 37. */
 export const AI_NET_MIDPOINT_SPIRAL = 37;
-/** Kosten einer erfolglosen Suche — `subw $0x32` @0x51662 / @0x51b1d. */
+/** Cost of an unsuccessful search — `subw $0x32` @0x51662 / @0x51b1d. */
 export const AI_NET_COST_NO_SITE = 50;
-/** Kosten eines fehlgeschlagenen Wegebaus — `subw $0x258` @0x5220b. */
+/** Cost of a failed road build — `subw $0x258` @0x5220b. */
 export const AI_NET_COST_ROAD_FAILED = 600;
 /**
  * Level **budget** of the network breadth-first search — `mov $0x2` @0x51dc4/@0x51dc9.
@@ -375,7 +375,7 @@ export function aiRoadNetworkTask(state: GameState, player: Player): number {
     const sweepPos = posOf(col, row, geo);
     const tile = state.mapTiles[sweepPos];
     if (tile !== undefined && tile.object === 1 && tile.owner === wantOwner) {
-      // @0x51cf4 — eigene Fahne: anbinden.
+      // @0x51cf4 — own flag: connect it.
       const rc = aiConnectFlag(state, player, tile.objIndex, sweepPos);
       if (rc === 'built') {
         built += 1;

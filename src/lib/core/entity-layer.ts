@@ -29,7 +29,7 @@
 
 import { MILL_TYPE, constructionMaterials, millRotationOffset, occupationFlags, productionOverlays } from './building-decor.js';
 import { PIG_FARM_TYPE, pigFarmCount, pigFarmPigs } from './pig-farm-layer.js';
-import { burningFlames } from './burning-layer.js';
+import { burningFlames, effectiveBurnCountdown } from './burning-layer.js';
 import { MAP_OBJECT_BASE, MAP_SHADOW_BASE, buildingDrawOps } from './building-sprites.js';
 import {
   blitSprite,
@@ -421,6 +421,12 @@ export function drawEntityLayer<Img extends DrawImage>(
         // `draw_building` @0x34e54 tests the burning bit and branches into the type dispatch
         // **before** it draws — so the sound hangs at the start of this branch.
         if (buildingSoundCtx !== null) emitBuildingSound(buildingSoundCtx, b, by);
+        // The burn countdown a drawn frame sees. `null` == burnt out, and then the original returns
+        // (@0x34ab3) **before** the type dispatch — so neither the body nor the materials nor the
+        // flames appear, and the building stays invisible until the tick driver ends the fire. The
+        // sound gate above is on purpose the one thing that still runs: it precedes the step.
+        const burnCd = b.burning ? effectiveBurnCountdown(b.firstKnight, b.level, state.header.tick) : 0;
+        if (burnCd === null) continue;
         // (1) Waiting construction materials BEHIND the building (only while building): stone =
         //     stock slot 1, planks = stock slot 0 (available).
         //
@@ -451,9 +457,7 @@ export function drawEntityLayer<Img extends DrawImage>(
         //      (`FUN_00034eb0` @0x34eb0) and only then puts its flames on top (`FUN_00034a70`). A
         //      burning building therefore looks normal including its type decoration; only the
         //      flames are added. The same branch applies to a shell under construction.
-        const flames = b.burning
-          ? burningFlames(b.type, b.firstKnight, b.constructing, b.progress)
-          : null;
+        const flames = b.burning ? burningFlames(b.type, burnCd, b.constructing, b.progress) : null;
         const drawFlames = (): void => {
           if (flames === null) return;
           for (const fl of flames) {

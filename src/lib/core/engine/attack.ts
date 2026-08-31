@@ -554,6 +554,6 @@ function sendKnightToTarget(state: GameState, knight: Serf, target: Building): v
   knight.stateData[1] = dRow & 0xff; // serf[0xc] dist_row
   knight.stateData[2] = 0; //           serf[0xd] neg_dist1
   knight.stateData[3] = 0; //           serf[0xe] neg_dist2
-  knight.stateData[4] = ST_KNIGHT_FREE_WALKING; // serf[0xf] Folgezustand
+  knight.stateData[4] = ST_KNIGHT_FREE_WALKING; // serf[0xf] follow-up state
   knight.state = ST_KNIGHT_LEAVE_FOR_WALK_TO_FIGHT;
 }

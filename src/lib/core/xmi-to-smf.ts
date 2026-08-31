@@ -34,13 +34,13 @@ const XMI_TICK_HZ = 120;
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
 export interface XmiMidiEvent {
-  /** Absolute Zeit in XMI-Ticks (120 Hz). */
+  /** Absolute time in XMI ticks (120 Hz). */
   readonly time: number;
-  /** Stabile Reihenfolge bei gleicher Zeit. */
+  /** Stable order for events at the same time. */
   readonly index: number;
-  /** MIDI-Status-Byte (inkl. Channel-Nibble). */
+  /** MIDI status byte (including the channel nibble). */
   readonly status: number;
-  /** 1. Datenbyte (Pitch / Controller-Nummer / Programm / Meta-Subtype …). */
+  /** First data byte (pitch / controller number / program / meta sub type ...). */
   readonly data1: number;
   /** Second data byte (velocity / controller value / meta length). 0 if absent. */
   readonly data2: number;
@@ -99,7 +99,7 @@ export function xmiDurationSec(parsed: ParsedXmi): number {
 }
 
 // ---------------------------------------------------------------------------
-// IFF-Walker
+// IFF walker
 // ---------------------------------------------------------------------------
 
 interface ParseCtx {
@@ -148,7 +148,7 @@ function handleChunk(
       // The first 4 bytes are the sub type (e.g. "XDIR", "XMID"); skip it and treat the rest as
       // nested chunks.
       if (dataEnd - dataStart < 4) {
-        throw new Error(`XMI: '${id}' ohne Sub-Type.`);
+        throw new Error(`XMI: '${id}' without a sub type.`);
       }
       walkChunks(bytes, dataStart + 4, dataEnd, ctx);
       return;
@@ -175,7 +175,7 @@ function handleChunk(
 }
 
 // ---------------------------------------------------------------------------
-// EVNT-Stream
+// EVNT stream
 // ---------------------------------------------------------------------------
 
 function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCtx): void {
@@ -194,11 +194,11 @@ function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCt
     const high = status & 0xf0;
 
     switch (high) {
-      case 0x80: // Note-Off
-      case 0xa0: // Polyphonic Aftertouch
-      case 0xb0: // Controller
+      case 0x80: // note off
+      case 0xa0: // polyphonic aftertouch
+      case 0xb0: // controller
       case 0xe0: {
-        // Pitch-Bend
+        // pitch bend
         const d1 = readByte(bytes, p++, end);
         const d2 = readByte(bytes, p++, end);
         ctx.events.push({
@@ -211,7 +211,7 @@ function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCt
         break;
       }
       case 0x90: {
-        // Note-On + XMI-Note-Duration (VLQ).
+        // note on + XMI note duration (VLQ).
         const note = readByte(bytes, p++, end);
         const velocity = readByte(bytes, p++, end);
         ctx.events.push({
@@ -228,13 +228,13 @@ function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCt
           index: ctx.nextIndex++,
           status,
           data1: note,
-          data2: 0, // Vel=0 = Note-Off in MIDI Running-Status-Konvention
+          data2: 0, // vel=0 == note off in the MIDI running-status convention
         });
         break;
       }
-      case 0xc0: // Programm-Change
+      case 0xc0: // program change
       case 0xd0: {
-        // Channel-Pressure
+        // channel pressure
         const d1 = readByte(bytes, p++, end);
         ctx.events.push({
           time,
@@ -248,7 +248,7 @@ function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCt
       case 0xf0: {
         if (status !== 0xff) {
           throw new Error(
-            `XMI: Status-Byte 0x${status.toString(16).toUpperCase()} (Sysex/Escape) ` +
+            `XMI: status byte 0x${status.toString(16).toUpperCase()} (sysex/escape) ` +
               `is not supported.`,
           );
         }
@@ -256,8 +256,8 @@ function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCt
         const metaLen = readByte(bytes, p++, end);
         if (p + metaLen > end) {
           throw new Error(
-            `XMI: Meta-Event 0x${metaType.toString(16).toUpperCase()} zu lang ` +
-              `(len=${metaLen}, verbleibend=${end - p}).`,
+            `XMI: meta event 0x${metaType.toString(16).toUpperCase()} too long ` +
+              `(len=${metaLen}, remaining=${end - p}).`,
           );
         }
         const payload = bytes.slice(p, p + metaLen);
@@ -279,14 +279,14 @@ function parseEvents(bytes: Uint8Array, start: number, end: number, ctx: ParseCt
       }
       default:
         throw new Error(
-          `XMI: unbekanntes Status-Byte 0x${status.toString(16).toUpperCase()} bei Offset ${p - 1}.`,
+          `XMI: unknown status byte 0x${status.toString(16).toUpperCase()} at offset ${p - 1}.`,
         );
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// SMF-Writer
+// SMF writer
 // ---------------------------------------------------------------------------
 
 export function buildSmf(parsed: ParsedXmi): Uint8Array {
@@ -294,7 +294,7 @@ export function buildSmf(parsed: ParsedXmi): Uint8Array {
     1,
     Math.floor((parsed.tempoMicrosPerBeat * XMI_TICK_HZ) / MICROSECONDS_PER_SECOND),
   );
-  // Herleitung: Synth-Tick-Rate = division × 1e6 / tempo Ticks/Sekunde. Soll = 120 Hz.
+  // Derivation: synth tick rate = division * 1e6 / tempo ticks per second. Target = 120 Hz.
   // => division = tempo * 120 / 1e6 (identical to the formula tempo*3/25000).
 
   const track = encodeTrack(parsed.events);
@@ -304,7 +304,7 @@ export function buildSmf(parsed: ParsedXmi): Uint8Array {
   p = writeAscii(out, p, 'MThd');
   p = writeU32BE(out, p, 6);
   p = writeU16BE(out, p, 0); // SMF Type 0
-  p = writeU16BE(out, p, 1); // 1 Track
+  p = writeU16BE(out, p, 1); // 1 track
   p = writeU16BE(out, p, division);
 
   p = writeAscii(out, p, 'MTrk');
@@ -404,7 +404,7 @@ function readVlq(bytes: Uint8Array, p: number, end: number): VlqResult {
 }
 
 function encodeVlq(value: number, out: number[]): void {
-  if (value < 0) throw new Error(`SMF: negativer Delta-Wert ${value}.`);
+  if (value < 0) throw new Error(`SMF: negative delta value ${value}.`);
   if (value === 0) {
     out.push(0);
     return;

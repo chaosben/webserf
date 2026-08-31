@@ -144,7 +144,7 @@ export function tick(state: GameState): void {
   updateEconomy(state, frameBoundary); // FUN_0000ec9d @0xbdfa — player tick every tick, round robin per frame
   if (frameBoundary) dispatchFrameRotation(state); // rest of FUN_0000f787 @0xbdff
   if (frameBoundary) updateFlags(state); // FUN_0004b858 @0xbe04 — goods scheduler
-  updateBuildings(state, frameBoundary); // FUN_000130f2 @0xbe09 — includes request_serf phase A
+  if (frameBoundary) updateBuildings(state); // FUN_000130f2 @0xbe09 — includes request_serf phase A
 
   updateSerfs(state); // FUN_0001599e @0xbe0e
  // FUN_0000c100 — statistics recorder + victory detection. The call sits @0xbe18 right behind the

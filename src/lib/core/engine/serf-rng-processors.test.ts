@@ -59,7 +59,7 @@ function place(state: GameState, b: Building): number {
 }
 
 describe('MakingTool (40)', () => {
-  it('Phase A: Stahl + Bretter vorhanden → beide verbrauchen, Anim 0x90, Counter 0x5ff', () => {
+  it('phase A: steel + planks present → consume both, anim 0x90, counter 0x5ff', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -104,8 +104,8 @@ describe('MakingTool (40)', () => {
     expect(serf.state).toBe(40);
   });
 
-  it('field_0xb erreicht 4 → Werkzeug fertig, Produktions-Stat++, Feld frei, Zustand ≠ 40', () => {
-    // toolPriority alle 0 → gleichverteilte Wahl; res+1 ∈ [16,24] → resourceCount[15..23].
+  it('field_0xb reaches 4 → tool finished, production stat++, tile free, state ≠ 40', () => {
+    // All toolPriority entries 0 → uniform choice; res+1 ∈ [16,24] → resourceCount[15..23].
     const state = makeState();
     place(state, bld());
     const serf = mkSerf({ index: 1, state: 40, tick: 999, counter: 0, stateData: [3, 0, 0, 0, 0] });
@@ -122,7 +122,7 @@ describe('MakingTool (40)', () => {
 
   it('weighted choice: only one non-zero tool_prio -> exactly that tool', () => {
     const tp = new Array(9).fill(0);
-    tp[3] = 0xffff; // nur Werkzeug-Index 3 (res 15+3 = 18 = Cleaver)
+    tp[3] = 0xffff; // only tool index 3 (res 15+3 = 18 = cleaver)
     const state = makeState(tp);
     place(state, bld());
     const serf = mkSerf({ index: 1, state: 40, tick: 999, counter: 0, stateData: [3, 0, 0, 0, 0] });
@@ -130,12 +130,12 @@ describe('MakingTool (40)', () => {
 
     dispatchSerf(state, serf);
 
-    expect((state.players[0]!.resourceCount as number[])[18]).toBe(1); // Cleaver (res 18)
+    expect((state.players[0]!.resourceCount as number[])[18]).toBe(1); // cleaver (res 18)
   });
 });
 
 describe('PigFarming (37)', () => {
-  it('Phase A: Getreide vorhanden → verbrauchen, Anim 0x8b, Counter 0x17f', () => {
+  it('phase A: wheat present → consume it, anim 0x8b, counter 0x17f', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -151,9 +151,9 @@ describe('PigFarming (37)', () => {
     expect(serf.counter).toBe(0x17f);
   });
 
-  it('8 Schweine → schlachten: Schwein abziehen, Pig (res+1=2) raustragen', () => {
+  it('8 pigs → slaughter: deduct one pig, carry out the pig (res+1=2)', () => {
     const state = makeState();
-    // Byte 9 = 8 Schweine (av0, rq8), Modus 6 → Schleife: mode 7 (ungerade) → Schlacht-Entscheidung.
+    // Byte 9 = 8 pigs (av0, rq8), mode 6 → loop: mode 7 (odd) → slaughter decision.
     place(state, bld({ type: 14, stock: [{ available: 0, requested: 0 }, { available: 0, requested: 8 }] }));
     const serf = mkSerf({ index: 1, state: 37, tick: 999, counter: 0, stateData: [6, 0, 0, 0, 0] });
     state.serfs[1] = serf;
@@ -163,12 +163,12 @@ describe('PigFarming (37)', () => {
     // rawByte9 == 7 (one pig slaughtered)
     const b = state.buildings[1]!;
     expect((b.stock[1].available << 4) | b.stock[1].requested).toBe(7);
-    expect(state.players[0]!.resourceCount[1]).toBe(1); // Pig(1)-Produktion +1
+    expect(state.players[0]!.resourceCount[1]).toBe(1); // pig(1) production +1
     expect(serf.state).not.toBe(37);
   });
 
   it('breeding: the even mode adds a piglet on a successful roll', () => {
-    // 1 Schwein (rq1), Modus 1 → Schleife mode 2 (gerade, Zucht). breeding_prob[1]=6000.
+    // 1 pig (rq1), mode 1 → loop mode 2 (even, breeding). breeding_prob[1]=6000.
     const state = makeState();
     place(state, bld({ type: 14, stock: [{ available: 0, requested: 0 }, { available: 0, requested: 1 }] }));
     // counter set so that the even mode carries -> wait (one breeding attempt per tick).
@@ -219,7 +219,7 @@ describe('BuildingBoat (41)', () => {
     expect(serf.animation).toBe(0x91);
   });
 
-  it('Schritt 9, Flagge frei → Boot (res+1=9) raustragen', () => {
+  it('step 9 with a free flag → carry out the boat (res+1=9)', () => {
     const state = makeState();
     place(state, bld({ type: 3, stock: [{ available: 0, requested: 0 }, { available: 0, requested: 7 }] }));
     const serf = mkSerf({ index: 1, state: 41, tick: 999, counter: 0, stateData: [8, 0, 0, 0, 0] });
@@ -227,21 +227,21 @@ describe('BuildingBoat (41)', () => {
 
     dispatchSerf(state, serf);
 
-    expect(state.players[0]!.resourceCount[8]).toBe(1); // Boat(8)-Produktion +1
+    expect(state.players[0]!.resourceCount[8]).toBe(1); // boat(8) production +1
     expect(serf.state).not.toBe(41);
   });
 
   it('step 9 with an occupied flag -> back to step 8, wait', () => {
     const state = makeState();
     const pos = place(state, bld({ type: 3 }));
-    // Flaggen-Feld belegt.
+    // The flag tile is occupied.
     state.mapTiles[neighbor(pos, Direction.DownRight, geo)] = tile({ objIndex: 1, serfIndex: 99 });
     const serf = mkSerf({ index: 1, state: 41, tick: 999, counter: 0, stateData: [8, 0, 0, 0, 0] });
     state.serfs[1] = serf;
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(8); // wartet weiter
+    expect(serf.stateData[0]).toBe(8); // keeps waiting
     expect(serf.counter).toBe(0);
     expect(serf.state).toBe(41);
   });

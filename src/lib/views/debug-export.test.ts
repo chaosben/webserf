@@ -32,9 +32,9 @@ describe('debugSlug — the note must not build a path', () => {
   });
 
   it('an empty or purely exotic note yields the fallback name', () => {
-    expect(debugSlug('')).toBe('bericht');
-    expect(debugSlug(undefined)).toBe('bericht');
-    expect(debugSlug('///')).toBe('bericht');
+    expect(debugSlug('')).toBe('report');
+    expect(debugSlug(undefined)).toBe('report');
+    expect(debugSlug('///')).toBe('report');
   });
 
   it('shortens long notes (the folder name stays manageable)', () => {
@@ -202,8 +202,8 @@ describe('buildDebugReport — what actually ends up in the package', () => {
     expect(md).toContain('colour: GPU');
     // The outlier comes BEFORE the median — that is what the complaint is about. It is NOT flagged
     // here: at 100 logic ticks/s the port draws 12.5 times a second, so the budget is 80 ms and
-    // 41.2 ms is half of it. A fixed 16 ms threshold — from the time when drawing happened on every
-    // repaint — used to flag an 18.6 ms frame that was five times inside its budget.
+    // 41.2 ms is half of it. A fixed 16 ms threshold would belong to drawing on every repaint and
+    // would flag an 18.6 ms frame that is five times inside its budget.
     expect(md).toContain('whole frame: outlier 41.2 ms · median 8.25 ms (n 812)');
     expect(md).not.toContain('⟵ above');
     expect(md).toContain('The **budget** per frame is 80 ms and not 16 ms');
@@ -219,8 +219,8 @@ describe('buildDebugReport — what actually ends up in the package', () => {
     // numbers; that is measured.)
     expect(md).toContain('putImageData: not measured (never ran in this session)');
     expect(md).toContain('logic pump (whole clock callback): not measured');
-    // And COMPLETELY: exactly one line per phase, measured or not. Without this count a phase
-    // added later could silently fall out again — exactly the old bug.
+    // And COMPLETELY: exactly one line per phase, measured or not. Without this count a phase added
+    // later could fall out silently.
     const rows = md
       .split('\n')
       .filter((l) => l.startsWith('- ') && /: (outlier|not measured)/.test(l));
@@ -278,8 +278,8 @@ describe('buildDebugReport — what actually ends up in the package', () => {
   });
 
   it('the map sits in the package as a diff, not as a tile table', async () => {
-    // The reason for the whole rework: at 512x256 the table would be 18.6 MB. The fake state here
-    // has eight tiles, so what is checked is the SHAPE — that `mapTiles` no longer appears.
+    // Why a diff at all: at 512x256 the tile table would be 18.6 MB. The fake state here has eight
+    // tiles, so what is checked is the SHAPE — that `mapTiles` does not appear.
     const json = (await filesOf()).get('state.json') ?? '';
     expect(json).not.toContain('"mapTiles"');
     expect(json).toContain('"map"');
@@ -318,9 +318,9 @@ describe('buildDebugReport — what actually ends up in the package', () => {
   });
 
   it('the issue body carries the note, the attachment box and the fingerprint — not the report', async () => {
-    // The body used to be the whole of `report.md`. That was duplication (the same prose is in the
-    // package) and it buried the one sentence a human wrote. Both directions are checked, because
-    // only the second one would notice a relapse into "just paste everything in".
+    // The body must NOT be the whole of `report.md`: the same prose lies in the package and it would
+    // bury the one sentence a human wrote. Both directions are checked, because only the second one
+    // notices a relapse into "just paste everything in".
     const st = fakeState();
     const report = await buildDebugReport(
       input({
@@ -339,7 +339,7 @@ describe('buildDebugReport — what actually ends up in the package', () => {
     expect(body).toContain(`- report \`${report.id}\``);
     expect(body).toContain('gameTick');
     expect(body).toContain('map seed [0x4b6b');
-    // Gegenrichtung: the report's own sections stay out of the URL.
+    // Opposite direction: the report's own sections stay out of the URL.
     expect(body).not.toContain('## Marked spot');
     expect(body).not.toContain('# Debug report');
     expect(report.issueUrl.length).toBeLessThan(2000);
@@ -397,7 +397,7 @@ describe('report ids', () => {
       'captures',
       '2026-08-19-134500-alt',
       '.git',
-      // Old counter-style names are not ours any more — they are too short for an id.
+      // Counter-style names are not ids: the leading group is too short.
       '0007-2026-08-19-134500-x',
     ]) {
       expect(reportIdOf(name)).toBeNull();

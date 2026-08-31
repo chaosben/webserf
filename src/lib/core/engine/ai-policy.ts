@@ -143,7 +143,7 @@ export function aiMilitaryPolicy(state: GameState, player: Player): void {
  // The roll from @0x546ea still sits in `0x1c(%edi)` while counting and drives the bitmap advance
  // there (module head, point 1) — surveyed: exactly two accesses to that slot in the body.
   const counts = countMilitaryBuildings(state, player, roll);
-  let knights = 0; // `mov -0xe(%ebx),%ax` @0x54b0c, dann vier `add %ax,0x1c(%edi)` bis @0x54b3c
+  let knights = 0; // `mov -0xe(%ebx),%ax` @0x54b0c, then four `add %ax,0x1c(%edi)` up to @0x54b3c
   for (let rank = 0; rank < 5; rank++) knights = u16(knights + (player.serfCount[SERF_KNIGHT0 + rank] ?? 0));
   player.aiKnightTotal = knights; // `mov %ax,0x1ac(%ebx)` @0x54b47
 
@@ -316,7 +316,7 @@ function applyOccupationRow(player: Player, level: number): void {
     const b = bytes[THREAT_LEVELS - 1 - idx]!;
     const hi = (b << 4) & 0xff; // `shlb $0x4` @0x54d67 — byte shift
     let lo = (b + idx) & 0xff; // `add %al,0x4(%edi)` @0x54d6d
-    lo = lo < 4 ? 0 : lo - 4; // `subb $0x4,0x4(%edi)` @0x54d70, dann `jae`
+    lo = lo < 4 ? 0 : lo - 4; // `subb $0x4,0x4(%edi)` @0x54d70, then `jae`
     if (idx === 3 && hi === 0x30) lo = 1; // @0x54d7b/@0x54d81 — the original's special case
     occ[idx] = lo | hi; // `mov %al,-0x4(%ebx,%esi,1)` @0x54d9b
   }
@@ -359,7 +359,7 @@ export function aiDistributionPolicy(player: Player): void {
   steel[0] = toolNeed; // tool maker — @0x5b3ec
 
   const inverted = u16(~toolNeed); // `not %ax` @0x5b3f7
-  const invertedPlus = satAdd(inverted, 4000); // `addw $0xfa0,0xc(%edi)` @0x5b406, dann `jae`
+  const invertedPlus = satAdd(inverted, 4000); // `addw $0xfa0,0xc(%edi)` @0x5b406, then `jae`
 
  // -- The knight occupation of the highest threat level drives steel and gold.
   let steelWant = 0xffff; // @0x5b416 — a preset only the 0x40 branch leaves standing
@@ -411,7 +411,7 @@ export function aiDistributionPolicy(player: Player): void {
   let planksBuild = 0xffff; // @0x5b5ea
   let planksBoat = u16(satSub(8, stock(RES.Boat)) << 8); // @0x5b5f2..@0x5b612
   planksBoat = u16(planksBoat << 3); // @0x5b617 — so x 2048 in total
-  if (planks[2]! >= 0xc000) { // `subw $0xc000,(%edi)` @0x5b629, dann `jb`
+  if (planks[2]! >= 0xc000) { // `subw $0xc000,(%edi)` @0x5b629, then `jb`
     planksBoat = 0; // @0x5b630
     const over = u16(u16(planks[2]! - 0xc000) * 2); // @0x5b63b
     planksBuild = u16(~over); // `not %ax` @0x5b641

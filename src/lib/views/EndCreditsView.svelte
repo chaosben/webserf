@@ -76,11 +76,10 @@
    * The largest rectangle of ratio {@link DISPLAY_ASPECT} that fits the stage — the same fitting
    * the main menu does with {@link fitScale}.
    *
-   * Why that is needed: the credits used to sit in a box of **640 × 480 CSS pixels** (`UI_SCREEN`
-   * times `uiScale`, and `uiScale` is exactly 1 at every zoom <= 1). In a larger window that was a
-   * small box at the bottom centre with the stage colour around it as a black frame — the
-   * reported fault. The original paints over the **whole** screen, so the sequence takes the
-   * whole stage here too.
+   * Why that is needed: the original paints over the **whole** screen, so the sequence takes the
+   * whole stage here too. It must NOT hang on `originBoxStyle(UI_SCREEN)` like a popup — that is
+   * **640 × 480 CSS pixels** times `uiScale`, and `uiScale` is exactly 1 at every zoom <= 1, which
+   * in a larger window leaves a small box at the bottom centre with the stage colour around it.
    */
   const fitted = $derived.by<{ w: number; h: number } | null>(() => {
     if (availWidth <= 0 || availHeight <= 0) return null;

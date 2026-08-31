@@ -18,7 +18,7 @@ import {
 } from './credits.js';
 import { MENU_AREA, MENU_TEXT_COLOR, type MenuTarget } from './main-menu.js';
 
-describe('Vorspann — Raster', () => {
+describe('opening credits — grid', () => {
   it('converts eighth-column and pixel row separately', () => {
     // x = col·8 + 0x10, y = row + 0x20 (FUN_00037b48 @0x37b89..@0x37b91).
     expect(creditsX(0)).toBe(16);
@@ -42,7 +42,7 @@ describe('Vorspann — Raster', () => {
   });
 });
 
-describe('Vorspann — Kommandos', () => {
+describe('opening credits — commands', () => {
   it('redraws the background first in every step', () => {
     // Every original body starts with `call 0x46f9`, so the text does not accumulate.
     for (let i = 0; i < CREDITS_STEPS.length; i++) {
@@ -75,7 +75,7 @@ describe('Vorspann — Kommandos', () => {
   });
 });
 
-describe('Vorspann — Standzeiten', () => {
+describe('opening credits — dwell times', () => {
   it('stands 215 ticks per step — and twice on the play-tester block', () => {
     // `mov $0xd6` + `subw $1`/`jae` => the value 0 is still passed through (@0x46ba/@0x46de).
     expect(CREDITS_STEP_TICKS).toBe(215);
@@ -88,7 +88,7 @@ describe('Vorspann — Standzeiten', () => {
   });
 
   it('loops forever and swallows no step on a large jump', () => {
-    const umlauf = CREDITS_STEPS.reduce((s, _, i) => s + creditsStepTicks(i), 0);
+    const cycle = CREDITS_STEPS.reduce((s, _, i) => s + creditsStepTicks(i), 0);
     let st = initialCreditsState();
     expect(st).toEqual({ step: 0, elapsed: 0 });
     // Step by step once around — the original jumps back with `je 0x45f8` @0x46b3.
@@ -98,17 +98,17 @@ describe('Vorspann — Standzeiten', () => {
     }
     expect(st).toEqual({ step: 0, elapsed: 0 });
     // A backgrounded tab delivers one large tick jump at once.
-    expect(advanceCredits(initialCreditsState(), umlauf)).toEqual({ step: 0, elapsed: 0 });
+    expect(advanceCredits(initialCreditsState(), cycle)).toEqual({ step: 0, elapsed: 0 });
     expect(advanceCredits(initialCreditsState(), CREDITS_STEP_TICKS * 3).step).toBe(3);
     expect(advanceCredits(initialCreditsState(), CREDITS_STEP_TICKS - 1).step).toBe(0);
   });
 
-  it('ignoriert negative Tick-Deltas', () => {
+  it('ignores negative tick deltas', () => {
     expect(advanceCredits({ step: 2, elapsed: 5 }, -100)).toEqual({ step: 2, elapsed: 5 });
   });
 });
 
-describe('Vorspann — Zeichen-Pfad', () => {
+describe('opening credits — drawing path', () => {
   /** A recorder instead of a framebuffer: WHAT is drawn matters here, not how it looks. */
   function recorder(): { calls: string[]; target: MenuTarget } {
     const calls: string[] = [];

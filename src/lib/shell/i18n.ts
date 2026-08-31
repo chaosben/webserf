@@ -182,7 +182,7 @@ const EN = {
 	// -- About ---------------------------------------------------------------------------------
 	'info.about.title': 'What this is',
 	'info.about.what':
-		'webserf brings “The Settlers” (Blue Byte, 1993) to the browser: the rules are ported from the original program, the graphics come from your own copy of the game. Roughly the same amount of work the settlers put in, only with fewer planks.',
+		'webserf brings “The Settlers” (Blue Byte, 1993) to the browser: the rules are ported from the original program, the graphics come from your own copy of the game.',
 	'info.about.assets':
 		'None of the original is bundled here. The archive you loaded stays in your browser, and so do your saved games — nothing is uploaded.',
 	'info.source.title': 'Source code',
@@ -382,7 +382,7 @@ const DE: Record<ShellKey, string> = {
 
 	'info.about.title': 'Was das hier ist',
 	'info.about.what':
-		'webserf holt „Die Siedler“ (Blue Byte, 1993) in den Browser: Die Regeln stammen aus dem Original-Programm, die Grafik aus Ihrer eigenen Kopie des Spiels. Etwa so viel Arbeit, wie die Siedler selbst hineinstecken — nur mit weniger Brettern.',
+		'webserf holt „Die Siedler“ (Blue Byte, 1993) in den Browser: Die Regeln stammen aus dem Original-Programm, die Grafik aus Ihrer eigenen Kopie des Spiels.',
 	'info.about.assets':
 		'Vom Original ist hier nichts dabei. Ihr geladenes Archiv bleibt in Ihrem Browser, Ihre Spielstände auch — hochgeladen wird nichts.',
 	'info.source.title': 'Quelltext',

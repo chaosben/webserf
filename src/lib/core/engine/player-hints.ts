@@ -36,11 +36,11 @@ import type { GameState, Building, Inventory, Player } from './state.js';
 import { addPlayerMessage } from './player-messages.js';
 import { u16 } from './int.js';
 
-/** `flags` Bit 6 == Spieler-Slot aktiv (@0x111ba `bt $0x6`). */
+/** `flags` bit 6 == player slot active (@0x111ba `bt $0x6`). */
 const PLAYER_FLAG_ACTIVE = 1 << 6;
 
 /** Bit layout of `messageFlags` (`player+0x163`). */
-const HINT_DONE = 0; // Bit 0 — Hinweise dauerhaft aus
+const HINT_DONE = 0; // bit 0 — hints off for good
 const HINT_NO_PLANKS = 1; // bit 1 — "out of planks" shown
 const HINT_NO_STONE = 2; // bit 2 — "out of stone" shown
 const HINT_PENDING = 6; // bit 6 — display marker of the message chain
@@ -78,9 +78,9 @@ export function updateAllPlayerHints(state: GameState): void {
   }
 }
 
-/** Ein Spieler-Durchgang (== `return_held_materials` @0x111b2). */
+/** One player pass (== `return_held_materials` @0x111b2). */
 export function updatePlayerHints(state: GameState, player: Player): void {
-  // @0x111c4 `jne 0x111c7` / @0x111c6 `ret` — inaktiver Slot.
+  // @0x111c4 `jne 0x111c7` / @0x111c6 `ret` — inactive slot.
   if ((player.flags & PLAYER_FLAG_ACTIVE) === 0) return;
 
   // @0x111ca: inv = gs->inventories + player[0x108] * 0x78. In the original the pointer is always
@@ -151,7 +151,7 @@ function returnHeldMaterialsAfterDelay(player: Player, inv: Inventory): void {
  *
  * The second condition is a **byte** computation on the packed stock bytes and must not be
  * simplified to `available[0] + available[1]`:
- * `((bld[8] + bld[9]) >> 4) == (bld[0x10] + bld[0x11])`, beide Summen als `u8` (@0x11458..@0x11482).
+ * `((bld[8] + bld[9]) >> 4) == (bld[0x10] + bld[0x11])`, both sums as `u8` (@0x11458..@0x11482).
  * `bld[8]` is `(available << 4) | requested`, so the byte sum carries from the `requested` nibbles
  * into the upper half and `shrb` cuts off at the top. Reproduced exactly like that.
  */
@@ -170,7 +170,7 @@ function buildingHint(state: GameState, player: Player, bit: number, slot: numbe
   (player.messageBuildingSlots as number[])[slot] = 0; // @0x114a1
 }
 
-/** `((bld[8] + bld[9]) >> 4) == (bld[0x10] + bld[0x11])`, beide Summen als u8 (s. `buildingHint`). */
+/** `((bld[8] + bld[9]) >> 4) == (bld[0x10] + bld[0x11])`, both sums as u8 (see `buildingHint`). */
 function stockComplete(bld: Building): boolean {
   const raw = (slotByte(bld, 0) + slotByte(bld, 1)) & 0xff;
   const max = bld.stockMaximum ? (bld.stockMaximum[0] + bld.stockMaximum[1]) & 0xff : 0;

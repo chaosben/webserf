@@ -8,9 +8,9 @@ import type { PackEntry } from './types.js';
  *   offset 0:    u32 LE file_size      (== exact file size, a sanity check)
  *   Offset 4:    u32 LE entry_count
  *   Offset 8 ..  entry_count × 8 Bytes TocEntry { u32 size; u32 offset }
- *   ... ab `offset` jedes Eintrags: 10 Byte SpriteHeader + payload
+ *   ... at each entry's `offset`: 10-byte SpriteHeader + payload
  *
- * Format empirisch reverse-engineered + verifiziert gegen reale Archive (`SPAD.PA`).
+ * Format empirically reverse-engineered and verified against real archives (`SPAD.PA`).
  */
 export class PaArchive {
   /** The immutable raw bytes (kept for sprite decoding). */
@@ -26,10 +26,10 @@ export class PaArchive {
     const data = toUint8Array(buffer);
 
     if (data.byteLength < 8) {
-      throw new Error(`PaArchive: Datei zu klein (${data.byteLength} Bytes).`);
+      throw new Error(`PaArchive: file too small (${data.byteLength} bytes).`);
     }
 
-    // Magic-Check: TPWM-komprimiert?
+    // Magic check: TPWM-compressed?
     if (
       data[0] === 0x54 /* T */ &&
       data[1] === 0x50 /* P */ &&
@@ -54,7 +54,7 @@ export class PaArchive {
     }
 
     if (entryCount === 0 || entryCount > 100_000) {
-      throw new Error(`PaArchive: unplausibler entry_count = ${entryCount}.`);
+      throw new Error(`PaArchive: implausible entry_count = ${entryCount}.`);
     }
 
     const tocBytes = entryCount * 8;
@@ -109,11 +109,11 @@ export class PaArchive {
  * slots. Without it the head formula `base + direction` lands on an empty slot and the serf would be
  * drawn headless in every direction but 0.
  *
- * Vier Kopier-Gruppen (Eintrag = ganze 8-Byte-TocEntry {size, offset}, per `entry = (byteOffset-8)/8`):
+ * Four copy groups (entry = the whole 8-byte TocEntry {size, offset}, via `entry = (byteOffset-8)/8`):
  *   1. 48 blocks from entry 3449, per block entry[0] -> [1..5] (serf head region 3449..3736)
  *   2. entries 3761..3763 -> 3764..3766
- *   3. Eintrag 1351 → 1362..1367
- *   4. Eintrag 1601 → 1612..1617
+ *   3. entry 1351 -> 1362..1367
+ *   4. entry 1601 -> 1612..1617
  * Only applied when the archive is large enough (a complete sprite pack), otherwise a no-op.
  */
 function applyDosLoadFixup(entries: PackEntry[]): void {
@@ -132,9 +132,9 @@ function applyDosLoadFixup(entries: PackEntry[]): void {
   }
   // 2. Entries 3761..3763 -> 3764..3766.
   for (let d = 0; d < 3; d++) copy(3761 + d, 3764 + d);
-  // 3. Eintrag 1351 → 1362..1367.
+  // 3. Entry 1351 -> 1362..1367.
   for (let d = 0; d < 6; d++) copy(1351, 1362 + d);
-  // 4. Eintrag 1601 → 1612..1617.
+  // 4. Entry 1601 -> 1612..1617.
   for (let d = 0; d < 6; d++) copy(1601, 1612 + d);
 }
 

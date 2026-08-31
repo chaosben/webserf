@@ -18,7 +18,7 @@
 
 import { posOf, colOf, rowOf, type MapGeometry } from './position.js';
 
-/** 49 Basis-Vektoren `(dcol, drow)` — extrahiert aus `DAT_00004223` (jeder 12-Byte-Slot). */
+/** 49 base vectors `(dcol, drow)` — extracted from `DAT_00004223` (every 12-byte slot). */
 const BASE_VECTORS: readonly (readonly [number, number])[] = [
   [1, 0], [2, 1], [2, 0], [3, 1], [3, 2], [3, 0], [4, 2], [4, 1], [4, 3], [4, 0],
   [5, 2], [5, 3], [5, 1], [5, 4], [5, 0], [6, 3], [6, 2], [6, 4], [6, 1], [6, 5],
@@ -27,7 +27,7 @@ const BASE_VECTORS: readonly (readonly [number, number])[] = [
   [9, 2], [9, 7], [9, 1], [9, 0], [16, 0], [16, 8], [24, 0], [24, 8], [24, 16],
 ];
 
-/** 2×2-Rotationsmatrizen `[m0,m1,m2,m3]` je Hex-Richtung — extrahiert aus `DAT_000041f3`. */
+/** 2x2 rotation matrices `[m0,m1,m2,m3]` per hex direction — extracted from `DAT_000041f3`. */
 const ROT_MATRIX: readonly (readonly [number, number, number, number])[] = [
   [1, 0, 0, 1],
   [1, 1, -1, 0],

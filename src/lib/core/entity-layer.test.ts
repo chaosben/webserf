@@ -55,9 +55,9 @@ const KIT: EntitySpriteKit<Tagged> = {
   flag: () => tagged('flag'),
 };
 
-// --- Minimaler Stand ----------------------------------------------------------------------------
+// --- minimal state ------------------------------------------------------------------------------
 
-const GEO = mapGeometry(0); // 32 × 16 Kacheln ⇒ Szenen-Periode 1024 × 320 px
+const GEO = mapGeometry(0); // 32 x 16 tiles => scene period 1024 x 320 px
 
 interface TilePatch {
   object?: number;
@@ -162,14 +162,14 @@ function run(state: SaveGameState, frame: ReturnType<typeof frameAround>['frame'
   return rec.draws;
 }
 
-// --- Painter-Reihenfolge: Drei-Pass PRO ZEILE ---------------------------------------------------
+// --- painter order: three passes PER ROW ---------------------------------------------------------
 
-describe('drawEntityLayer — Reihenfolge', () => {
+describe('drawEntityLayer — order', () => {
   it('draws a serf of the SAME row ON TOP of the building (even at a smaller column)', () => {
     // The earlier single pass interleaved object+serf per TILE and thereby pushed a serf with a
     // smaller column behind the building.
     const bldPos = posOf(10, 8, GEO);
-    const serfPos = posOf(9, 8, GEO); // gleiche Zeile, kleinere Spalte
+    const serfPos = posOf(9, 8, GEO); // same row, smaller column
     const state = makeState(
       new Map([
         [bldPos, { object: 2, objIndex: 1 }],
@@ -229,7 +229,7 @@ describe('drawEntityLayer — Reihenfolge', () => {
 
 // --- positions from the traversal ----------------------------------------------------------------
 
-describe('drawEntityLayer — Positionen', () => {
+describe('drawEntityLayer — positions', () => {
   it('draws the same tile SEVERAL times when the window exceeds one map period', () => {
     // Computed from `col/row` through the camera the position would be the same every time — the
     // ground repeated while the building stuck once in the middle.
@@ -242,7 +242,7 @@ describe('drawEntityLayer — Positionen', () => {
     const { frame } = frameAround(10, 8, 2200, 700);
     const bodies = run(state, frame).filter((d) => d.tag.startsWith('obj'));
     expect(bodies.length).toBeGreaterThan(1);
-    // Und zwar an VERSCHIEDENEN Stellen.
+    // And at DIFFERENT places, too.
     expect(new Set(bodies.map((d) => `${d.x},${d.y}`)).size).toBe(bodies.length);
   });
 
@@ -270,7 +270,7 @@ describe('drawEntityLayer — Positionen', () => {
   });
 });
 
-// --- Wasser-Zweig + Objekt-Schatten (§7.18) -------------------------------------------------------
+// --- water branch + object shadow -----------------------------------------------------------------
 
 describe('drawEntityLayer — water branch and the second blit', () => {
   it('a map object gets SHADOW and body at the same spot (`blit_map_object_with_shadow`)', () => {
@@ -281,7 +281,7 @@ describe('drawEntityLayer — water branch and the second blit', () => {
     const iShadow = draws.findIndex((d) => d.tag === 'shadow');
     const iBody = draws.findIndex((d) => d.tag.startsWith('obj'));
     expect(iShadow).toBeGreaterThanOrEqual(0);
-    expect(iShadow).toBeLessThan(iBody); // Schatten ZUERST (@0x345cf vor @0x345f9)
+    expect(iShadow).toBeLessThan(iBody); // shadow FIRST (@0x345cf before @0x345f9)
     expect({ x: draws[iShadow]!.x, y: draws[iShadow]!.y }).toEqual({ x: draws[iBody]!.x, y: draws[iBody]!.y });
   });
 
@@ -328,9 +328,9 @@ describe('drawEntityLayer — water branch and the second blit', () => {
   });
 });
 
-// --- Schalter ------------------------------------------------------------------------------------
+// --- switches ------------------------------------------------------------------------------------
 
-describe('drawEntityLayer — Schalter', () => {
+describe('drawEntityLayer — switches', () => {
   it('leaves disabled categories out', () => {
     const bldPos = posOf(10, 8, GEO);
     const state = makeState(
@@ -361,7 +361,7 @@ describe('drawEntityLayer — Schalter', () => {
  * In a fight the tile carries only the attacker, so the defender would stay invisible. The original
  * draws him from the attacker branch (`FUN_00026cc4` -> `FUN_00026d80`) together with the hit marker.
  */
-describe('drawEntityLayer — Kampf (Gegner + Treffer-Marker)', () => {
+describe('drawEntityLayer — fight (opponent + hit marker)', () => {
   /** Kit tagging the torso by owner — so attacker and defender are distinguishable. */
   const FIGHT_KIT: EntitySpriteKit<Tagged> = { ...KIT, torso: (owner) => tagged(`serf${owner}`) };
 
@@ -422,7 +422,7 @@ describe('drawEntityLayer — Kampf (Gegner + Treffer-Marker)', () => {
     expect(def).toBeGreaterThanOrEqual(0);
     // The opponent first — in the original he lands before the own body in the row list.
     expect(def).toBeLessThan(att);
-    // Gleiche Kachel ⇒ gleicher Zeichenpunkt.
+    // Same tile => same drawing point.
     expect(draws[def]).toMatchObject({ x: draws[att]!.x, y: draws[att]!.y });
   });
 

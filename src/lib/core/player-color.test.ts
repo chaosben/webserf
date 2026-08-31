@@ -32,7 +32,7 @@ describe('recolorMaskImage', () => {
     expect(out.offsetY).toBe(-7);
   });
 
-  it('differierendes Pixel → Spielerfarbe (hellster Region-Pixel = volle Farbe)', () => {
+  it('a differing pixel → player colour (brightest region pixel = full colour)', () => {
     // One pixel, differing between image and variant -> recolourable; the only one -> maxLum == lum -> f = 1.
     const img = sprite([0, 200, 200, 255]);
     const variant = sprite([200, 0, 0, 255]);
@@ -40,13 +40,13 @@ describe('recolorMaskImage', () => {
     expect([out.pixels[0], out.pixels[1], out.pixels[2], out.pixels[3]]).toEqual([100, 50, 25, 255]);
   });
 
-  it('gleiches Pixel bleibt festes Bild-Pixel', () => {
+  it('an identical pixel stays a fixed image pixel', () => {
     const img = sprite([10, 20, 30, 255]);
     const out = recolorMaskImage(img, img, [100, 50, 25]);
     expect([out.pixels[0], out.pixels[1], out.pixels[2], out.pixels[3]]).toEqual([10, 20, 30, 255]);
   });
 
-  it('transparentes Bild-Pixel bleibt transparent', () => {
+  it('a transparent image pixel stays transparent', () => {
     const img = sprite([0, 200, 200, 0]);
     const variant = sprite([200, 0, 0, 0]);
     const out = recolorMaskImage(img, variant, [100, 50, 25]);
@@ -58,9 +58,9 @@ describe('recolorMaskImage', () => {
     const img = sprite([0, 227, 227, 255, 0, 100, 100, 255]);
     const variant = sprite([227, 0, 0, 255, 100, 0, 0, 255]);
     const out = recolorMaskImage(img, variant, [200, 100, 50]);
-    // Pixel 0 = volle Spielerfarbe.
+    // Pixel 0 = full player colour.
     expect([out.pixels[0], out.pixels[1], out.pixels[2]]).toEqual([200, 100, 50]);
-    // Pixel 1 dunkler als Pixel 0 (jeder Kanal kleiner), aber > 0.
+    // Pixel 1 darker than pixel 0 (every channel smaller) but > 0.
     expect(out.pixels[4]).toBeLessThan(out.pixels[0]);
     expect(out.pixels[5]).toBeLessThan(out.pixels[1]);
     expect(out.pixels[4]).toBeGreaterThan(0);

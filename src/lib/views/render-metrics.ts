@@ -51,12 +51,11 @@ export const RENDER_PHASES = [
  * Part 2: the LOGIC side — a group of its own, because `frame` does not contain it (it runs in the
  * clock callback, the frame is produced afterwards in a Svelte effect).
  *
- * The reason it exists: a report once proved the opposite of what it was meant to prove. After the
- * snapshot decoding was dropped, the whole frame cost 2.6 ms at 15.4 frames/s on the reporter's
- * machine — about 4 % of a core. "Where does the CPU load come from?" was therefore no longer
- * answerable inside the draw path, and about everything else the report had NO number. `pump` is the
- * whole clock callback (ticks + ground signature + sound + message clocks), `logic` only `runTicks`
- * within it — the difference tells whether the simulation or its surroundings cost.
+ * Without it a report cannot answer "where does the CPU load come from?" at all once the draw path
+ * is cheap — a whole frame of 2.6 ms at 15.4 frames/s is about 4 % of a core, and everything outside
+ * the draw path would have NO number. `pump` is the whole clock callback (ticks + ground signature +
+ * sound + message clocks), `logic` only `runTicks` within it — the difference tells whether the
+ * simulation or its surroundings cost.
  */
 export const LOGIC_PHASES = ['pump', 'logic'] as const;
 

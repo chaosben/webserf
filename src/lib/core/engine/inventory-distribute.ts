@@ -387,7 +387,7 @@ function deliver(
     if (resOff < 0) resOff = pickLargestFood(inv);
 
     inv.resources[resOff >> 1] -= 1; // @0x107cd
-    const resIndex = resOff >> 1; // @0x107d3 `shrw $1` + @0x107d7 `addw $1` == roher Typ res+1
+    const resIndex = resOff >> 1; // @0x107d3 `shrw $1` + @0x107d7 `addw $1` == raw type res+1
     const target = rawQueueType(inv, 0) === 0 ? 0 : 1; // @0x107df
     inv.outQueue[target].type = resIndex;
     inv.outQueue[target].dest = dest;
@@ -420,9 +420,9 @@ function wakeWaitingCarrier(state: GameState, inv: Inventory, serfIndex: number)
   if (serf.state !== 0x0c) return; // @0x1085a — only a waiting carrier (state 12)
 
   serf.state = 0x0b; // @0x10860 MoveResourceOut
-  setUnionU8(serf, 0xb, rawQueueType(inv, 0)); // @0x1086b `serf[0xb] = inv[0x3a]` (roher Typ)
+  setUnionU8(serf, 0xb, rawQueueType(inv, 0)); // @0x1086b `serf[0xb] = inv[0x3a]` (raw type)
   setUnionU16(serf, 0xc, 0x3c); // @0x10874 ORIGINAL: a literal, not `inv[0x3c]` (see above)
-  setUnionU8(serf, 0xf, 0x0d); // @0x1087f Folgezustand 13 DropResourceOut
+  setUnionU8(serf, 0xf, 0x0d); // @0x1087f follow-up state 13 DropResourceOut
 
   // Advance the queue by one slot (@0x10887..@0x108a6). `outQueue[1].dest` stays behind as a
   // residual — the original clears only the type byte `inv[0x3b]`.

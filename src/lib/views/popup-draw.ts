@@ -265,9 +265,9 @@ export interface ObjectPopupView {
 /**
  * Knight chain of a military building (`bld+10` → `serf+0xe`).
  *
- * Walks the RAW union bytes like the original (@0x3b1aa). A stored decoded twin used to lead into
- * the garrison a conqueror had already left (the reason it no longer exists). The loop cap is an
- * addition — the original would hang on a cyclic list.
+ * Walks the RAW union bytes like the original (@0x3b1aa). A stored decoded twin must not be used
+ * here: it ages, and a stale one leads into the garrison a conqueror has already left. The loop cap
+ * is an addition — the original would hang on a cyclic list.
  */
 export function garrisonKnightTypes(state: GameState, firstKnight: number): number[] {
   const types: number[] = [];

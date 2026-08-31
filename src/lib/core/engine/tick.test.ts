@@ -62,8 +62,8 @@ function makeSave(overrides?: {
     stateData: [0, 0, 0, 0, 0],
   })) as unknown as SaveGameState['serfRecords'];
   // `height` > 0 means walkable. Height 0 is water or map edge in the original; a map that is
-  // unwalkable throughout does not exist there, and the random walk of the lost handler (@0x1bc7f) draws
-  // dann endlos. Vgl. denselben Hinweis in `determinism.test.ts`.
+  // unwalkable throughout does not exist there, and the random walk of the lost handler (@0x1bc7f)
+  // would draw forever. See the same note in `determinism.test.ts`.
   const mapTiles = Array.from({ length: 4096 }, () => ({
     height: 8,
     terrainUp: 8,
@@ -93,7 +93,7 @@ function makeSave(overrides?: {
   };
 }
 
-describe('tick — Logik-Tick', () => {
+describe('tick — logic tick', () => {
   it('advances the game tick by 1 (u16 wrap)', () => {
     const state = loadState(makeSave({ tick: 1000 }));
     tick(state);
@@ -142,7 +142,7 @@ describe('tick — Logik-Tick', () => {
     expect(snapshot(a)).toEqual(snapshot(b));
   });
 
-  it('updateSerfs direkt aufrufbar (ohne Tick-Vorlauf)', () => {
+  it('updateSerfs can be called directly (without running a tick first)', () => {
     const state = loadState(makeSave({ tick: 1000 }));
     state.gameTick = 1005;
     updateSerfs(state);
@@ -150,7 +150,7 @@ describe('tick — Logik-Tick', () => {
   });
 });
 
-describe('advanceFrameClock — zentraler Frame-Takt', () => {
+describe('advanceFrameClock — the central frame clock', () => {
   const mk = (over: Partial<{ frameAccum: number; rotation: number; rotationWrap: number }> = {}) =>
     ({ frameAccum: over.frameAccum ?? 0, rotation: over.rotation ?? 0, rotationWrap: over.rotationWrap ?? 49 } as GameState);
 

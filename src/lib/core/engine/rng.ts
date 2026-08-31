@@ -39,7 +39,7 @@ export class Rng {
     return r;
   }
 
-  /** Aktuellen Zustand als serialisierbares Tripel auslesen. */
+  /** Read the current state as a serialisable triple. */
   getState(): [number, number, number] {
     return [this.s0, this.s1, this.s2];
   }

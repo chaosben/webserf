@@ -23,7 +23,7 @@ import type { DecodedSprite } from './types.js';
  * click zones). Both are checked through the order of the sprite requests: which icon per direction,
  * and that the carrier state switches it.
  */
-describe('flag-popup — Screen 0x2a (WARENTRANSPORT)', () => {
+describe('flag-popup — screen 0x2a (resource transport)', () => {
   const sprite = {
     width: 2,
     height: 2,
@@ -93,22 +93,22 @@ describe('flag-popup — Screen 0x2a (WARENTRANSPORT)', () => {
   it('background, geologist and exit are always drawn, demolish only on request', () => {
     const withoutRaze = render(none, none);
     expect(withoutRaze.filter((e) => e === UI_ICON_BASE + FLAG_POPUP_BG_ICON).length).toBeGreaterThan(0);
-    expect(withoutRaze).toContain(UI_ICON_BASE + 0x1c); // Geologe
-    expect(withoutRaze).toContain(UI_ICON_BASE + 0x3c); // RAUS
+    expect(withoutRaze).toContain(UI_ICON_BASE + 0x1c); // geologist
+    expect(withoutRaze).toContain(UI_ICON_BASE + 0x3c); // exit
     expect(withoutRaze).not.toContain(UI_ICON_BASE + 0x135);
 
     expect(render(none, none, { attachRoad: true })).toContain(UI_ICON_BASE + 0x135);
   });
 
   it('the click zones cover geologist and exit; `viewOnly` leaves only the exit', () => {
-    // Geologe: Icon (col 7, row 0x64) → Zeichen-Pixel (64, 109).
+    // Geologist: icon (col 7, row 0x64) -> drawing pixels (64, 109).
     expect(flagPopupAction(64, 109)).toMatchObject({ kind: 'callGeologist' });
-    // RAUS: (col 14, row 0x80) → (120, 137).
+    // Exit: (col 14, row 0x80) -> (120, 137).
     expect(flagPopupAction(120, 137)).toMatchObject({ kind: 'close' });
     // The demolish zone only when the symbol is drawn.
     expect(flagPopupAction(64, 60)).toMatchObject({ kind: 'attachRoad' });
     expect(flagPopupAction(64, 60, { attachRoadShown: false })).toBeNull();
-    // `gs+0x37e` Bit 5 ⇒ reine Anzeige.
+    // `gs+0x37e` bit 5 => display only.
     expect(flagPopupAction(64, 109, { viewOnly: true })).toBeNull();
     expect(flagPopupAction(120, 137, { viewOnly: true })).toMatchObject({ kind: 'close' });
     // Empty area.

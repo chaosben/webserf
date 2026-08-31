@@ -1,11 +1,10 @@
 /**
  * Minimal blit backend, so the drawing passes can live **backend free** in `core/`.
  *
- * Road, entity and fallback passes used to sit in the Svelte component and were therefore out of reach
- * for the verification scripts: those could only check a *reimplementation* of the same calculation.
- * That is exactly where the repetition bug slipped through — the reimplementation had the same defect
- * as the component and could not show it. With this interface a script calls the same code the browser
- * runs.
+ * Road, entity and fallback passes live here and not in the Svelte component so that a verification
+ * script calls **the same code** the browser runs. A script that reimplements the calculation only
+ * ever checks its own reimplementation: it carries whatever defect the component carries and cannot
+ * show it.
  *
  * Two implementations:
  * - browser: a canvas blitter over `HTMLCanvasElement` + `drawImage`.

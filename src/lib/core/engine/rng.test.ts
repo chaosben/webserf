@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { Rng } from './rng.js';
 
-describe('Rng — bit-exakter Original-PRNG (@0x28c54)', () => {
+describe('Rng — bit-exact original PRNG (@0x28c54)', () => {
   // Reference vector, computed by hand from the original algorithm for seed [1,2,3] - independent of
   // the code, so it catches transcription and wraparound mistakes.
-  //   Zug 1: r=((1+2)^3)=0
-  //   Zug 2: Zustand (0,32771,32770) → r=((0+32771)^32770)=1
-  //   Zug 3: Zustand (1,16387,32770) → r=((1+16387)^32770)=49158
+  //   draw 1: r=((1+2)^3)=0
+  //   draw 2: state (0,32771,32770) → r=((0+32771)^32770)=1
+  //   draw 3: state (1,16387,32770) → r=((1+16387)^32770)=49158
   it('reproduces the hand-computed reference vector', () => {
     const rng = new Rng([1, 2, 3]);
     expect(rng.next()).toBe(0);
@@ -21,14 +21,14 @@ describe('Rng — bit-exakter Original-PRNG (@0x28c54)', () => {
   });
 
   it('is deterministic: same seed -> same sequence', () => {
-    const a = new Rng([0x0380, 0xeea7, 0x6b11]); // realer SAVE0-Seed
+    const a = new Rng([0x0380, 0xeea7, 0x6b11]); // the real SAVE0 seed
     const b = new Rng([0x0380, 0xeea7, 0x6b11]);
     const seqA = Array.from({ length: 32 }, () => a.next());
     const seqB = Array.from({ length: 32 }, () => b.next());
     expect(seqA).toEqual(seqB);
   });
 
-  it('alle Ausgaben liegen im u16-Bereich', () => {
+  it('every output stays inside the u16 range', () => {
     const rng = new Rng([0x0380, 0xeea7, 0x6b11]);
     for (let i = 0; i < 1000; i++) {
       const v = rng.next();

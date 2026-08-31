@@ -21,7 +21,7 @@ export const TEXT_KEY_CURSOR_LEFT = 0xfc;
 export const TEXT_KEY_CURSOR_RIGHT = 0xfb;
 /** Backspace — step back, then shift the rest (`cmpb $0xfe` @0xd174 -> @0xd1b3). */
 export const TEXT_KEY_BACKSPACE = 0xfe;
-/** Entfernen — Rest nachziehen, Cursor bleibt (`cmpb $0xfd` @0xd179 → @0xd182). */
+/** Delete — shift the rest up, the cursor stays (`cmpb $0xfd` @0xd179 -> @0xd182). */
 export const TEXT_KEY_DELETE = 0xfd;
 /** Finish the input (`cmpb $0xff` @0xd24e). */
 export const TEXT_KEY_COMMIT = 0xff;
@@ -52,12 +52,12 @@ export function editTextBuffer(
     return buf.cursor === n ? null : { text: buf.text, cursor: buf.cursor + 1 };
   if (key === TEXT_KEY_BACKSPACE || key === TEXT_KEY_DELETE) {
     const at = key === TEXT_KEY_BACKSPACE ? buf.cursor - 1 : buf.cursor;
-    if (at < 0 || at >= n) return null; // @0xd1c4 bzw. @0xd1ab
+    if (at < 0 || at >= n) return null; // @0xd1c4 resp. @0xd1ab
     return { text: buf.text.slice(0, at) + buf.text.slice(at + 1) + ' ', cursor: at };
   }
   if (key >= 0x80) return null; // other control characters — @0xd317, not read
   if (digitsOnly && (key < 0x31 || key > 0x38)) return null;
-  if (buf.cursor === n) return null; // Puffer voll — @0xd0c2
+  if (buf.cursor === n) return null; // buffer full — @0xd0c2
   return {
     text: buf.text.slice(0, buf.cursor) + String.fromCharCode(key) + buf.text.slice(buf.cursor + 1),
     cursor: buf.cursor + 1,

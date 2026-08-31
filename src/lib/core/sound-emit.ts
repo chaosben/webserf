@@ -29,6 +29,7 @@
 import type { MapGeometry } from './engine/position.js';
 import type { Rng } from './engine/rng.js';
 import type { BuildingRecord, SerfRecord } from './types.js';
+import { effectiveBurnCountdown } from './burning-layer.js';
 import { enqueueSoundIfVisible, enqueueSoundIfYVisible, type SoundQueue } from './sound.js';
 
 /**
@@ -104,8 +105,15 @@ export function emitBuildingSound(ctx: BuildingSoundCtx, b: BuildingRecord, y: n
   // through its type routine as usual and can queue that sound too. That the latch is the same
   // (`building[5]` bit 3) is an original quirk, not an imprecision of the port: if the fire branch
   // queues 0x54 it thereby blocks e.g. the mill sound in the same frame.
+  //
+  // The countdown must be the one a drawn frame sees, not the stored field: the tick driver only
+  // visits a building once per rotation cycle, so the stored value stands still for seconds. One
+  // knowingly accepted difference: the original reads it here BEFORE its own subtraction, i.e. one
+  // frame's worth higher, so this latch fires one frame earlier than the original's. Inaudible, and
+  // cheaper than carrying a second clock just to be off by nothing.
   if (b.burning) {
-    if (((b.firstKnight >> 3) & 3) === 3) latched(0x54);
+    const cd = effectiveBurnCountdown(b.firstKnight, b.level, ctx.tick);
+    if (cd !== null && ((cd >> 3) & 3) === 3) latched(0x54);
     else unlatch();
   }
   if (b.constructing) return; // construction sites have their own drawing branch without sound

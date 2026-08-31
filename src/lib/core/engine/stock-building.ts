@@ -54,7 +54,7 @@ const RES_DIR_OUT_MASK = 0x0a;
 
 /** The warehouse's carrier request: transporter, no tools (`send_serf_to_flag(0, 0, 0)`). */
 const HOLDER_REQUEST: WorkerRequest = { serfType: SERF_TRANSPORTER, tools: [] };
-/** Generic-Nachschub: unspezialisierter Siedler, ohne Werkzeug (`send_serf_to_flag(0x15, 0, 0)`). */
+/** Generic resupply: unspecialised serf, no tools (`send_serf_to_flag(0x15, 0, 0)`). */
 const GENERIC_REQUEST: WorkerRequest = { serfType: SERF_GENERIC, tools: [] };
 
 /** The inventory of a stock building (`bld[0xe]`). */

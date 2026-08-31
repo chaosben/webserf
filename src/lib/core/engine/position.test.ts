@@ -12,7 +12,7 @@ import {
   neighbor,
 } from './position.js';
 
-describe('position — Map-Geometrie + Positions-Codec', () => {
+describe('position — map geometry + position codec', () => {
   it('mapGeometry for the standard size 3 (64x64)', () => {
     const geo = mapGeometry(3);
     expect(geo.cols).toBe(64);
@@ -23,11 +23,11 @@ describe('position — Map-Geometrie + Positions-Codec', () => {
     expect(geo.tileCount).toBe(4096);
   });
 
-  it('posOf/colOf/rowOf sind konsistent', () => {
+  it('posOf/colOf/rowOf are consistent', () => {
     const geo = mapGeometry(3);
     for (const [col, row] of [
       [0, 0],
-      [25, 46], // Schloss P0 in SAVE0
+      [25, 46], // castle of player 0 in SAVE0
       [63, 63],
       [7, 47],
     ]) {
@@ -38,7 +38,7 @@ describe('position — Map-Geometrie + Positions-Codec', () => {
     }
   });
 
-  it('posOf wrappt am Torus-Rand', () => {
+  it('posOf wraps at the torus edge', () => {
     const geo = mapGeometry(3);
     expect(colOf(posOf(64, 0, geo), geo)).toBe(0);
     expect(rowOf(posOf(0, 64, geo), geo)).toBe(0);
@@ -62,7 +62,7 @@ describe('position — Map-Geometrie + Positions-Codec', () => {
   });
 });
 
-describe('position — Hex-Richtungen', () => {
+describe('position — hex directions', () => {
   const geo = mapGeometry(3);
 
   it('DIR_DELTA holds the 6 verified deltas', () => {
@@ -83,7 +83,7 @@ describe('position — Hex-Richtungen', () => {
     expect(oppositeDir(Direction.Up)).toBe(Direction.Down);
   });
 
-  it('neighbor schrittweise in jede Richtung', () => {
+  it('neighbor steps into every direction', () => {
     const from = posOf(10, 20, geo);
     const cases: [Direction, number, number][] = [
       [Direction.Right, 11, 20],
@@ -107,7 +107,7 @@ describe('position — Hex-Richtungen', () => {
     expect(neighbor(flag, Direction.UpLeft, geo)).toBe(castle);
   });
 
-  it('neighbor wrappt am Torus-Rand', () => {
+  it('neighbor wraps at the torus edge', () => {
     const edge = posOf(63, 63, geo);
     expect(colOf(neighbor(edge, Direction.Right, geo), geo)).toBe(0);
     expect(rowOf(neighbor(edge, Direction.Down, geo), geo)).toBe(0);

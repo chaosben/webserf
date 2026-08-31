@@ -48,7 +48,7 @@ const RES_SWORD = 24;
 const RES_SHIELD = 25;
 /** State 1 `IdleInStock` — the released knight waits in the castle's stock. */
 const STATE_IDLE_IN_STOCK = 1;
-/** Zustand 75 `DefendingCastle` (`mov $0x4b` @0x14ffc / @0x150af). */
+/** State 75 `DefendingCastle` (`mov $0x4b` @0x14ffc / @0x150af). */
 const STATE_DEFENDING_CASTLE = 0x4b;
 /** Counter of a freshly moved-in knight (`mov $0x1770` @0x150b7). The conversion does **not** set it. */
 const ENTER_COUNTER = 6000;

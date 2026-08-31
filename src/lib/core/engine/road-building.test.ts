@@ -125,7 +125,7 @@ describe('road building — entering the mode (@0x2860d)', () => {
     const st = state();
     const p = st.players[0]!;
     const rb = roadSession(st, p);
-    expect(beginRoadBuilding(st, p)).toBe(false); // freie Kachel
+    expect(beginRoadBuilding(st, p)).toBe(false); // free tile
     expect(rb.active).toBe(false);
 
     putFlag(st, 10, 10, 1);
@@ -135,8 +135,8 @@ describe('road building — entering the mode (@0x2860d)', () => {
   });
 });
 
-describe('road-building — Marker + erlaubte Richtungen (@0x32d49)', () => {
-  it('freies eigenes Umfeld: alle sechs Richtungen erlaubt, Marker = Steigung 0', () => {
+describe('road-building — markers + allowed directions (@0x32d49)', () => {
+  it('free own surroundings: all six directions allowed, marker = slope 0', () => {
     const st = state();
     const p = st.players[0]!;
     const rb = roadSession(st, p);
@@ -165,9 +165,9 @@ describe('road-building — Marker + erlaubte Richtungen (@0x32d49)', () => {
     const rb = roadSession(st, p);
     putFlag(st, 10, 10, 1);
     const [fc, fr] = stepTo(10, 10, Direction.Right);
-    at(st, fc, fr).owner = 2; // Spieler 1
+    at(st, fc, fr).owner = 2; // player 1
     const [sc, sr] = stepTo(10, 10, Direction.Down);
-    at(st, sc, sr).object = 72; // Stein-Haufen → OBJECT_CLASS 2
+    at(st, sc, sr).object = 72; // stone pile → OBJECT_CLASS 2
     beginRoadBuilding(st, p);
     updateRoadMarkers(st, p);
     expect(rb.markers[Direction.Right]).toBe(MARKER_BLOCKED);
@@ -192,7 +192,7 @@ describe('road-building — Marker + erlaubte Richtungen (@0x32d49)', () => {
   });
 });
 
-describe('road-building — Klick (@0x2a63c)', () => {
+describe('road-building — click (@0x2a63c)', () => {
   it('a segment sets both path bits, counts up and moves the cursor along', () => {
     const st = state();
     const p = st.players[0]!;
@@ -248,7 +248,7 @@ describe('road-building — Klick (@0x2a63c)', () => {
     beginRoadBuilding(st, p);
     updateRoadMarkers(st, p);
     const [c, r] = stepTo(10, 10, Direction.Right);
-    roadBuildingClick(st, p, c, r); // vor
+    roadBuildingClick(st, p, c, r); // forward
     const res = roadBuildingClick(st, p, 10, 10); // back
     expect(res.sound).toBe(SOUND_SEGMENT);
     expect(rb.segments).toBe(0);
@@ -258,7 +258,7 @@ describe('road-building — Klick (@0x2a63c)', () => {
   });
 });
 
-describe('road-building — Commit (FUN_0002b542)', () => {
+describe('road-building — commit (FUN_0002b542)', () => {
   it('a click on a flag links both ends and leaves the mode', () => {
     const st = state();
     const p = st.players[0]!;

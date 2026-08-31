@@ -21,7 +21,7 @@ import {
 
 const HOLD_END = END_CREDITS_HOLD_BEFORE + 2 * END_CREDITS_LAST_COLUMN + 0x1f;
 
-describe('Abspann — Phasen (run_end_credits @0x38b55)', () => {
+describe('end credits — phases (run_end_credits @0x38b55)', () => {
   it('phase 1 holds 109 frames on column 0', () => {
     expect(endCreditsFrame(0).column).toBe(0);
     expect(endCreditsFrame(END_CREDITS_HOLD_BEFORE - 1).column).toBe(0);
@@ -43,7 +43,7 @@ describe('Abspann — Phasen (run_end_credits @0x38b55)', () => {
   it('phase 4 passes -1 but STILL shows the final position', () => {
     const f = endCreditsFrame(HOLD_END);
     expect(f.column).toBeNull(); // the original does not blit here ...
-    expect(f.visibleColumn).toBe(END_CREDITS_LAST_COLUMN); // … sichtbar bleibt es trotzdem
+    expect(f.visibleColumn).toBe(END_CREDITS_LAST_COLUMN); // ... it stays visible nonetheless
     expect(f.text).toBe(true);
   });
 
@@ -68,12 +68,12 @@ describe('Abspann — Phasen (run_end_credits @0x38b55)', () => {
     const a = endCreditsFrame(HOLD_END).deco2Entry;
     const b = endCreditsFrame(HOLD_END + 1).deco2Entry;
     expect(a).not.toBe(b);
-    // Zyklus 7 (`cmpw $0x7` @0x39105)
+    // cycle of 7 (`cmpw $0x7` @0x39105)
     expect(endCreditsFrame(HOLD_END + END_CREDITS_DECO2.frames).deco2Entry).toBe(a);
   });
 });
 
-describe('Abspann — Zeichnung', () => {
+describe('end credits — drawing', () => {
   it('draws ground, picture, two decoration sprites and 21 lines in the hold phase', () => {
     const cmds = endCreditsCommands(endCreditsFrame(HOLD_END));
     expect(cmds[0]).toEqual({ kind: 'bar', x: 0, y: 0, w: 0x160, h: 0xf0, color: 0 });
@@ -96,7 +96,7 @@ describe('Abspann — Zeichnung', () => {
     expect(icons[2]!.x).toBe(f.imageX + END_CREDITS_DECO2.dx);
   });
 
-  it('Text-Ursprung: col 0x28 ⇒ x 0x10, row + 0xe (FUN_00037bad @0x37bee ff.)', () => {
+  it('text origin: col 0x28 => x 0x10, row + 0xe (FUN_00037bad @0x37bee ff.)', () => {
     expect(endCreditsX(0x28)).toBe(0x10);
     expect(endCreditsY(0x0a)).toBe(0x18);
     expect(END_CREDITS_TEXT_COLOR).toBe(0x1f);
@@ -111,7 +111,7 @@ describe('end credits — trigger (@0x38824)', () => {
   });
 });
 
-describe('Abspann — Uhr (5 Ticks je Frame, `cmpw $0x5` @0x38fe5)', () => {
+describe('end credits — clock (5 ticks per frame, `cmpw $0x5` @0x38fe5)', () => {
   it('a frame stands for exactly END_CREDITS_FRAME_TICKS ticks', () => {
     let s = initialEndCreditsState();
     for (let i = 0; i < END_CREDITS_FRAME_TICKS - 1; i++) s = advanceEndCredits(s, 1);
@@ -142,7 +142,7 @@ describe('Abspann — Uhr (5 Ticks je Frame, `cmpw $0x5` @0x38fe5)', () => {
     expect(advanceEndCredits(done, 10_000)).toEqual(done);
   });
 
-  it('negative oder Null-Ticks bewegen nichts', () => {
+  it('negative or zero ticks move nothing', () => {
     const s = initialEndCreditsState();
     expect(advanceEndCredits(s, 0)).toEqual(s);
     expect(advanceEndCredits(s, -5)).toEqual(s);

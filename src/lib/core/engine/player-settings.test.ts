@@ -86,10 +86,10 @@ function gameState(serfs: (Serf | null)[], inventories: (Inventory | null)[]): G
   } as unknown as GameState;
 }
 
-describe('player-settings — Schieberegler', () => {
-  it('linker Rand ⇒ 0, rechter Rand ⇒ Vollausschlag 65500', () => {
-    const s = FOOD_POPUP_SLIDERS[0]!; // Spalte 4 ⇒ Zone x 0x20..0x5f
-    expect(sliderValueFromClick(s, 0x20)).toBe(0); // Borrow-Zweig
+describe('player-settings — sliders', () => {
+  it('left edge ⇒ 0, right edge ⇒ full deflection 65500', () => {
+    const s = FOOD_POPUP_SLIDERS[0]!; // column 4 ⇒ zone x 0x20..0x5f
+    expect(sliderValueFromClick(s, 0x20)).toBe(0); // borrow branch
     expect(sliderValueFromClick(s, 0x27)).toBe(0); // exactly the 7px dead zone
     expect(sliderValueFromClick(s, 0x28)).toBe(SLIDER_STEP);
     expect(sliderValueFromClick(s, 0x5f)).toBe(50 * SLIDER_STEP);
@@ -103,7 +103,7 @@ describe('player-settings — Schieberegler', () => {
 
   it('writes into the field the slider names', () => {
     const p = player();
-    applySliderClick(p, TOOLS_POPUP_SLIDERS[2]!, 0x30); // dritte Zeile ⇒ toolPriority[5]
+    applySliderClick(p, TOOLS_POPUP_SLIDERS[2]!, 0x30); // third row ⇒ toolPriority[5]
     expect(p.toolPriority[5]).toBe((0x30 - 0x20 - 7) * SLIDER_STEP);
     expect(p.toolPriority[0]).toBe(0);
     applySliderClick(p, KNIGHT_POPUP_RATE_SLIDER, 0x5f);
@@ -111,7 +111,7 @@ describe('player-settings — Schieberegler', () => {
   });
 });
 
-describe('player-settings — Standardwerte', () => {
+describe('player-settings — defaults', () => {
   it('sets exactly the fields of its screen', () => {
     const p = player();
     expect(applySettingsDefaults(p, 0x1c)).toBe(true);
@@ -120,7 +120,7 @@ describe('player-settings — Standardwerte', () => {
     expect(applySettingsDefaults(p, 0x1d)).toBe(true);
     expect(p.planksDistribution).toEqual([65500, 3275, 19650]);
     expect(p.steelDistribution).toEqual([45850, 65500]);
-    expect(applySettingsDefaults(p, 0x1f)).toBe(false); // Screen ohne Standard-Knopf
+    expect(applySettingsDefaults(p, 0x1f)).toBe(false); // screen without a defaults button
   });
 
   it('both priority defaults are permutations of 1..26', () => {
@@ -131,17 +131,17 @@ describe('player-settings — Standardwerte', () => {
 
   it('the defaults match the manual: wood at the top, gold at the bottom, gold before wheat', () => {
     const t = SETTINGS_DEFAULTS.flagPriority;
-    expect(t[7]).toBe(26); // Bretter ganz oben
-    expect(t[6]).toBe(22); // Bauholz weit oben
-    expect(Math.min(...t)).toBe(t[13]!); // Golderz ganz unten
+    expect(t[7]).toBe(26); // planks at the very top
+    expect(t[6]).toBe(22); // lumber high up
+    expect(Math.min(...t)).toBe(t[13]!); // gold ore at the very bottom
     const e = SETTINGS_DEFAULTS.inventoryPriority;
-    expect(e[14]).toBe(26); // Goldbarren zuerst retten
-    expect(e[13]).toBe(25); // Golderz danach
-    expect(e[3]).toBe(1); //  Getreide zuletzt
+    expect(e[14]).toBe(26); // gold bars evacuated first
+    expect(e[13]).toBe(25); // gold ore next
+    expect(e[3]).toBe(1); //  wheat last
   });
 });
 
-describe('player-settings — Ritter-Besetzung', () => {
+describe('player-settings — knight occupation', () => {
   it('the target cannot drop below the minimum nor rise above 4', () => {
     const p = player({ knightOccupation: [0x22, 0x40, 0x00, 0x44] });
     expect(adjustKnightOccupation(p, 0, 'max', -1)).toBe(false); // max == min
@@ -167,9 +167,9 @@ describe('player-settings — Ritter-Besetzung', () => {
 describe('player settings — priority lists', () => {
   it('a click on a row stores the 1-based resource index as the cursor', () => {
     const p = player(); // flagPriority[i] = 26 − i
-    expect(selectPriorityItem(p, 'transport', 0)).toBe(true); // Platz 0 ⇒ Wert 26 ⇒ Ware 0
+    expect(selectPriorityItem(p, 'transport', 0)).toBe(true); // slot 0 ⇒ value 26 ⇒ resource 0
     expect(p.currentSett5Item).toBe(1);
-    expect(selectPriorityItem(p, 'transport', 25)).toBe(true); // Wert 1 ⇒ Ware 25
+    expect(selectPriorityItem(p, 'transport', 25)).toBe(true); // value 1 ⇒ resource 25
     expect(p.currentSett5Item).toBe(26);
     expect(selectPriorityItem(p, 'evacuation', 0)).toBe(true); // inventoryPriority[i] = i+1
     expect(p.currentSett6Item).toBe(26);
@@ -186,7 +186,7 @@ describe('player settings — priority lists', () => {
   });
 
   it('top/bottom set 26 and 1, up/down swap with the neighbour', () => {
-    const p = player({ currentSett5Item: 10 }); // Wert 17
+    const p = player({ currentSett5Item: 10 }); // value 17
     movePriorityItem(p, 'transport', 'top');
     expect(p.flagPriority[9]).toBe(26);
     expect(p.flagPriority[0]).toBe(25); // the previous 26 moves down
@@ -203,15 +203,15 @@ describe('player settings — priority lists', () => {
   });
 
   it('does nothing when the resource is already at the top or bottom', () => {
-    const top = player({ currentSett5Item: 1 }); // Wert 26
+    const top = player({ currentSett5Item: 1 }); // value 26
     expect(movePriorityItem(top, 'transport', 'up')).toBe(false);
-    const bottom = player({ currentSett5Item: 26 }); // Wert 1
+    const bottom = player({ currentSett5Item: 26 }); // value 1
     expect(movePriorityItem(bottom, 'transport', 'down')).toBe(false);
   });
 });
 
 describe('player settings — knight menu', () => {
-  it('Angriffswahl schaltet nur Bit 1', () => {
+  it('the attack selection toggles only bit 1', () => {
     const p = player({ flags: 0x41 });
     setAttackSelection(p, true);
     expect(p.flags).toBe(0x43);
@@ -229,7 +229,7 @@ describe('player settings — knight menu', () => {
     expect(p.knightMenuValue).toBe(99);
   });
 
-  it('rekrutierbar == min(freie Siedler, Schwerter, Schilde) je Lager', () => {
+  it('recruitable == min(idle serfs, swords, shields) per warehouse', () => {
     const a = inventory({ index: 1, genericCount: 5, resources: withRes({ 24: 3, 25: 9 }) });
     const b = inventory({ index: 2, genericCount: 2, resources: withRes({ 24: 9, 25: 9 }) });
     const foreign = inventory({ index: 3, owner: 1, genericCount: 9, resources: withRes({ 24: 9, 25: 9 }) });
@@ -244,7 +244,7 @@ describe('player settings — knight menu', () => {
     const state = gameState(serfs, [null, inv]);
     const p = player();
 
-    expect(recruitKnights(state, p, 20)).toBe(2); // nur zwei Schwerter
+    expect(recruitKnights(state, p, 20)).toBe(2); // only two swords
     expect(serfs[1]!.type).toBe(22);
     expect(serfs[2]!.type).toBe(22);
     expect(serfs[3]!.type).toBe(21);
@@ -252,7 +252,7 @@ describe('player settings — knight menu', () => {
     expect(inv.resources[24]).toBe(0);
     expect(inv.resources[25]).toBe(3);
     expect(inv.genericCount).toBe(2);
-    expect(inv.serfIndices[21]).toBe(0); // gecachter Generic-Zeiger verworfen
+    expect(inv.serfIndices[21]).toBe(0); // cached generic pointer discarded
     expect(p.serfCount[21]).toBe(-2);
     expect(p.serfCount[22]).toBe(2);
     expect(p.totalMilitaryScore).toBe(2);
@@ -287,7 +287,7 @@ describe('knight shift — trigger and countdown', () => {
     startKnightShift(p);
     const phase1 = KNIGHT_SHIFT_DURATION - KNIGHT_SHIFT_PHASE2_AT;
     for (let t = 0; t < phase1 - 1; t++) tickKnightShift(p);
-    expect(p.flags & PLAYER_FLAG_REDUCED_OCCUPANCY).toBeTruthy(); // noch Phase 1
+    expect(p.flags & PLAYER_FLAG_REDUCED_OCCUPANCY).toBeTruthy(); // still phase 1
     tickKnightShift(p);
     expect(p.knightShiftTimer).toBe(KNIGHT_SHIFT_PHASE2_AT);
     expect(p.flags & PLAYER_FLAG_REDUCED_OCCUPANCY).toBeFalsy();

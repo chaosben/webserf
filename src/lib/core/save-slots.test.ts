@@ -22,7 +22,7 @@ const rec = (index: number, name: string, savedAt: number): SaveSlotRecord => {
 
 describe('save-slots — file names and index', () => {
   it('builds the slot names like the original (digit at position 4)', () => {
-    // Das Original tauscht `*(vorlage + 4) = slot + 0x30`; zehn Slots passen genau.
+    // The original patches `*(template + 4) = slot + 0x30`; ten slots fit exactly.
     expect(saveFileName(0)).toBe('SAVE0.DS');
     expect(saveFileName(9)).toBe('SAVE9.DS');
     expect(ARCHIV_FILE_NAME).toBe('ARCHIV.DS');
@@ -92,7 +92,7 @@ describe('save-slots — reconciling two stores', () => {
     expect(parseArchiv(plan.archiv)[0]!.name).toBe('GLEICH'.padEnd(14));
   });
 
-  it('behandelt zwei leere Ablagen als deckungsgleich', () => {
+  it('treats two empty stores as identical', () => {
     const plan = reconcileSlots([], []);
     expect(plan.actions.every((a) => a.kind === 'keep')).toBe(true);
     expect(parseArchiv(plan.archiv).some((s) => s.used)).toBe(false);

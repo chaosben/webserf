@@ -20,10 +20,10 @@ class Recorder implements Blitter<Img> {
     this.draws.push({ mask: image.mask, ground: image.ground, x, y });
   }
   blitPartial(): void {
-    throw new Error('Wege zeichnen nie teilweise');
+    throw new Error('roads never draw partially');
   }
   blitOverIndex(): void {
-    throw new Error('Wege zeichnen nie bedingt');
+    throw new Error('roads never draw conditionally');
   }
 }
 
@@ -125,7 +125,7 @@ describe('drawRoadLayer', () => {
  * descriptor offsets resolved against `compute_map_window_tiles` @0xd93a. These tests pin **which
  * neighbour tile** enters the calculation.
  */
-describe('drawRoadLayer — Boden-Textur-Auswahl', () => {
+describe('drawRoadLayer — ground texture selection', () => {
   const groundOf = (rec: Recorder) => rec.draws[0]!.ground - PATH_GROUND_BASE;
 
   it('dir 0 Right: the cross slope uses Up and DownRight, factor 3', () => {
@@ -152,9 +152,9 @@ describe('drawRoadLayer — Boden-Textur-Auswahl', () => {
     const frame = frameAround(10, 8);
     const paths = new Map([[a, 1 << 1]]);
     const right = run(makeTiles(paths, new Map([[posOf(11, 8, geo), 3]])), frame);
-    expect(groundOf(right)).toBe(0); // 2·3 = 6 >= 5
+    expect(groundOf(right)).toBe(0); // 2*3 = 6 >= 5
     const down = run(makeTiles(paths, new Map([[posOf(10, 9, geo), 3]])), frame);
-    expect(groundOf(down)).toBe(2); // 2·(−3) = −6 < −5
+    expect(groundOf(down)).toBe(2); // 2*(-3) = -6 < -5
   });
 
   it('dir 2 Down: the second term is DownRight, NOT the segment target Down', () => {
@@ -176,7 +176,7 @@ describe('drawRoadLayer — Boden-Textur-Auswahl', () => {
     // dir 0: max(A.terrainDown, Up.terrainUp). A high value in the field that is NOT read
     // (A.terrainUp) must not change the group; the same value in Up.terrainUp must.
     const base = run(makeTiles(new Map([[a, 1 << 0]])), frame);
-    expect(groundOf(base)).toBe(1); // Gras (5), flach ⇒ Variante 1
+    expect(groundOf(base)).toBe(1); // grass (5), flat => variant 1
 
     const ignored = run(
       makeTiles(new Map([[a, 1 << 0]]), new Map(), new Map([[a, { up: 15 }]])),

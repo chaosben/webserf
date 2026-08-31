@@ -20,10 +20,10 @@ import {
 } from './copy-protection.js';
 import { MENU_AREA, type MenuTarget } from './main-menu.js';
 
-describe('Kopierschutz-Bildschirm — Gitter', () => {
+describe('copy protection screen — grid', () => {
   it('maps click points onto cells 0..19, row base 10', () => {
     expect(copyProtectionCell(16, 44)).toBe(0);
-    expect(copyProtectionCell(47, 75)).toBe(0); // dieselbe 32er-Zelle
+    expect(copyProtectionCell(47, 75)).toBe(0); // the same 32-wide cell
     expect(copyProtectionCell(48, 44)).toBe(1);
     expect(copyProtectionCell(304, 44)).toBe(9);
     expect(copyProtectionCell(16, 76)).toBe(10);
@@ -67,7 +67,7 @@ describe('Kopierschutz-Bildschirm — Gitter', () => {
   });
 });
 
-describe('Kopierschutz-Bildschirm — Aufgabe', () => {
+describe('copy protection screen — task', () => {
   it('derives page and half from the high word of rng * 0x10c', () => {
     expect(copyProtectionTask(0)).toEqual({ page: 2, half: 'OBEN' });
     expect(copyProtectionTask(0xffff)).toEqual({ page: 135, half: 'UNTEN' });
@@ -101,7 +101,7 @@ describe('Kopierschutz-Bildschirm — Aufgabe', () => {
   });
 });
 
-describe('Kopierschutz-Bildschirm — Kommandos', () => {
+describe('copy protection screen — commands', () => {
   const task = { page: 20, half: 'OBEN' } as const;
 
   it('draws background, then symbols, then text', () => {
@@ -172,15 +172,15 @@ describe('Kopierschutz-Bildschirm — Kommandos', () => {
   });
 });
 
-describe('Kopierschutz-Bildschirm — Bedienung', () => {
+describe('copy protection screen — interaction', () => {
   it('collects three symbols and ends afterwards', () => {
     let st = initialCopyProtectionState(0);
-    let r = copyProtectionClick(st, 16, 44); // Zelle 0 → Symbol 0x0f
+    let r = copyProtectionClick(st, 16, 44); // cell 0 -> symbol 0x0f
     expect(r.done).toBe(false);
     expect(r.state.picked).toEqual([0x0f]);
-    r = copyProtectionClick(r.state, 48, 44); // Zelle 1 → 0x0d
+    r = copyProtectionClick(r.state, 48, 44); // cell 1 -> 0x0d
     expect(r.done).toBe(false);
-    r = copyProtectionClick(r.state, 80, 44); // Zelle 4 → 0x04
+    r = copyProtectionClick(r.state, 80, 44); // cell 4 -> 0x04
     expect(r.done).toBe(true);
     expect(r.state.picked).toEqual([0x0f, 0x0d, 0x04]);
     // First click = most significant nibble (`shlw $0x4` before the `or`).
@@ -204,7 +204,7 @@ describe('Kopierschutz-Bildschirm — Bedienung', () => {
     }
   });
 
-  it('verlangt genau drei Klicks', () => {
+  it('demands exactly three clicks', () => {
     expect(COPY_PROTECTION_CLICKS).toBe(3);
     expect(copyProtectionCode([])).toBe(0);
     expect(copyProtectionCode([1, 2, 3])).toBe(0x123);

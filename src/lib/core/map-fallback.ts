@@ -1,5 +1,5 @@
 /**
- * Fallback-Darstellung ohne Archiv: Boden als **Farb-Dreiecke**, Entities als **Marker**.
+ * Fallback display without an archive: ground as **colour triangles**, entities as **markers**.
  *
  * Both exist only so a save stays readable without the original assets — they have no counterpart
  * in the original and imitate nothing. The core therefore yields pure geometry plus colour; the
@@ -64,7 +64,7 @@ function corners(
   };
 }
 
-/** Boden-Ersatz: zwei schattierte Dreiecke je sichtbarer Kachel, in Painter-Reihenfolge. */
+/** Ground substitute: two shaded triangles per visible tile, in painter order. */
 export function buildColorTriangles(
   frame: WindowFrame,
   input: ColorTriangleInput,

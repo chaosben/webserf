@@ -18,7 +18,7 @@ const header = (gameType: number, mission: number, level: number) => ({
   levelSetupIndex: level,
 });
 
-describe('player-setup — Setup-Record-Index', () => {
+describe('player-setup — setup record index', () => {
   it('game type 0 computes with +5, everything else with -1', () => {
     expect(setupRecordIndex(0, 99, 30)).toBe(35); // @124 + 5, the other field stays a leftover
     expect(setupRecordIndex(0, 99, 1)).toBe(6);
@@ -27,14 +27,14 @@ describe('player-setup — Setup-Record-Index', () => {
   });
 });
 
-describe('player-setup — Gesichter', () => {
+describe('player-setup — faces', () => {
   it('the human always has the same face', () => {
     expect(HUMAN_FACE).toBe(0x0c);
     for (const level of [1, 15, 30]) expect(playerFaces(header(0, 0, level))[0]).toBe(HUMAN_FACE);
   });
 
   it('returns the opponents of the record; 0 means "slot empty"', () => {
-    // Record 11 (Spieltyp 0, Level 6): drei Spieler.
+    // Record 11 (game type 0, level 6): three players.
     expect(playerFaces(header(0, 0, 6))).toEqual([0x0c, 3, 5, 0]);
     // record 35 (level 30): one opponent.
     expect(playerFaces(header(0, 0, 30))).toEqual([0x0c, 11, 0, 0]);
@@ -82,8 +82,8 @@ describe('player-setup — Gesichter', () => {
     // "face != 0" as slot occupancy, the way the original does.
     for (const [i, row] of SETUP_OPPONENT_FACES.entries()) {
       for (let k = 0; k < 2; k++) {
-        if (row[k] === 0) expect(row.slice(k + 1), `Record ${i}`).toEqual([0, 0].slice(0, 2 - k));
-        else if (row[k + 1] !== 0) expect(row[k + 1]!, `Record ${i}`).toBeGreaterThan(row[k]!);
+        if (row[k] === 0) expect(row.slice(k + 1), `record ${i}`).toEqual([0, 0].slice(0, 2 - k));
+        else if (row[k + 1] !== 0) expect(row[k + 1]!, `record ${i}`).toBeGreaterThan(row[k]!);
       }
     }
   });

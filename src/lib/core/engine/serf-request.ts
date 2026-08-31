@@ -50,8 +50,34 @@ const STATE_READY_TO_LEAVE = 7;
  */
 const MILITARY_GOLD_CAPACITY: Record<number, number> = { 11: 2, 21: 4, 22: 8 };
 /** Only rotations < 32 process building blocks (== the building driver `FUN_000130f2`). */
-const BUILDING_ROTATIONS = 32;
-const BLOCK_SIZE = 32;
+/**
+ * The building driver's block scheme, shared with {@link updateBuildings}. `FUN_000130f2` returns at
+ * once for rotation >= 32 (`cmpw $0x20 ; jb/ret` @0x130ff..@0x13105) and then walks 32 buildings from
+ * `rotation * 32` (`shlw $0x5` @0x13127, counter `0x1f`) — and after those 32 it does **not** stop:
+ * the outer loop @0x132c2 adds `0x80` to the bitmap pointer, `0x4800` (== 1024 * 0x12) to the record
+ * base and `0x3e0` to the index, so the next batch is `rotation * 32 + 1024`. It repeats until the
+ * index passes `maxBuildingIndex` (`cmp 0x260(%ebx)` @0x13174). The driver therefore serves 1/32 of
+ * ALL buildings per frame with a stride of 1024, not just the first block.
+ *
+ * Exported so the driver's two phases cannot drift apart.
+ */
+export const BUILDING_ROTATIONS = 32;
+export const BUILDING_BLOCK_SIZE = 32;
+/** Stride of the outer batch loop (`addw $0x3e0` @0x132d5 on an index already advanced by 32). */
+export const BUILDING_BATCH_STRIDE = 1024;
+const BLOCK_SIZE = BUILDING_BLOCK_SIZE;
+
+/**
+ * The index sequence the driver visits this frame — `rotation * 32 .. +31`, then the same window
+ * every {@link BUILDING_BATCH_STRIDE} indices, bounded by `limit` (== `maxBuildingIndex`).
+ */
+export function* buildingDriverBlock(rotation: number, limit: number): Generator<number> {
+  if (rotation >= BUILDING_ROTATIONS) return;
+  for (let base = rotation * BLOCK_SIZE; base < limit; base += BUILDING_BATCH_STRIDE) {
+    const end = Math.min(base + BLOCK_SIZE, limit);
+    for (let i = base; i < end; i++) yield i;
+  }
+}
 
 /** One worker need: which serf type, and which tool resources specialise a generic into it. */
 export interface WorkerRequest {
@@ -92,11 +118,8 @@ WORKER_REQUEST[23] = { serfType: 10, tools: [] }; //   gold smelter-> smelter
  * `rotation*32` (rotation < 32).
  */
 export function requestBuildingWorkers(state: GameState): void {
-  if (state.rotation >= BUILDING_ROTATIONS) return; // economy rotation, no buildings
   const { buildings } = state;
-  const start = state.rotation * BLOCK_SIZE;
-  const end = Math.min(start + BLOCK_SIZE, buildings.length);
-  for (let i = start; i < end; i++) {
+  for (const i of buildingDriverBlock(state.rotation, buildings.length)) {
     const bld = buildings[i];
     if (bld === null || bld.burning) continue;
     // The driver jumps through `(bld[4] & 0xfc) * 2` into the stub table @0x132e2 (8 bytes each).

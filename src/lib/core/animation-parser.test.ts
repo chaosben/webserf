@@ -14,7 +14,7 @@ function makeEmptyTable(count: number, extraFrameBytes = 0): Uint8Array {
   const size = 4 + count * 4 + extraFrameBytes;
   const buf = new Uint8Array(size);
   const dv = new DataView(buf.buffer);
-  dv.setUint32(0, size, false); // size-Header (BE)
+  dv.setUint32(0, size, false); // size header (BE)
   // All offsets point at the end of the table = count*4 -> 0 frames per animation
   // (except the last one, which runs to the end of the buffer)
   for (let i = 0; i < count; i++) {
@@ -23,15 +23,15 @@ function makeEmptyTable(count: number, extraFrameBytes = 0): Uint8Array {
   return buf;
 }
 
-describe('parseAnimationTable — synthetisch', () => {
-  it('wirft bei zu kleinem Buffer', () => {
+describe('parseAnimationTable — synthetic', () => {
+  it('throws when the buffer is too small', () => {
     expect(() => parseAnimationTable(new Uint8Array(4))).toThrow(/too small for the header/);
   });
 
   it('throws when the size header does not match the file length', () => {
     const buf = new Uint8Array(4 + 200 * 4 + 100);
     const dv = new DataView(buf.buffer);
-    dv.setUint32(0, 999999, false); // falsch
+    dv.setUint32(0, 999999, false); // wrong
     expect(() => parseAnimationTable(buf)).toThrow(/size header/);
   });
 
@@ -73,18 +73,18 @@ describe('parseAnimationTable — synthetisch', () => {
     dv.setUint32(0, size, false);
     // Animation 0 starts at offset 800 and has 2 frames (6 bytes)
     dv.setUint32(4 + 0 * 4, count * 4, false); // 800
-    // Animation 1..199 zeigen ans Ende (= 806)
+    // Animations 1..199 point at the end (= 806)
     for (let i = 1; i < count; i++) {
       dv.setUint32(4 + i * 4, count * 4 + 6, false);
     }
     // 2 frames for animation 0
     const frameBase = 4 + count * 4;
     buf[frameBase + 0] = 42;  // sprite
-    buf[frameBase + 1] = 200; // x (= -56 als int8)
+    buf[frameBase + 1] = 200; // x (= -56 as int8)
     buf[frameBase + 2] = 7;   // y
     buf[frameBase + 3] = 100; // sprite
     buf[frameBase + 4] = 0;   // x
-    buf[frameBase + 5] = 250; // y (= -6 als int8)
+    buf[frameBase + 5] = 250; // y (= -6 as int8)
 
     const table = parseAnimationTable(buf);
     expect(table.animations[0]!.length).toBe(2);
@@ -94,8 +94,8 @@ describe('parseAnimationTable — synthetisch', () => {
   });
 });
 
-describe.runIf(loadOrigFile('SPAD.PA') !== null)('parseAnimationTable — gegen Original SPAD.PA', () => {
-  it('parst Entry #1 (30528 Bytes) als 200-Animationen-Tabelle (Standard-Format)', () => {
+describe.runIf(loadOrigFile('SPAD.PA') !== null)('parseAnimationTable — against the original SPAD.PA', () => {
+  it('parses entry #1 (30528 bytes) as a 200-animation table (standard format)', () => {
     const arch = PaArchive.parse(loadOrigFile('SPAD.PA')!);
     const table = loadAnimationTable(arch);
     expect(table.animations.length).toBe(200);

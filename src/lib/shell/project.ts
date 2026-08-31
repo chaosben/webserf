@@ -2,11 +2,10 @@
  * WHERE THIS COPY LIVES — repository address, issue tracker, and the links the interface offers
  * outwards.
  *
- * The address is a CONSTANT, not an environment variable. It used to be one (`PUBLIC_ISSUE_REPO`),
- * and that was the wrong shape: this is not deployment configuration but the identity of the
- * project itself — the same value in every copy, in the development server as in a deployment.
- * As a variable it could be unset (silently no reporting route) or misspelled (a link into an
- * error page), so the code carried a whole branch for a value that never actually varies.
+ * The address is a CONSTANT, not an environment variable: it is not deployment configuration but
+ * the identity of the project itself — the same value in every copy, in the development server as in
+ * a deployment. A variable could be unset (silently no reporting route) or misspelled (a link into
+ * an error page), and the code would carry a whole branch for a value that never varies.
  *
  * ## How a bug report reaches the tracker
  *

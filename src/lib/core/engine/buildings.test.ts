@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { updateBuildings, demolishBuilding } from './buildings.js';
+import { constructionDemand, buildingConstructionHead } from './building-construction.js';
+import { buildingDriverBlock } from './serf-request.js';
 import { mapGeometry, posOf, neighbor, Direction } from './position.js';
 import type { GameState, Building, Flag, Player, Tile, Serf } from './state.js';
 
@@ -36,7 +38,16 @@ function player(over: Partial<Player> = {}): Player {
   } as unknown as Player;
 }
 function state(b: Building, f: Flag, p: Player): GameState {
-  return { buildings: [null, b], flags: [null, f], players: [p] } as unknown as GameState;
+ // `rotation` is not decoration: the driver walks the block `rotation * 32 .. +31` (@0x13127), so
+ // without it `start` is NaN and the loop body never runs.
+  return {
+    buildings: [null, b],
+    flags: [null, f],
+    players: [p],
+    rotation: 0,
+    inventories: [],
+    serfs: [],
+  } as unknown as GameState;
 }
 
 describe('updateBuildings — phase B material demand priority', () => {
@@ -79,7 +90,9 @@ describe('updateBuildings — phase B material demand priority', () => {
   it('unoccupied (holder=false) -> phase B does not run', () => {
     const f = flag();
     f.stockPriority[0] = 7; // pre-existing value survives
-    const b = bld({ type: 15, holder: false, stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }] });
+ // `serfRequested` closes phase A (`!holder && !serfRequested && !serfRequestFailed`); without it the
+ // driver would walk the flag network over this minimal stub, which is not what this test is about.
+    const b = bld({ type: 15, holder: false, serfRequested: true, stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }] });
     updateBuildings(state(b, f, player({ wheatDistribution: [0, 0xff00] })));
     expect(f.stockPriority[0]).toBe(7);
   });
@@ -105,7 +118,11 @@ describe('updateBuildings — phase B material demand priority', () => {
  * planks (slider `planksDistribution[0]`), slot 1 = stone (0xff); `prio = (base>>fill) [>>2 if
  * !holder] & 0xfe`, gated on `fill<8 && fill != stockMaximum[slot]` and `constructing && progress != 0`.
  */
-describe('updateBuildings — construction material demand (head branch)', () => {
+/**
+ * The construction tail `constructionDemand` @0x13bf5 — in the original it is reached from the head
+ * `FUN_000138ed`, so these tests call it directly.
+ */
+describe('constructionDemand — construction material demand (tail of FUN_000138ed)', () => {
   it('coal mine under construction (holder=false, stockMax=[5,0]): planks demanded, stone not', () => {
     const f = flag();
  // Coal mine (type 6) under construction: needs planks (stockMax[0]=5), no stone (stockMax[1]=0).
@@ -117,7 +134,7 @@ describe('updateBuildings — construction material demand (head branch)', () =>
       stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }],
       stockMaximum: [5, 0],
     });
-    updateBuildings(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })));
+    constructionDemand(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1, false);
  // Planks: base=0xff, fill=0 -> 0xff>>0=255, !holder -> >>2=63, &0xfe=62
     expect(f.stockPriority[0]).toBe(62);
  // Stone: fill=0 == stockMax[1]=0 -> no demand
@@ -134,7 +151,7 @@ describe('updateBuildings — construction material demand (head branch)', () =>
       stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }],
       stockMaximum: [1, 1],
     });
-    updateBuildings(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })));
+    constructionDemand(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1, false);
     expect(f.stockPriority[0]).toBe(62); // planks via the slider
     expect(f.stockPriority[1]).toBe(62); // stone: 0xff>>0=255, >>2=63, &0xfe=62
   });
@@ -149,7 +166,7 @@ describe('updateBuildings — construction material demand (head branch)', () =>
       stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }],
       stockMaximum: [1, 1],
     });
-    updateBuildings(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })));
+    constructionDemand(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1, false);
     expect(f.stockPriority[0]).toBe(0xff & 0xfe); // 0xff>>0=255, no >>2, &0xfe=254
     expect(f.stockPriority[1]).toBe(254);
   });
@@ -164,7 +181,7 @@ describe('updateBuildings — construction material demand (head branch)', () =>
       stock: [{ available: 1, requested: 0 }, { available: 0, requested: 1 }], // fill 1/1
       stockMaximum: [1, 1],
     });
-    updateBuildings(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })));
+    constructionDemand(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1, false);
     expect(f.stockPriority[0]).toBe(0);
     expect(f.stockPriority[1]).toBe(0);
   });
@@ -179,22 +196,39 @@ describe('updateBuildings — construction material demand (head branch)', () =>
       stock: [{ available: 2, requested: 0 }, { available: 0, requested: 0 }], // fill slot0=2
       stockMaximum: [5, 5],
     });
-    updateBuildings(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })));
+    constructionDemand(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1, false);
     expect(f.stockPriority[0]).toBe((0xff >> 2) & 0xfe); // 63&0xfe = 62
   });
 
-  it('progress == 0 (still levelling) -> priority untouched', () => {
+  // A `progress == 0` guard in the TAIL would be too wide: only the LARGE types level first, and
+  // their early exit sits in the HEAD.
+  it('small type at progress 0: the tail DOES demand (there is no levelling)', () => {
     const f = flag();
-    f.stockPriority[0] = 9; // pre-existing
+    f.stockPriority[0] = 9;
     const b = bld({
-      type: 11,
+      type: 11, // hut — not in LARGE_CONSTRUCTION_TYPES, so no digger and no levelling
       constructing: true,
       progress: 0,
-      holder: false,
+      holder: true,
       stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }],
       stockMaximum: [1, 1],
     });
-    updateBuildings(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })));
+    constructionDemand(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1, false);
+    expect(f.stockPriority[0]).toBe(254);
+  });
+
+  it('LARGE type at progress 0: the HEAD returns before the tail -> priority untouched', () => {
+    const f = flag();
+    f.stockPriority[0] = 9; // pre-existing value survives
+    const b = bld({
+      type: 17, // sawmill — large, so `progress == 0` means it is still being levelled
+      constructing: true,
+      progress: 0,
+      holder: true, // `bld.holder || bld.serfRequested` -> return @0x13905, no network walk
+      stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }],
+      stockMaximum: [4, 3],
+    });
+    buildingConstructionHead(state(b, f, player({ planksDistribution: [0xff00, 0, 0] })), b, 1);
     expect(f.stockPriority[0]).toBe(9);
   });
 });
@@ -255,6 +289,9 @@ describe('razing a building', () => {
     } as unknown as Serf;
     const state = {
       buildings, serfs, flags: [], inventories: [], players: [p], mapTiles, geo: GEO, gameTick,
+ // The driver only walks `rotation * 32 .. +31` (@0x13127). The building under test sits on slot 48,
+ // so without rotation 1 it is never visited and every burn assertion would pass vacuously.
+      rotation: 1,
  // `mapGoldTotal` is the map gold counter (gs+0x4c), which the demolition adjusts.
       header: { mapGoldTotal: 1000 },
       blockMeta: {
@@ -485,6 +522,7 @@ describe('razing a building', () => {
     (state.buildings as (Building | null)[])[75] = b;
     (state.buildings as (Building | null)[])[40] = forester({ index: 40 }); // next occupied one below
     state.blockMeta.buildings.maxIndex = 76;
+    (state as { rotation: number }).rotation = 2; // slot 75 lives in block 2 (75 >> 5)
     state.gameTick = 101; // elapsed 1, old countdown 0 < 1 -> finale
     updateBuildings(state);
     expect(state.buildings[75]).toBeNull();
@@ -492,17 +530,52 @@ describe('razing a building', () => {
   });
 });
 
+/**
+ * The block scheme of `FUN_000130f2`: 32 buildings from `rotation * 32`, and the outer loop @0x132c2
+ * repeats that window every 1024 indices until `maxBuildingIndex`. Nothing else tests the stride, and
+ * it only shows up beyond 1024 buildings — which a 512x256 map can reach.
+ */
+describe('buildingDriverBlock — 1/32 per frame, stride 1024', () => {
+  it('rotation 0 of a small game: exactly the first 32 indices', () => {
+    expect([...buildingDriverBlock(0, 119)]).toEqual([...Array(32).keys()]);
+  });
+
+  it('rotation 3: the block starts at 96', () => {
+    const got = [...buildingDriverBlock(3, 119)];
+    expect(got[0]).toBe(96);
+    expect(got[got.length - 1]).toBe(118); // bounded by maxBuildingIndex
+  });
+
+  it('rotations 0..31 partition the index space exactly once', () => {
+    const seen: number[] = [];
+    for (let rot = 0; rot < 32; rot++) seen.push(...buildingDriverBlock(rot, 1024));
+    expect(seen.length).toBe(1024);
+    expect(new Set(seen).size).toBe(1024);
+  });
+
+  it('beyond 1024 buildings the outer loop adds a second window (`addw $0x3e0` @0x132d5)', () => {
+    const got = [...buildingDriverBlock(0, 2000)];
+    expect(got.slice(0, 32)).toEqual([...Array(32).keys()]);
+    expect(got.slice(32, 64)).toEqual([...Array(32).keys()].map((i) => i + 1024));
+    expect(got.length).toBe(64);
+  });
+
+  it('rotation >= 32 is the economy/AI sweep — no building at all (`jb`/`ret` @0x13103)', () => {
+    expect([...buildingDriverBlock(32, 500)]).toEqual([]);
+    expect([...buildingDriverBlock(48, 500)]).toEqual([]);
+  });
+});
+
 describe('updateBuildings — phase A (request_serf), grouped into the driver (FUN_000130f2)', () => {
- // request_serf is the head of the per-type handler, so part of updateBuildings — frame boundary only.
-  it('runs phase A ONLY on the frame boundary', () => {
+ // request_serf is the head of the per-type handler, so part of updateBuildings. The frame gate moved
+ // to the caller (`tick.ts`): the whole driver runs once per frame, so there is no parameter left.
+  it('runs phase A as part of the driver', () => {
     const f = { index: 1, stockPriority: [0, 0], bldFlags: 0, bld2Flags: 0, endpointDirs: [false, false, false, false, false, false], connections: [null, null, null, null, null, null] } as unknown as Flag;
     const b = bld({ type: 15, holder: false, constructing: false }); // mill, unoccupied -> requests a worker
     const st = { buildings: [null, b], flags: [null, f], players: [player()], inventories: [], serfs: [], rotation: 0 } as unknown as GameState;
- // No frame boundary -> phase A does not run.
-    updateBuildings(st, false);
     expect(b.serfRequestFailed).toBeFalsy();
- // Frame boundary -> phase A: no inventory reachable (flag without connections) -> serfRequestFailed.
-    updateBuildings(st, true);
+ // Phase A: no inventory reachable (flag without connections) -> serfRequestFailed.
+    updateBuildings(st);
     expect(b.serfRequestFailed).toBe(true);
   });
 });

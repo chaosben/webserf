@@ -60,8 +60,8 @@ export const planningLogging = (state: GameState, serf: Serf): void => {
   }
 };
 
-// 19 PlanningPlanting (@0x1f352) — Spiral-Suche nach leerem Gras-Feld (Objekt 0, wegfrei, beide Dreiecke
-// Grass1 on the tile and its UpLeft neighbour).
+// 19 PlanningPlanting (@0x1f352) — spiral search for an empty grass tile (object 0, road-free, both
+// triangles Grass1 on the tile and its UpLeft neighbour).
 export const planningPlanting = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
   if (!advance(serf, state.gameTick)) return;
@@ -88,7 +88,7 @@ export const planningPlanting = (state: GameState, serf: Serf): void => {
 };
 
 // 21 PlanningStoneCutting (@0x1c11a) — spiral search for a stone object (72..79) on the UpLeft tile of
-// Ziels, Ziel selbst begehbar → ReadyToLeave/**StoneCutterFreeWalking (22)**.
+// the target, the target itself passable → ReadyToLeave/**StoneCutterFreeWalking (22)**.
 export const planningStoneCutting = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
   if (!advance(serf, state.gameTick)) return;
@@ -108,7 +108,7 @@ export const planningStoneCutting = (state: GameState, serf: Serf): void => {
 };
 
 // 31 PlanningFishing (@0x1a574) — spiral search for a lake shore (empty, road-free tile with a water
-// Dreieck neben Land) → ReadyToLeave/FreeWalking.
+// triangle next to land) → ReadyToLeave/FreeWalking.
 export const planningFishing = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
   if (!advance(serf, state.gameTick)) return;
@@ -134,9 +134,9 @@ export const planningFishing = (state: GameState, serf: Serf): void => {
   }
 };
 
-// 33 PlanningFarming (@0x1a138) — Spiral-Suche (dist = ((rng>>2)&0x1f)+7) nach einem Acker-Platz: entweder
-// an existing field (object 110 or 121..126) OR a free Grass1 tile with no large building in the
-// Nachbarn → ReadyToLeave/FreeWalking.
+// 33 PlanningFarming (@0x1a138) — spiral search (dist = ((rng>>2)&0x1f)+7) for a farm spot: either
+// an existing field (object 110 or 121..126) OR a free Grass1 tile with no large building among the
+// neighbours → ReadyToLeave/FreeWalking.
 export const planningFarming = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
   if (!advance(serf, state.gameTick)) return;
@@ -183,10 +183,10 @@ export const logging = (state: GameState, serf: Serf): void => {
   if (!advance(serf, state.gameTick)) return;
   const pos = posOf(serf.col, serf.row, state.geo);
   for (;;) {
-    serf.stateData[3] = (serf.stateData[3] + 1) & 0xff; // neg_dist2 (Frame) += 1
+    serf.stateData[3] = (serf.stateData[3] + 1) & 0xff; // neg_dist2 (frame) += 1
     const frame = serf.stateData[3];
     let obj = (0x5c + frame) & 0xff;
-    if (serf.stateData[2] !== 0) obj = (obj + 5) & 0xff; // neg_dist1 != 0 → FelledTree statt FelledPine
+    if (serf.stateData[2] !== 0) obj = (obj + 5) & 0xff; // neg_dist1 != 0 → FelledTree instead of FelledPine
     state.mapTiles[pos].object = obj;
     if (frame === 5) break;
     serf.animation = (0x74 + frame) & 0xff;
@@ -200,14 +200,14 @@ export const logging = (state: GameState, serf: Serf): void => {
 };
 
 // 20 Planting (@0x1f072) — the forester plants a sapling (`0x67 + (rng&1)`) on an empty, road-free tile,
-// dann FreeWalking. `neg_dist2`-Toggle: erste Iteration pflanzt, zweite (neg_dist2 != 0) beendet.
+// then FreeWalking. `neg_dist2` toggle: the first iteration plants, the second (neg_dist2 != 0) ends it.
 export const planting = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
   if (!advance(serf, state.gameTick)) return;
   const pos = posOf(serf.col, serf.row, state.geo);
   for (;;) {
     if (serf.stateData[3] !== 0) {
-      // neg_dist2 != 0 → fertig
+      // neg_dist2 != 0 → done
       serf.stateData[2] = 0x80;
       serf.stateData[3] = 0;
       serf.stateData[4] = 0;
@@ -217,17 +217,17 @@ export const planting = (state: GameState, serf: Serf): void => {
     }
     serf.animation = 0x7a;
     let obj = 0x67;
-    if (state.rng.next() & 1) obj += 1; // NewPine oder NewTree
+    if (state.rng.next() & 1) obj += 1; // NewPine or NewTree
     const t = state.mapTiles[pos];
     if (t.object === 0 && (t.paths & 0x3f) === 0) t.object = obj;
-    serf.stateData[3] = ~serf.stateData[3] & 0xff; // Toggle → 0xff
+    serf.stateData[3] = ~serf.stateData[3] & 0xff; // toggle → 0xff
     if (!addCounterContinue(serf, 0x80)) return;
   }
 };
 
 // 32 Fishing (@0x1a408) — the fisher casts: odd `neg_dist1` steps cast (RNG catch against the fish
 // stock of the water tile), even ones swing back. A catch sets `neg_dist2 = 1`. Ends at
-// Fang oder `flags == 10` → FreeWalking.
+// a catch or `flags == 10` → FreeWalking.
 export const fishing = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
   if (!advance(serf, state.gameTick)) return;
@@ -301,7 +301,7 @@ export const farming = (state: GameState, serf: Serf): void => {
 
 // 23 StoneCutting (@0x1c25f) — the stonecutter mines a stone. Two phases via `neg_dist1`: 0 = approach
 // (wait until the counter drops below the u16 threshold `neg_dist2|flags<<8`, then cutting anim 0x7b), 1 =
-// Abbau (Stein-Objekt dekrementieren `object+1`, bei 0x4f → entfernen; einen Schritt DownRight; neg_dist1
+// mining (decrement the stone object `object+1`, at 0x4f → remove it; one step DownRight; neg_dist1
 // = 2), 2 = done. The u16 threshold read included.
 export const stoneCutting = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
@@ -309,10 +309,10 @@ export const stoneCutting = (state: GameState, serf: Serf): void => {
   const delta = subU16(state.gameTick, serf.tick);
   serf.tick = state.gameTick;
   if (serf.stateData[2] === 0) {
-    // Anmarsch-Phase
+    // approach phase
     serf.counter = subU16(serf.counter, delta);
     const thresh = (serf.stateData[3] | (serf.stateData[4] << 8)) & 0xffff;
-    if (i16(serf.counter) >= i16(thresh)) return; // Counter >= Schwelle → weiter warten
+    if (i16(serf.counter) >= i16(thresh)) return; // counter >= threshold → keep waiting
     serf.counter = subU16(serf.counter, (thresh + 1) & 0xffff);
     serf.stateData[2] = 1; // neg_dist1 = 1
     serf.animation = 0x7b;
@@ -324,7 +324,7 @@ export const stoneCutting = (state: GameState, serf: Serf): void => {
   }
   for (;;) {
     if (serf.stateData[2] !== 1) {
-      // neg_dist1 != 1 → fertig
+      // neg_dist1 != 1 → done
       serf.stateData[2] = 0x80;
       serf.stateData[3] = 1;
       serf.stateData[4] = 0;
@@ -335,13 +335,13 @@ export const stoneCutting = (state: GameState, serf: Serf): void => {
     const pos = posOf(serf.col!, serf.row!, geo);
     const flagTile = neighbor(pos, Direction.DownRight, geo);
     if (state.mapTiles[flagTile].serfIndex !== 0) {
-      serf.counter = 0; // Feld blockiert → warten
+      serf.counter = 0; // tile blocked → wait
       return;
     }
     const obj = state.mapTiles[pos].object;
-    if (obj === 0x4f) state.mapTiles[pos].object = 0; // letzter Stein → entfernen
-    else state.mapTiles[pos].object = (obj + 1) & 0xff; // Stein-Haufen verkleinern
-    // Schritt DownRight (start_walking).
+    if (obj === 0x4f) state.mapTiles[pos].object = 0; // last stone → remove it
+    else state.mapTiles[pos].object = (obj + 1) & 0xff; // shrink the stone pile
+    // step DownRight (start_walking).
     state.mapTiles[pos].serfIndex = 0;
     state.mapTiles[flagTile].serfIndex = serf.index;
     serf.col = colOf(flagTile, geo);

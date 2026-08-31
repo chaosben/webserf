@@ -118,7 +118,7 @@ describe('IndexBlitter — scale', () => {
     5, 6, 7, 8,
   ], new Array(16).fill(1));
 
-  it('scale 1 changes nothing about the previous path', () => {
+  it('scale 1 is byte for byte the unscaled blit', () => {
     const a = createIndexSurface(4, 4);
     const b = createIndexSurface(4, 4);
     new IndexBlitter(a).blit(quad(), 0, 0);
@@ -174,7 +174,7 @@ describe('IndexBlitter — scale', () => {
     expect([...s.data]).toEqual([5 | SHADE_BIT, 5 | SHADE_BIT, 5 | SHADE_BIT, 5 | SHADE_BIT]);
   });
 
-  it('setOffset verschiebt jede Position', () => {
+  it('setOffset shifts every position', () => {
     const s = createIndexSurface(4, 2);
     const b = new IndexBlitter(s);
     b.setOffset(2, 1);

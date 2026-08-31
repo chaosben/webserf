@@ -10,7 +10,7 @@ import {
 } from './building-decor.js';
 import { gameSprite, resourceSprite, GAME_OBJECT_BASE } from './flag-sprites.js';
 
-describe('gameSprite (GameObject-Adressierung)', () => {
+describe('gameSprite (GameObject addressing)', () => {
   it('maps the original draw_game_sprite(i) space onto GAME_OBJECT_BASE + i - 1', () => {
     expect(gameSprite(1)).toBe(GAME_OBJECT_BASE);
     expect(gameSprite(128)).toBe(GAME_OBJECT_BASE + 127);
@@ -35,7 +35,7 @@ describe('mill rotation', () => {
     expect(millRotationOffset(16, true)).toBe(1);
     expect(millRotationOffset(32, true)).toBe(2);
     expect(millRotationOffset(48, true)).toBe(3);
-    expect(millRotationOffset(64, true)).toBe(0); // Wrap
+    expect(millRotationOffset(64, true)).toBe(0); // wrap
   });
 
   it('MILL_TYPE is 15', () => {
@@ -43,7 +43,7 @@ describe('mill rotation', () => {
   });
 });
 
-describe('Produktions-Overlays (Rauch/Dampf/Aufzug/Seil)', () => {
+describe('production overlays (smoke/steam/lift/rope)', () => {
   it('returns nothing for buildings without an overlay', () => {
     for (const t of [0, 1, 2, 11, 15, 24]) expect(productionOverlays(t, 0, true, true)).toEqual([]);
   });
@@ -60,7 +60,7 @@ describe('Produktions-Overlays (Rauch/Dampf/Aufzug/Seil)', () => {
     expect(f0.idx).toBe(gameSprite(154));
     expect(productionOverlays(16, 8, true, false)[0].idx).toBe(gameSprite(155));
     expect(productionOverlays(16, 8 * 7, true, false)[0].idx).toBe(gameSprite(161));
-    expect(productionOverlays(16, 8 * 8, true, false)[0].idx).toBe(gameSprite(154)); // Wrap
+    expect(productionOverlays(16, 8 * 8, true, false)[0].idx).toBe(gameSprite(154)); // wrap
   });
 
   it('smelters and weaponsmith share the smoke base 128', () => {
@@ -81,7 +81,7 @@ describe('Produktions-Overlays (Rauch/Dampf/Aufzug/Seil)', () => {
     }
   });
 
-  it('Mine playingSfx (Bergmann unter Tage) → Seil 153 am selben Anker', () => {
+  it('mine playingSfx (miner underground) -> rope 153 on the same anchor', () => {
     for (const t of [5, 6, 7, 8]) {
       const rope = productionOverlays(t, 0, false, true);
       expect(rope).toHaveLength(1);
@@ -91,7 +91,7 @@ describe('Produktions-Overlays (Rauch/Dampf/Aufzug/Seil)', () => {
     }
   });
 
-  it('Mine active UND playingSfx → beide Overlays (Korb 152 + Seil 153)', () => {
+  it('mine active AND playingSfx -> both overlays (basket 152 + rope 153)', () => {
     const both = productionOverlays(6, 0, true, true);
     expect(both.map((o) => o.idx)).toEqual([gameSprite(152), gameSprite(153)]);
   });
@@ -102,7 +102,7 @@ describe('Produktions-Overlays (Rauch/Dampf/Aufzug/Seil)', () => {
   });
 });
 
-describe('Besatzungsfahnen', () => {
+describe('occupation flags', () => {
   it('returns nothing for non-military buildings', () => {
     for (const t of [0, 1, 10, 15, 24]) expect(occupationFlags(t, 0, 0, 0)).toEqual([]);
   });
@@ -123,11 +123,11 @@ describe('Besatzungsfahnen', () => {
     // hut `shrw $0x3` => 2 px per knight
     expect(occupationFlags(11, 0, 0, 0)[0].dy).toBe(2);
     expect(occupationFlags(11, 0, 0, 3)[0].dy).toBe(2 - 6);
-    // Turm `shrw $0x4` ⇒ 1 px je Ritter
+    // tower `shrw $0x4` => 1 px per knight
     expect(occupationFlags(21, 0, 0, 2)[0].dy).toBe(-18 - 2);
   });
 
-  it('Festung: linke Fahne rundet AB, rechte AUF (`addw $0x10` vor `shrw $0x5`)', () => {
+  it('fortress: the left flag rounds DOWN, the right one UP (`addw $0x10` before `shrw $0x5`)', () => {
     for (const [n, left, right] of [
       [0, 0, 0],
       [1, 0, 1],
@@ -141,10 +141,10 @@ describe('Besatzungsfahnen', () => {
     }
   });
 
-  it('Wehen-Frame wechselt alle 8 Ticks (0..3)', () => {
+  it('the waving frame changes every 8 ticks (0..3)', () => {
     expect(occupationFlags(11, 0, 0, 0)[0].idx).toBe(gameSprite(182));
     expect(occupationFlags(11, 8, 0, 0)[0].idx).toBe(gameSprite(183));
-    expect(occupationFlags(11, 8 * 4, 0, 0)[0].idx).toBe(gameSprite(182)); // Wrap
+    expect(occupationFlags(11, 8 * 4, 0, 0)[0].idx).toBe(gameSprite(182)); // wrap
   });
 
   it('the fortress carries two flags with a phase offset of +2', () => {
@@ -156,7 +156,7 @@ describe('Besatzungsfahnen', () => {
   });
 });
 
-describe('Bau-Deko (wartende Baumaterialien)', () => {
+describe('construction decor (waiting build materials)', () => {
   it('empty when nothing is waiting', () => {
     expect(constructionMaterials(0, 0)).toEqual([]);
   });
@@ -164,7 +164,7 @@ describe('Bau-Deko (wartende Baumaterialien)', () => {
   it('stacks stone (slot 1) and planks (slot 0) at fixed offsets', () => {
     const m = constructionMaterials(2, 1);
     expect(m).toHaveLength(3);
-    // Steine zuerst
+    // stones first
     expect(m[0]).toEqual({ idx: resourceSprite(RESOURCE_STONE), dx: 10, dy: -8 });
     expect(m[1]).toEqual({ idx: resourceSprite(RESOURCE_STONE), dx: 7, dy: -7 });
     // then planks

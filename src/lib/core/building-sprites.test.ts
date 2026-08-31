@@ -30,10 +30,10 @@ describe('building sprite tables', () => {
   });
 
   it('scaffold offsets', () => {
-    expect(MAP_BUILDING_FRAME_SPRITE[1]).toBe(0xba); // Fisher-Rohbau
-    expect(MAP_BUILDING_FRAME_SPRITE[5]).toBe(0xb9); // StoneMine-Rohbau
-    expect(MAP_BUILDING_FRAME_SPRITE[10]).toBe(0xc1); // Warehouse-Rohbau
-    expect(MAP_BUILDING_FRAME_SPRITE[22]).toBe(0xaf); // Fortress-Rohbau
+    expect(MAP_BUILDING_FRAME_SPRITE[1]).toBe(0xba); // fisher scaffold
+    expect(MAP_BUILDING_FRAME_SPRITE[5]).toBe(0xb9); // stone mine scaffold
+    expect(MAP_BUILDING_FRAME_SPRITE[10]).toBe(0xc1); // warehouse scaffold
+    expect(MAP_BUILDING_FRAME_SPRITE[22]).toBe(0xaf); // fortress scaffold
   });
 });
 
@@ -67,7 +67,7 @@ describe('buildingDrawOps', () => {
   });
 
   it('scaffold-done phase (bit 15) -> scaffold full + finished building growing in', () => {
-    const progress = 0x8000 | 0x2000; // Bit 15 gesetzt, untere Bits = 0x2000
+    const progress = 0x8000 | 0x2000; // bit 15 set, lower bits = 0x2000
     const ops = buildingDrawOps(11, false, progress);
     expect(ops).toHaveLength(2);
     expect(ops[0]).toEqual({ offset: MAP_BUILDING_FRAME_SPRITE[11], progress: 1 });
@@ -75,9 +75,9 @@ describe('buildingDrawOps', () => {
     expect(ops[1].progress).toBeCloseTo((2 * 0x2000) / 0xffff, 6);
   });
 
-  it('Einwachs-Anteil bleibt stets in [0,1] (bei jedem u16-progress)', () => {
+  it('the growth fraction always stays in [0,1] (for any u16 progress)', () => {
     // For a valid u16, 2*(progress & 0x7fff) can never exceed 0xFFFF -> always < 1,
-    // aber nahe 1 am Phasenende. Die clamp01-Absicherung darf nichts kaputt machen.
+    // but close to 1 at the end of a phase. The clamp01 guard must not break that.
     for (const progress of [0x0001, 0x1000, 0x7fff, 0x8000, 0x8001, 0xbfff, 0xffff]) {
       for (const type of [11, BUILDING_TYPE_CASTLE]) {
         for (const op of buildingDrawOps(type, false, progress)) {
@@ -99,7 +99,7 @@ describe('buildingDrawOps', () => {
     expect(ops[0].progress).toBeCloseTo(0x8000 / 0xffff, 6);
   });
 
-  it('Schloss fertig → volles Schloss-Sprite', () => {
+  it('finished castle -> full castle sprite', () => {
     expect(buildingDrawOps(BUILDING_TYPE_CASTLE, true, 0)).toEqual([
       { offset: CASTLE_SPRITE, progress: 1 },
     ]);

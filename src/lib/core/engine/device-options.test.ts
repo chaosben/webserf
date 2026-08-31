@@ -41,8 +41,8 @@ describe('device switch', () => {
   });
 });
 
-describe('Werkseinstellung (Zweig ohne DEVICE.CFG, @0x2dd5…@0x2e09)', () => {
-  it('Joystick, Toleranz 25, Geschwindigkeit 0x1000, COM 2, IRQ 3', () => {
+describe('factory settings (branch without DEVICE.CFG, @0x2dd5..@0x2e09)', () => {
+  it('joystick, tolerance 25, speed 0x1000, COM 2, IRQ 3', () => {
     expect(DEVICE_OPTIONS_DEFAULT).toEqual({
       mode: 0,
       tolerance: 0x19,
@@ -63,7 +63,7 @@ describe('joystick face: the two numbers and their limits', () => {
     expect(stepDeviceValue(JOY, 0, -1).speed).toBe(0x0f00);
   });
 
-  it('nach oben bei 0x4000 (`cmpw $0x4000` @0x2f36a)', () => {
+  it('upwards it stops at 0x4000 (`cmpw $0x4000` @0x2f36a)', () => {
     const at = { ...JOY, speed: JOYSTICK_SPEED_INC_CEIL - JOYSTICK_SPEED_STEP };
     expect(stepDeviceValue(at, 0, 1).speed).toBe(JOYSTICK_SPEED_INC_CEIL);
     expect(stepDeviceValue({ ...JOY, speed: JOYSTICK_SPEED_INC_CEIL }, 0, 1).speed).toBe(
@@ -71,7 +71,7 @@ describe('joystick face: the two numbers and their limits', () => {
     );
   });
 
-  it('nach unten erst ab 0x1ff (`cmpw $0x1ff` @0x2f349) — 0x100 bleibt stehen', () => {
+  it('downwards only from 0x1ff on (`cmpw $0x1ff` @0x2f349) - 0x100 stays put', () => {
     // The limit is deliberately NOT symmetric: at 0x100 the original refuses the step, even though
     // 0x000 would be representable. A `clamp(0, 0x4000)` would behave differently here.
     expect(stepDeviceValue({ ...JOY, speed: 0x0100 }, 0, -1).speed).toBe(0x0100);
@@ -117,7 +117,7 @@ describe('mouse face: same buttons, different fields (@0x2f333)', () => {
     expect(after.tolerance).toBe(MOUSE.tolerance);
   });
 
-  it('Mousesystems bedient dieselben Felder wie Microsoft', () => {
+  it('Mousesystems serves the same fields as Microsoft', () => {
     const ms = { ...MOUSE, mode: DEVICE_MODE_MOUSESYSTEMS };
     expect(stepDeviceValue(ms, 0, 1).comPort).toBe(ms.comPort + 1);
   });

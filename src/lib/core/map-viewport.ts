@@ -135,9 +135,9 @@ export interface HalfRow {
  *    exactly. Pixel-smooth scrolling is our addition and costs precisely this one column.
  * 3. **Height shear in y.** A tile of height `h` is pulled up by `4*h`, so tiles from *below* the
  *    window must be drawn too, otherwise the bottom edge stays black over mountains. The margin is
- *    therefore **derived** from `maxHeight` rather than guessed: an earlier fixed value (5 half rows =
- *    100 px) sufficed for the campaign saves but would have left a gap at height 31 (= 124 px of
- *    lift) — a data-dependent bug that strikes exactly when nobody thinks of it any more.
+ *    therefore **derived** from `maxHeight` rather than fixed: a constant of 5 half rows (100 px)
+ *    covers the campaign saves and leaves a gap at height 31 (= 124 px of lift) — a data-dependent
+ *    bug that strikes exactly when nobody thinks of it any more.
  *
  * `maxHeight` may be lowered to the map's actual maximum (computed once per map); the default
  * `MAX_HEIGHT` is the safe upper bound.

@@ -41,7 +41,7 @@ describe('build menu tables (layout vs. click zones)', () => {
   it('every click zone has a known action', () => {
     for (const screen of BUILD_SCREENS.values()) {
       for (const box of screen.hitboxes) {
-        expect(BUILD_POPUP_ACTIONS.has(box.action), `Screen ${screen.id}, Aktion ${box.action}`).toBe(
+        expect(BUILD_POPUP_ACTIONS.has(box.action), `screen ${screen.id}, action ${box.action}`).toBe(
           true,
         );
       }
@@ -55,7 +55,7 @@ describe('build menu tables (layout vs. click zones)', () => {
       const buildActions = screen.hitboxes.filter(
         (b) => BUILD_POPUP_ACTIONS.get(b.action)?.kind === 'build',
       );
-      expect(buildActions.length, `Screen ${screen.id}`).toBe(screen.layout.length);
+      expect(buildActions.length, `screen ${screen.id}`).toBe(screen.layout.length);
     }
   });
 
@@ -79,9 +79,9 @@ describe('build menu tables (layout vs. click zones)', () => {
   });
 });
 
-describe('buildPopupAction (Klick → Wirkung)', () => {
+describe('buildPopupAction (click -> effect)', () => {
   it('hits the mines of screen 3', () => {
-    // Klick-Zone [16,48]×[8,72] liegt in Zeichen-Pixeln bei [24,56]×[17,81].
+    // Click zone [16,48]x[8,72] sits at [24,56]x[17,81] in drawing pixels.
     expect(buildPopupAction(3, 30, 30)).toEqual({ kind: 'build', buildingType: 5, military: false });
     expect(buildPopupAction(3, 80, 30)).toEqual({ kind: 'build', buildingType: 6, military: false });
     expect(buildPopupAction(3, 50, 100)).toEqual({ kind: 'build', buildingType: 7, military: false });
@@ -106,7 +106,7 @@ describe('buildPopupAction (Klick → Wirkung)', () => {
 });
 
 describe('nextBuildScreen (page-turn handler 0x31e47)', () => {
-  it('zyklisiert 5 → 6 → 7 → 5', () => {
+  it('cycles 5 -> 6 -> 7 -> 5', () => {
     expect(nextBuildScreen(5)).toBe(6);
     expect(nextBuildScreen(6)).toBe(7);
     expect(nextBuildScreen(7)).toBe(5);
@@ -161,7 +161,7 @@ describe('drawBuildPopup', () => {
       const fb = createFramebuffer(160, 176);
       const { provider, entries } = recordingProvider();
       drawBuildPopup(fb, provider, id);
-      expect(entries.includes(UI_ICON_BASE + PAGE_ICON), `Screen ${id}`).toBe(expected);
+      expect(entries.includes(UI_ICON_BASE + PAGE_ICON), `screen ${id}`).toBe(expected);
     }
   });
 

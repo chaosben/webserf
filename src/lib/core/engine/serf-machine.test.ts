@@ -23,8 +23,8 @@ function serf(fields: Partial<Serf> & { state: number }): Serf {
 }
 const gs = (gameTick: number): GameState => ({ gameTick }) as unknown as GameState;
 
-describe('serf-machine — Union-Zugriffe', () => {
-  it('u8 lesen/schreiben (Offset 0xb..0xf → stateData[0..4])', () => {
+describe('serf-machine — union accessors', () => {
+  it('u8 read/write (offset 0xb..0xf → stateData[0..4])', () => {
     const s = serf({ state: 0, stateData: [10, 20, 30, 40, 50] });
     expect(unionU8(s, 0xb)).toBe(10);
     expect(unionU8(s, 0xf)).toBe(50);
@@ -34,7 +34,7 @@ describe('serf-machine — Union-Zugriffe', () => {
     expect(s.stateData[0]).toBe(0xff);
   });
 
-  it('u16 little-endian lesen/schreiben', () => {
+  it('u16 little-endian read/write', () => {
     const s = serf({ state: 0, stateData: [0, 0x34, 0x12, 0, 0] });
     expect(unionU16(s, 0xc)).toBe(0x1234);
     setUnionU16(s, 0xe, 0xabcd);
@@ -44,7 +44,7 @@ describe('serf-machine — Union-Zugriffe', () => {
   });
 });
 
-describe('serf-machine — advance (Tick-Prolog)', () => {
+describe('serf-machine — advance (tick prologue)', () => {
   it('not expired: delta <= counter -> false, counter -= delta', () => {
     const s = serf({ state: 2, counter: 100, tick: 1000 });
     expect(advance(s, 1005)).toBe(false);
@@ -52,7 +52,7 @@ describe('serf-machine — advance (Tick-Prolog)', () => {
     expect(s.tick).toBe(1005);
   });
 
-  it('abgelaufen: delta > counter → true (Unterlauf)', () => {
+  it('expired: delta > counter → true (underflow)', () => {
     const s = serf({ state: 2, counter: 3, tick: 1000 });
     expect(advance(s, 1005)).toBe(true);
     expect(s.counter).toBe(0xfffe); // subU16(3,5)
@@ -75,10 +75,10 @@ describe('serf-machine — dispatch', () => {
     expect(s.stateData[4]).toBe(2); // field_0xf unchanged
   });
 
-  it('05 LeavingBuilding (abgelaufen): Wechsel in field_0xf, counter=0, field_0xf=0', () => {
+  it('05 LeavingBuilding (expired): switches to field_0xf, counter=0, field_0xf=0', () => {
     const s = serf({ state: 5, counter: 3, tick: 1000, stateData: [0, 0, 0, 0, 2] });
     dispatchSerf(gs(1005), s);
-    expect(s.state).toBe(2); // gemerkter Folgezustand
+    expect(s.state).toBe(2); // the remembered follow-up state
     expect(s.counter).toBe(0);
     expect(s.stateData[4]).toBe(0);
   });
@@ -92,7 +92,7 @@ describe('serf-machine — dispatch', () => {
   });
 });
 
-// --- Bewegungs-Primitiv: 07 ReadyToLeave (stepOutToFlag) ---
+// --- Movement primitive: 07 ReadyToLeave (stepOutToFlag) ---
 
 const geo = mapGeometry(3);
 function tile(over: Partial<Tile> = {}): Tile {
@@ -149,7 +149,7 @@ describe('serf-machine — 07 ReadyToLeave / stepOutToFlag', () => {
   });
 });
 
-// --- Spiegel-Primitiv: 06 ReadyToEnter (stepInToBuilding) ---
+// --- Mirror primitive: 06 ReadyToEnter (stepInToBuilding) ---
 
 /** Serf @(11,21) h6 wants into the building UpLeft @(10,20) h5 (hut 11). */
 function enterState(bldOccupiedBy = 0): { state: GameState; serf: Serf; here: number; bld: number } {
@@ -192,7 +192,7 @@ describe('serf-machine — 06 ReadyToEnter / stepInToBuilding', () => {
   });
 });
 
-// --- Ritter-Garnisons-Eintritt (serf_state_04 case 0xc95) ---
+// --- Knight garrison entry (serf_state_04 case 0xc95) ---
 
 /**
  * Knight (type 26) in state 4 on the hut tile, entry due (counter <= fieldC). Models the garrison entry
@@ -237,13 +237,13 @@ function garrisonEnterState(): { state: GameState; serf: Serf; bld: Building; he
   return { state, serf, bld, here };
 }
 
-describe('serf-machine — 04 Ritter-Garnisons-Eintritt (case 0xc95)', () => {
+describe('serf-machine — 04 knight garrison entry (case 0xc95)', () => {
   it('the first knight occupies a fresh hut -> state 70, active, firstKnight, garrison count, territory', () => {
     const { state, serf, bld, here } = garrisonEnterState();
     dispatchSerf(state, serf);
-    expect(serf.state).toBe(70); // DefendingHut (Hut→70)
+    expect(serf.state).toBe(70); // DefendingHut (hut→70)
     expect(serf.counter).toBe(6000);
-    expect(unionU16(serf, 0xe)).toBe(0); // serf[0xe] = altes firstKnight (0)
+    expect(unionU16(serf, 0xe)).toBe(0); // serf[0xe] = old firstKnight (0)
     expect(bld.firstKnight).toBe(5); // building.firstKnight = serf.index
     expect(bld.active).toBe(true);
     expect(bld.stock[0]).toEqual({ available: 1, requested: 0 }); // Byte 0x01 + 0x0f = 0x10
@@ -252,7 +252,7 @@ describe('serf-machine — 04 Ritter-Garnisons-Eintritt (case 0xc95)', () => {
  // `xor` -> 0x45): the BUILD mask (plank 0x02 / stone 0x10) gives way to the GOLD mask (bit 3).
     const f = state.flags[1]!;
     expect(f.bldFlags).toBe(0x00);
-    expect(f.bld2Flags).toBe(0x08); // Bit 3 == GoldBar (DEMAND_TABLE[14])
+    expect(f.bld2Flags).toBe(0x08); // bit 3 == GoldBar (DEMAND_TABLE[14])
     expect(f.acceptsSerfs).toBe(false);
     expect(f.acceptsResources).toBe(false);
     expect(f.stockPriority[1]).toBe(0); // `militaryGoldDemand` sets it again next tick
@@ -268,8 +268,7 @@ describe('serf-machine — 04 Ritter-Garnisons-Eintritt (case 0xc95)', () => {
   });
 
  /**
-  * Message 6 "military building occupied" (@0x23f62). It used to be missing because the call site
-  * als „Angriffs-Register `FUN_00018234`, bewusst OFFEN" abgelegt war — falscher Name, echter Effekt.
+  * Message 6 "military building occupied" — sent at @0x23f62 out of `FUN_00018234`.
   */
   it('the first occupation reports "building occupied" with the building class as the parameter', () => {
  // Discrimination: hut 0, tower 1, everything else (fortress) 2.
@@ -286,7 +285,7 @@ describe('serf-machine — 04 Ritter-Garnisons-Eintritt (case 0xc95)', () => {
  // The position is the tile of the BUILDING (`bld[0]`), not that of the serf.
       const i = p.messageTypes.indexOf(6 + (cls << 5));
       expect(p.messagePositions[i]).toBe(here);
-      expect(p.flags & 0x08).toBe(0x08); // Wecker
+      expect(p.flags & 0x08).toBe(0x08); // wake-up flag
     }
   });
 
@@ -311,7 +310,7 @@ describe('serf-machine — 04 Ritter-Garnisons-Eintritt (case 0xc95)', () => {
   });
 });
 
-// --- Handler 11 MoveResourceOut (stepOutToFlag + freier Flaggen-Waren-Slot) ---
+// --- Handler 11 MoveResourceOut (stepOutToFlag + a free flag resource slot) ---
 
 /** Serf(11) @(10,20) h5 in hut(11); flag tile @(11,21) h6, flag #2 with or without a free resource slot. */
 function resourceOutState(hasFreeSlot: boolean): { state: GameState; serf: Serf } {
@@ -348,7 +347,7 @@ describe('serf-machine — 11 MoveResourceOut', () => {
   });
 });
 
-// --- Handler 12 WaitForResourceOut (Inventar-Ausgabe: Ware aufnehmen + austreten) ---
+// --- Handler 12 WaitForResourceOut (inventory hand-out: pick the resource up and step out) ---
 
 /**
  * Serf(TransporterInventory) in the warehouse(10) building @(10,20) h5, state 12, counter 0 (the body runs
@@ -387,13 +386,13 @@ function waitResourceState(queueType: number): { state: GameState; serf: Serf; i
 
 describe('serf-machine — 12 WaitForResourceOut', () => {
   it('resource in the out queue: pick it up, advance the queue, step out -> state 5', () => {
-    const { state, serf, inv } = waitResourceState(4); // Ausgabe-Ware Typ 4
+    const { state, serf, inv } = waitResourceState(4); // outgoing resource type 4
     dispatchSerf(state, serf);
-    expect(serf.stateData[0]).toBe(5); // field_0xb = roher Queue-Typ = 4+1
-    expect(serf.stateData[3]).toBe(0); // field_0xf-Vorbereitung / (0xd steht in [4])
+    expect(serf.stateData[0]).toBe(5); // field_0xb = raw queue type = 4+1
+    expect(serf.stateData[3]).toBe(0); // field_0xf preparation / (0xd sits in [4])
     expect(unionU16(serf, 0xc)).toBe(33); // destination taken over
-    expect(inv.outQueue[0].type).toBe(-1); // Queue vorgeschoben (Slot0 ← Slot1 = leer)
-    expect([serf.col, serf.row]).toEqual([11, 21]); // ausgetreten
+    expect(inv.outQueue[0].type).toBe(-1); // queue advanced (slot 0 ← slot 1 = empty)
+    expect([serf.col, serf.row]).toEqual([11, 21]); // stepped out
     expect(serf.state).toBe(5); // LeavingBuilding
     expect(serf.counter).toBe(149); // (COUNTER_FROM_ANIMATION[14]=319 * (0x1f^slope[10]=16 → 15)) >> 5
     expect(unionU8(serf, 0xf)).toBe(0xd); // follow-up state after leaving = 13
@@ -437,14 +436,14 @@ describe('serf-machine — 13 DropResourceOut', () => {
   it('puts the resource into the first free slot, then enters the building -> state 4', () => {
     const { state, serf, flag } = dropResourceState();
     dispatchSerf(state, serf);
-    expect(flag.resourceSlots[0]).toBe(4); // (roh 5 & 0x1f) - 1
+    expect(flag.resourceSlots[0]).toBe(4); // (raw 5 & 0x1f) - 1
     expect(flag.slotDir[0]).toBe(-1); // (5>>5 & 7) - 1
     expect(flag.slotDest[0]).toBe(42);
     expect(flag.hasResources).toBe(true);
-    expect(serf.stateData[0]).toBe(0); // field_0xb geleert
+    expect(serf.stateData[0]).toBe(0); // field_0xb cleared
     expect([serf.col, serf.row]).toEqual([10, 20]); // entered the building
     expect(serf.state).toBe(4); // EnteringBuilding
-    expect(serf.counter).toBe(319); // Geh-Dauer = COUNTER_FROM_ANIMATION[39]
+    expect(serf.counter).toBe(319); // walk duration = COUNTER_FROM_ANIMATION[39]
     expect(unionU16(serf, 0xc)).toBe(179); // inside walk length (319*18)>>5
   });
 });
@@ -475,7 +474,7 @@ describe('serf-machine — 15 ReadyToLeaveInventory', () => {
   it('steps out of the inventory to the flag, books serfIndices[4]--, state -> 5', () => {
     const { state, serf, inv } = leaveInventoryState();
     dispatchSerf(state, serf);
-    expect(inv.serfIndices[4]).toBe(4); // dekrementiert (war 5)
+    expect(inv.serfIndices[4]).toBe(4); // decremented (was 5)
     expect(serf.stateData[3]).toBe(0); // field_0xe low byte cleared
     expect(serf.stateData[4]).toBe(2); // field_0xf = 2 (field_0xb != 0xfd)
     expect([serf.col, serf.row]).toEqual([11, 21]);
@@ -495,7 +494,7 @@ describe('serf-machine — 15 ReadyToLeaveInventory', () => {
   });
 });
 
-// --- Handler 09 Building (Bau: Struktur hochziehen bis fertig) ---
+// --- Handler 09 Building (construction: raise the structure until it is finished) ---
 
 /** Building serf(9) at slot 6 plus a building under construction at slot 1. Optional map/flag/player context. */
 function buildingState(over: {
@@ -555,7 +554,7 @@ describe('serf-machine — 09 Building', () => {
     const { state, serf, bld } = buildingState({
       serf: { stateData: [0xff, 1, 0, 0, 8] },
       bld: {
-        type: 2, // Lumberjack, Phase 0 → BUILD_PROGRESS_STEP[4] = 4096
+        type: 2, // Lumberjack, phase 0 → BUILD_PROGRESS_STEP[4] = 4096
         progress: 0,
         stock: [
           { available: 5, requested: 0 },
@@ -572,7 +571,7 @@ describe('serf-machine — 09 Building', () => {
   });
 
   it('requesting material (mode 0): consume the matching build material from the stock', () => {
- // field_0xb=0 → Setup (Modus 1) + Material; Hut(11) need=0b10, Schritt 0 → Brett (Slot 0).
+ // field_0xb=0 → setup (mode 1) + material; hut(11) need=0b10, step 0 → plank (slot 0).
     const { state, serf, bld } = buildingState({
       serf: { stateData: [0, 1, 0, 0, 0] },
       bld: {
@@ -586,17 +585,17 @@ describe('serf-machine — 09 Building', () => {
       },
     });
     dispatchSerf(state, serf);
-    expect(bld.stock[0].available).toBe(1); // 1 Brett verbraucht
-    expect(bld.stockMaximum![0]).toBe(0); // stockMaximum ebenfalls -1
-    expect(serf.stateData[3]).toBe(1); // field_0xe (Material-Schritt) 0 → 1
-    expect(serf.stateData[4]).toBe(8); // field_0xf = 8 Arbeits-Iterationen
-    expect(serf.stateData[0]).toBe(0xff); // field_0xb → Arbeiten
+    expect(bld.stock[0].available).toBe(1); // one plank consumed
+    expect(bld.stockMaximum![0]).toBe(0); // stockMaximum goes down as well
+    expect(serf.stateData[3]).toBe(1); // field_0xe (material step) 0 → 1
+    expect(serf.stateData[4]).toBe(8); // field_0xf = 8 work iterations
+    expect(serf.stateData[0]).toBe(0xff); // field_0xb → working
     expect(bld.progress).toBe(1); // no progress in the material branch
   });
 
   it('material missing: waiting branch (counter += 0x100), no progress, mode stays', () => {
     const { state, serf, bld } = buildingState({
-      serf: { counter: 3, tick: 1000, stateData: [1, 1, 0, 0, 0] }, // Modus 1
+      serf: { counter: 3, tick: 1000, stateData: [1, 1, 0, 0, 0] }, // mode 1
       bld: {
         type: 11,
         progress: 1,
@@ -654,7 +653,7 @@ describe('serf-machine — 09 Building', () => {
     expect(bld.holder).toBe(false);
     expect(bld.firstKnight).toBe(0);
     expect(player.totalBuildingScore).toBe(102); // + BUILDING_SCORE[2] = 2
-    expect(player.completedBuildingCount[1]).toBe(1); // Typ 2 → Array-Index 1
+    expect(player.completedBuildingCount[1]).toBe(1); // type 2 → array index 1
     expect(player.incompleteBuildingCount[1]).toBe(0);
     expect(flag.acceptsSerfs).toBe(false);
     expect(flag.acceptsResources).toBe(false);
@@ -662,7 +661,7 @@ describe('serf-machine — 09 Building', () => {
  // (base-relative `index * 70`) rather than the levelling height of the site. Without this store a
  // save game written by us kept the height there, and the original reads it as a pointer.
     expect(bld.level).toBe(2 * 70);
-    expect(serf.state).toBe(5); // ausgetreten (stepOutToFlag → LeavingBuilding)
+    expect(serf.state).toBe(5); // stepped out (stepOutToFlag → LeavingBuilding)
     expect([serf.col, serf.row]).toEqual([11, 21]);
   });
 });
@@ -688,7 +687,7 @@ describe('serf-machine — 01/66 Sleep', () => {
   });
 
   it('01 IdleInStock: registers as serfIndices[type] in the inventory (in mode), without counter or tick', () => {
- // field_0xe = Inventar 0 (stateData[3]=0, [4]=0); Serf-Typ 21 (Generic), state 1.
+ // field_0xe = inventory 0 (stateData[3]=0, [4]=0); serf type 21 (Generic), state 1.
     const s = serf({ state: 1, type: 21, counter: 50, tick: 500, stateData: [0, 0, 0, 0, 0] });
     const inv = {
       index: 0,
@@ -699,8 +698,8 @@ describe('serf-machine — 01/66 Sleep', () => {
     } as unknown as import('./state.js').Inventory;
     const state = { ...gs(510), inventories: [inv] } as unknown as GameState;
     dispatchSerf(state, s);
-    expect(inv.serfIndices[21]).toBe(s.index); // registriert
-    expect(s.counter).toBe(50); // eingefroren
+    expect(inv.serfIndices[21]).toBe(s.index); // registered
+    expect(s.counter).toBe(50); // frozen
     expect(s.tick).toBe(500);
     expect(s.state).toBe(1);
   });
@@ -719,7 +718,7 @@ describe('serf-machine — 01/66 Sleep', () => {
       const s = serf({ state: 1, type: 21, counter: 50, tick: 500, col: null, row: null, stateData: [0, 0, 0, 0, 0] });
       const inv = mkInv({ serfMode: mode });
       dispatchSerf({ ...gs(510), inventories: [inv] } as unknown as GameState, s);
-      expect(s.stateData[0]).toBe(0xfd); // Auswurf-Kennung gesetzt
+      expect(s.stateData[0]).toBe(0xfd); // eviction marker set
       expect(inv.serfIndices[4]).toBe(1); // serfs_out += 1
       expect(s.state).not.toBe(1);
     }
@@ -741,7 +740,7 @@ describe('serf-machine — 01/66 Sleep', () => {
     const inv = mkInv({ serfMode: 3 });
     inv.serfIndices[4] = 3;
     dispatchSerf({ ...gs(510), inventories: [inv] } as unknown as GameState, s);
-    expect(s.state).toBe(1); // registriert statt ausgelagert
+    expect(s.state).toBe(1); // registered instead of evicted
     expect(inv.serfIndices[4]).toBe(3);
     expect(s.stateData[0]).toBe(0);
   });
@@ -761,7 +760,7 @@ describe('serf-machine — 01/66 Sleep', () => {
     expect(invB.serfIndices[21]).toBe(other.index + 99);
   });
 
- // --- Ritter-Ausbildung im Lager (@0x1f7be/@0x1f89e/@0x1f97e/@0x1fa5e) ---
+ // --- Knight training in the warehouse (@0x1f7be/@0x1f89e/@0x1f97e/@0x1fa5e) ---
 
   it('01 IdleInStock: Knight4 (type 26) does not age — registration only (@0x1fb3e)', () => {
     const s = serf({ state: 1, type: 26, counter: 4321, tick: 500, owner: 0, stateData: [0, 0, 0, 0, 0] });
@@ -793,10 +792,10 @@ describe('serf-machine — 01/66 Sleep', () => {
     dispatchSerf(st, s);
     expect(s.type).toBe(23); // serf[0] += 4 @0x1f814
     expect(s.counter).toBe(0x1770); // @0x1f85c
-    expect(inv.serfIndices[22]).toBe(0); // alten Slot nullen @0x1f867
-    expect(inv.serfIndices[23]).toBe(s.index); // neuen setzen @0x1f871
+    expect(inv.serfIndices[22]).toBe(0); // clear the old slot @0x1f867
+    expect(inv.serfIndices[23]).toBe(s.index); // set the new one @0x1f871
     const p = st.players[0]!;
-    expect(p.totalMilitaryScore).toBe(100 + 1); // 1 << rang
+    expect(p.totalMilitaryScore).toBe(100 + 1); // 1 << rank
     expect(p.serfCount[22]).toBe(9);
     expect(p.serfCount[23]).toBe(1);
   });
@@ -866,7 +865,7 @@ function arriveState(over: { dir1: number; bldOccupiedBy?: number; burning?: boo
     null,
     { index: 1, type: 11, constructing: false, burning: over.burning ?? false, holder: false, serfRequested: true, firstKnight: 0, inventoryIndex: 9 } as unknown as Building,
   ];
- // came (F_E) = 0 (orientiert), dest (F_C) = 1 == flagIdx, dir1 (F_B) = over.dir1.
+ // came (F_E) = 0 (oriented), dest (F_C) = 1 == flagIdx, dir1 (F_B) = over.dir1.
   const serf = {
     index: 7, state: 2, col: 11, row: 21, counter: 0, tick: 900, animation: 0,
     stateData: [over.dir1 & 0xff, 1, 0, 0, 0],
@@ -881,7 +880,7 @@ describe('serf-machine — 02 Walking: arrival handover', () => {
     const { state, serf, bld } = arriveState({ dir1: 0xfe }); // -2
     dispatchSerf(state, serf);
     expect(state.buildings[1]!.holder).toBe(true);
-    expect(state.buildings[1]!.firstKnight).toBe(7); // serfRequested war true → firstKnight = index
+    expect(state.buildings[1]!.firstKnight).toBe(7); // serfRequested was true → firstKnight = index
     expect(state.buildings[1]!.serfRequested).toBe(false);
     expect(serf.state).toBe(4); // EnteringBuilding
     expect([serf.col, serf.row]).toEqual([10, 20]); // moved into the hut
@@ -891,12 +890,12 @@ describe('serf-machine — 02 Walking: arrival handover', () => {
   it('dir1 < 0, building tile occupied -> ReadyToEnter (6) with waiting anim 0x55', () => {
     const { state, serf } = arriveState({ dir1: 0xfe, bldOccupiedBy: 99 });
     dispatchSerf(state, serf);
-    expect(serf.state).toBe(6); // ReadyToEnter, wartet
+    expect(serf.state).toBe(6); // ReadyToEnter, waiting
     expect(serf.animation).toBe(0x55);
     expect([serf.col, serf.row]).toEqual([11, 21]); // stays at the flag
   });
 
-  it('dir1 == 6 → LookingForGeoSpot (42), Counter 0', () => {
+  it('dir1 == 6 → LookingForGeoSpot (42), counter 0', () => {
     const { state, serf } = arriveState({ dir1: 6 });
     dispatchSerf(state, serf);
     expect(serf.state).toBe(42);
@@ -914,9 +913,9 @@ describe('serf-machine — 02 Walking: arrival handover', () => {
     expect(flag1.length[2]).toBe(1); // 0x80 -> bit 7 cleared, +1
     expect(otherFlag.length[5]).toBe(2); // 0x81 → 1, +1 = 2
  // field_0xe was set to dir1=2, then the carrier took one step Down via change_direction
- // (Feld frei) → field_0xe = Gegenrichtung reverse(2) = 5 (= „woher").
+ // (tile free) → field_0xe = opposite direction reverse(2) = 5 (= where he came from).
     expect(serf.stateData[0xe - 0xb]).toBe(5);
-    expect([serf.col, serf.row]).toEqual([11, 22]); // einen Schritt Down gelaufen
+    expect([serf.col, serf.row]).toEqual([11, 22]); // walked one step Down
   });
 });
 
@@ -951,7 +950,7 @@ function insideState(over: {
       stock: [{ available: 0, requested: 0 }, { available: 0, requested: 0 }],
     } as unknown as Building,
   ];
- // counter 0, field_0xc 0 → innen angekommen (counter <= field_0xc). dir1 (F_B) = over.dir1.
+ // counter 0, field_0xc 0 → arrived inside (counter <= field_0xc). dir1 (F_B) = over.dir1.
   const serf = {
     index: 7, type: over.type ?? 5, state: 4, col: 10, row: 20, counter: 0, tick: 900, animation: 0,
     stateData: [over.dir1 & 0xff, 0, 0, 0, 0],
@@ -966,7 +965,7 @@ function insideState(over: {
 }
 
 describe('serf-machine — 04 EnteringBuilding', () => {
-  it('field_0xb == -2 → IdleInStock (1), field_0xe = inventoryIndex, Serf-Feld frei', () => {
+  it('field_0xb == -2 → IdleInStock (1), field_0xe = inventoryIndex, serf tile freed', () => {
     const { state, serf, bld } = insideState({ dir1: 0xfe });
     dispatchSerf(state, serf);
     expect(serf.state).toBe(1); // IdleInStock
@@ -982,20 +981,20 @@ describe('serf-machine — 04 EnteringBuilding', () => {
     expect(serf.counter).toBe(0);
   });
 
-  it('Lumberjack (Typ 5), field_0xb=0 → PlanningLogging (18), Map-Serf-Feld frei', () => {
+  it('Lumberjack (type 5), field_0xb=0 → PlanningLogging (18), map serf tile freed', () => {
     const { state, serf, bld } = insideState({ dir1: 0, type: 5 });
     dispatchSerf(state, serf);
     expect(serf.state).toBe(18);
     expect(state.mapTiles[bld].serfIndex).toBe(0);
   });
 
-  it('Sawmiller (Typ 6) Erst-Eintritt (field_0xb=1) → Sawing (24), Flagge acceptsResources=false', () => {
+  it('Sawmiller (type 6) entering for the first time (field_0xb=1) → Sawing (24), flag acceptsResources=false', () => {
     const flag = { acceptsSerfs: true, acceptsResources: true, stockPriority: [9, 9] } as unknown as Flag;
     const { state, serf } = insideState({ dir1: 1, type: 6, bldFlag: 3, flags: [null, null, null, flag] });
     dispatchSerf(state, serf);
     expect(serf.state).toBe(24);
     expect(serf.stateData[0]).toBe(0); // sawing.mode = 0
-    expect(flag.acceptsResources).toBe(false); // byte68 = 0x20 → Bit7 = 0
+    expect(flag.acceptsResources).toBe(false); // byte68 = 0x20 → bit 7 = 0
     expect(flag.stockPriority[1]).toBe(0); // byte69 = 0
   });
 
@@ -1011,24 +1010,24 @@ describe('serf-machine — 04 EnteringBuilding', () => {
     expect(state.buildings[1]!.playingSfx).toBe(false); // stop_playing_sfx
   });
 
-  it('Smelter (Typ 10): SteelSmelter → field_0xd=0, GoldSmelter → 0xff', () => {
+  it('Smelter (type 10): SteelSmelter → field_0xd=0, GoldSmelter → 0xff', () => {
     const s1 = insideState({ dir1: 0, type: 10, bldType: 18 }); // SteelSmelter
     dispatchSerf(s1.state, s1.serf);
     expect(s1.serf.state).toBe(30);
-    expect(s1.serf.stateData[2]).toBe(0); // field_0xd = 0 (Stahl)
+    expect(s1.serf.stateData[2]).toBe(0); // field_0xd = 0 (steel)
 
     const s2 = insideState({ dir1: 0, type: 10, bldType: 23 }); // GoldSmelter
     dispatchSerf(s2.state, s2.serf);
-    expect(s2.serf.stateData[2]).toBe(0xff); // field_0xd = -1 (Gold)
+    expect(s2.serf.stateData[2]).toBe(0xff); // field_0xd = -1 (gold)
   });
 
-  it('PigFarmer (Typ 12) Erst-Eintritt → PigFarming (37) mode 0, Byte9=1; erneut → mode 6', () => {
+  it('PigFarmer (type 12) entering for the first time → PigFarming (37) mode 0, byte9=1; again → mode 6', () => {
     const pfFlag = { acceptsSerfs: false, acceptsResources: false, stockPriority: [0, 0] } as unknown as Flag;
     const first = insideState({ dir1: 1, type: 12, bldType: 14, bldFlag: 3, flags: [null, null, null, pfFlag] });
     dispatchSerf(first.state, first.serf);
     expect(first.serf.state).toBe(37);
     expect(first.serf.stateData[0]).toBe(0); // mode 0
-    expect(first.state.buildings[1]!.stock[1]).toEqual({ available: 0, requested: 1 }); // Byte9 = 1
+    expect(first.state.buildings[1]!.stock[1]).toEqual({ available: 0, requested: 1 }); // byte9 = 1
 
     const again = insideState({ dir1: 0, type: 12, bldType: 14 });
     dispatchSerf(again.state, again.serf);
@@ -1036,7 +1035,7 @@ describe('serf-machine — 04 EnteringBuilding', () => {
     expect(again.serf.stateData[0]).toBe(6); // mode 6
   });
 
-  it('Generic (Typ 21) → IdleInStock (1) + genericCount++', () => {
+  it('Generic (type 21) → IdleInStock (1) + genericCount++', () => {
     const inv = { genericCount: 4 };
     const { state, serf, bld } = insideState({ dir1: 0, type: 21, inventoryIndex: 2, inventories: [null, null, inv] });
     dispatchSerf(state, serf);
@@ -1054,7 +1053,7 @@ describe('serf-machine — 04 EnteringBuilding', () => {
     expect(reg.serf.stateData[0]).toBe(1); // mode = 1
     expect(reg.serf.stateData[3] & 0x80).toBe(0); // material_step Bit7 clear
 
-    const two = insideState({ dir1: 1, type: 3, bldType: 17 }); // Sawmill = Zwei-Phasen
+    const two = insideState({ dir1: 1, type: 3, bldType: 17 }); // Sawmill = two phase
     dispatchSerf(two.state, two.serf);
     expect(two.serf.animation).toBe(100);
     expect(two.serf.stateData[3] & 0x80).toBe(0x80);
@@ -1067,25 +1066,24 @@ describe('serf-machine — 04 EnteringBuilding', () => {
     expect(serf.state).toBe(12);
     expect(serf.counter).toBe(0x3f);
     expect(serf.type).toBe(4); // TransporterInventory
-    expect(flag.acceptsSerfs).toBe(true); // byte66 = 0xc0 → Bit7 = 1
-    expect(flag.acceptsResources).toBe(true); // byte68 = 0x80 → Bit7 = 1
+    expect(flag.acceptsSerfs).toBe(true); // byte66 = 0xc0 → bit 7 = 1
+    expect(flag.acceptsResources).toBe(true); // byte68 = 0x80 → bit 7 = 1
   });
 
-  it('Geologist (Typ 20) → LookingForGeoSpot (42), Map-Serf-Feld bleibt', () => {
+  it('Geologist (type 20) → LookingForGeoSpot (42), map serf tile stays', () => {
     const { state, serf, bld } = insideState({ dir1: 0, type: 20 });
     dispatchSerf(state, serf);
     expect(serf.state).toBe(42);
     expect(serf.counter).toBe(0);
-    expect(state.mapTiles[bld].serfIndex).toBe(7); // NICHT geleert
+    expect(state.mapTiles[bld].serfIndex).toBe(7); // NOT cleared
   });
 });
 
 // --- 26 LostSailor / 27 FreeSailing ---------------------------------------------------------
 
 /**
- * The sailor used to be a stub on a wrongly noted address (`@0x1baa2` lies inside the
- * body of state 25; the jump table names `0x1b6fb`). What is checked here is what sets him apart from
- * the land walker.
+ * The entry of state 26 is `0x1b6fb`, as named by the jump table — `@0x1baa2` lies inside the body
+ * of state 25 and is not it. What is checked here is what sets the sailor apart from the land walker.
  */
 function sailorState(over: {
   flagAt?: { col: number; row: number; endpointDirs?: boolean[]; owner?: number };
@@ -1121,8 +1119,8 @@ describe('serf-machine — 26 LostSailor', () => {
   it('takes the nearest own connected flag as the destination and moves to 27', () => {
     const { state, serf } = sailorState({ flagAt: { col: 21, row: 20 } });
     dispatchSerf(state, serf);
-    expect(serf.state).toBe(27); // FreeSailing, NICHT 16 FreeWalking
-    expect([unionU8(serf, 0xb), unionU8(serf, 0xc)]).toEqual([1, 0]); // Spiral-Delta (+1,0)
+    expect(serf.state).toBe(27); // FreeSailing, NOT 16 FreeWalking
+    expect([unionU8(serf, 0xb), unionU8(serf, 0xc)]).toEqual([1, 0]); // spiral delta (+1,0)
     expect(unionU8(serf, 0xd)).toBe(0x80); // neg_dist1 = −128
     expect(unionU8(serf, 0xe)).toBe(0xff);
     expect(unionU8(serf, 0xf)).toBe(0);
@@ -1135,7 +1133,7 @@ describe('serf-machine — 26 LostSailor', () => {
     });
     dispatchSerf(state, serf);
     expect(serf.state).toBe(27);
-    expect([unionU8(serf, 0xb), unionU8(serf, 0xc)]).not.toEqual([1, 0]); // Zufallszweig
+    expect([unionU8(serf, 0xb), unionU8(serf, 0xc)]).not.toEqual([1, 0]); // random branch
   });
 
   it('skips a foreign flag', () => {
@@ -1144,7 +1142,7 @@ describe('serf-machine — 26 LostSailor', () => {
     expect([unionU8(serf, 0xb), unionU8(serf, 0xc)]).not.toEqual([1, 0]);
   });
 
-  it('ohne Flagge: Zufalls-Delta aus −16..15 (feste Maske 0x1f, Versatz 0x10)', () => {
+  it('with no flag: random delta out of −16..15 (fixed mask 0x1f, offset 0x10)', () => {
     const { state, serf } = sailorState();
     dispatchSerf(state, serf);
     expect(serf.state).toBe(27);
@@ -1180,7 +1178,7 @@ describe('serf-machine — 27 FreeSailing', () => {
   it('on open water he sails on and changes tile', () => {
     const { state, serf, here } = sailorState();
     serf.state = 27;
-    setUnionU8(serf, 0xb, 4); // Ziel vier Spalten weiter
+    setUnionU8(serf, 0xb, 4); // destination four columns further on
     setUnionU8(serf, 0xd, 0x80);
     state.gameTick = 1010;
     dispatchSerf(state, serf);

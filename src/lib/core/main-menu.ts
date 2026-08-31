@@ -611,8 +611,8 @@ export const MENU_STAGE1_ICONS: readonly MenuIcon[] = [
   { icon: MENU_ICON_START, col: 0x00, row: 0x30 }, // START
   { icon: 0x10b, col: 0x1f, row: 0x30 }, // EXTRA OPTION
   { icon: 0x13c, col: 0x24, row: 0x30 }, // LADEN
-  { icon: 0x11b, col: 0x00, row: 0x00 }, // Titel-Schriftzug
-  { icon: 0x13d, col: 0x00, row: 0x00 }, // Titel-Zusatz
+  { icon: 0x11b, col: 0x00, row: 0x00 }, // title lettering
+  { icon: 0x13d, col: 0x00, row: 0x00 }, // title subtitle
 ];
 
 // ─── player columns ──────────────────────────────────────────────────────────────────────────────
@@ -711,9 +711,9 @@ export const menuColumnBase = (slot: number): number => slot * 10;
  * from surface y 180 and is 4 px wide.
  */
 export const MENU_BAR_LAYOUT: readonly { readonly dx: number; readonly color: number }[] = [
-  { dx: 74, color: 0x1e }, // values[0] — Intelligenz
-  { dx: 68, color: 0x43 }, // values[1] — Vorrat
-  { dx: 80, color: 0x4b }, // values[2] — Fortpflanzung
+  { dx: 74, color: 0x1e }, // values[0] — intelligence
+  { dx: 68, color: 0x43 }, // values[1] — supply
+  { dx: 80, color: 0x4b }, // values[2] — reproduction
 ];
 
 /** Baseline of the slider bars in surface pixels (`vreg1 = 0xb4 − value`). */
@@ -743,8 +743,8 @@ const COMMON: readonly MenuZone[] = [
   z(13, 248, 279, 48, 79), // EXTRA OPTION
   z(39, 288, 319, 48, 79), // LADEN
   z(38, 0, 31, 48, 79), // START
-  z(11, 0, 7, 0, 7), // Ecke oben links
-  z(0, 40, 71, 48, 79), // Spielart weiterschalten
+  z(11, 0, 7, 0, 7), // top left corner
+  z(0, 40, 71, 48, 79), // cycle the game type
 ];
 
 /** The slider and face zones of slots 1..3 (identical in all free game types). */
@@ -783,8 +783,8 @@ const FREE_MAP: readonly MenuZone[] = [
  * get out of the state by leaving the program.
  */
 export const MENU_ZONES_LOADED: readonly MenuZone[] = [
-  z(11, 0, 7, 0, 7), // Ecke oben links (Programm verlassen)
-  z(40, 0, 31, 48, 79), // links: weiterspielen
+  z(11, 0, 7, 0, 7), // top left corner (leave the program)
+  z(40, 0, 31, 48, 79), // left: keep playing
   z(41, 288, 311, 48, 79), // right: back to the menu
 ];
 
@@ -1323,7 +1323,7 @@ export function applyMainMenuAction(
   const toggleSlot = FACE_TOGGLE_ACTIONS.get(action);
   if (toggleSlot !== undefined) {
     const next = toggleFace(s.face[toggleSlot] ?? 0);
-    return discard({ // Schwanz @0x509d0
+    return discard({ // tail @0x509d0
       ...s,
       face: withAt(s.face, toggleSlot, next) as unknown as MainMenuState['face'],
     });

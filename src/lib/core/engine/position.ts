@@ -50,12 +50,12 @@ export function posOf(col: number, row: number, geo: MapGeometry): number {
   return ((row & geo.rowMask) << geo.rowShift) | (col & geo.colMask);
 }
 
-/** Spalte einer Map-Position. */
+/** Column of a map position. */
 export function colOf(pos: number, geo: MapGeometry): number {
   return pos & geo.colMask;
 }
 
-/** Zeile einer Map-Position. */
+/** Row of a map position. */
 export function rowOf(pos: number, geo: MapGeometry): number {
   return (pos >>> geo.rowShift) & geo.rowMask;
 }
@@ -81,11 +81,11 @@ export function encodePackedPos(col: number, row: number, geo: MapGeometry): num
   return ((((row & geo.rowMask) << (geo.rowShift + 1)) | (col & geo.colMask)) << 2) >>> 0;
 }
 
-// ---- Hex-Richtungen + Nachbar-Arithmetik ----
+// ---- Hex directions + neighbour arithmetic ----
 
 /**
- * Die 6 Hex-Richtungen (Reihenfolge == Weg-Bits `paths` Bit 0..5 im Map-Tile/Flag-Record).
- * Gegenrichtung = `(dir + 3) % 6`.
+ * The 6 hex directions (order == road bits `paths` bit 0..5 in the map tile / flag record).
+ * Opposite direction = `(dir + 3) % 6`.
  */
 export enum Direction {
   Right = 0,
@@ -114,12 +114,12 @@ export const DIR_DELTA: readonly (readonly [number, number])[] = [
   [0, -1], // 5 Up
 ];
 
-/** Gegenrichtung (180°). */
+/** Opposite direction (180 degrees). */
 export function oppositeDir(dir: Direction): Direction {
   return ((dir + 3) % 6) as Direction;
 }
 
-/** Nachbar-Map-Position in einer Richtung (Torus-Wrap). */
+/** Neighbour map position in a direction (torus wrap). */
 export function neighbor(pos: number, dir: Direction, geo: MapGeometry): number {
   const [dc, dr] = DIR_DELTA[dir];
   return posOf(colOf(pos, geo) + dc, rowOf(pos, geo) + dr, geo);

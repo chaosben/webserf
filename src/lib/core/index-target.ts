@@ -15,11 +15,10 @@
  * ```
  *
  * The upper half of the palette is the darkened lower half (over `i = 0..127`, `palette[i|0x80]` is
- * darker in 98 cases; for terrain and object colours the factor is about 0.49). That is why the
- * earlier imitation "50 % alpha over black" *looks* similar — it was the wrong mechanism all the same
- * and produced colours that are **not in the palette** (measured against a capture: of all
- * non-palette pixels in our image 100 % were deviations, while not a single original pixel lay
- * outside the palette).
+ * darker in 98 cases; for terrain and object colours the factor is about 0.49). That is why an
+ * imitation as "50 % alpha over black" *looks* similar — it is the wrong mechanism all the same and
+ * produces colours that are **not in the palette** (measured against a capture: of all non-palette
+ * pixels 100 % are deviations, while not a single original pixel lies outside the palette).
  *
  * A reverse lookup RGB->index as a shortcut is ruled out: the palette has 233 colours on 256 indices,
  * and **8 colours are ambiguous when darkened** — among them black, white and four greys occurring in
@@ -80,7 +79,7 @@ export function fillIndexSurface(surface: IndexSurface, index = 0): void {
  * blitter writes **directly in screen resolution** and samples the sprite in fixed-point steps.
  *
  * Two things matter about it:
- * - **At `scale === 1` the previous path runs byte for byte unchanged.** All pixel-exact guards
+ * - **At `scale === 1` the result is byte for byte the unscaled blit.** All pixel-exact guards
  *   measure exactly there.
  * - **Only SPRITES are shrunk this way, not the ground.** Ground triangles tile (their masks overlap
  *   at dithered edges), and independently rounded target rectangles tore gaps there. The ground is

@@ -56,8 +56,8 @@ describe('Logging (17)', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[3]).toBe(1); // neg_dist2 (Frame) hoch
-    expect(state.mapTiles[pos].object).toBe(0x5d); // 0x5c + Frame 1 (FelledPine)
+    expect(serf.stateData[3]).toBe(1); // neg_dist2 (frame) goes up
+    expect(state.mapTiles[pos].object).toBe(0x5d); // 0x5c + frame 1 (FelledPine)
     expect(serf.animation).toBe(0x75);
   });
 
@@ -85,20 +85,20 @@ describe('Logging (17)', () => {
 });
 
 describe('Planting (20)', () => {
-  it('leeres wegfreies Feld → Setzling gepflanzt (1. Tick), dann FreeWalking (2. Tick)', () => {
+  it('empty road-free tile → sapling planted (1st tick), then FreeWalking (2nd tick)', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     const serf = mkSerf({ index: 1, state: 20, stateData: [0, 0, 0, 0, 0] });
     state.serfs[1] = serf;
 
-    dispatchSerf(state, serf); // pflanzt + Toggle neg_dist2 → 0xff, Counter-Carry → return
-    expect(state.mapTiles[pos].object).toBeGreaterThanOrEqual(0x67); // NewPine/NewTree gepflanzt
+    dispatchSerf(state, serf); // plants + toggles neg_dist2 → 0xff, counter carry → return
+    expect(state.mapTiles[pos].object).toBeGreaterThanOrEqual(0x67); // NewPine/NewTree planted
     expect(state.mapTiles[pos].object).toBeLessThanOrEqual(0x68);
-    expect(serf.stateData[3]).toBe(0xff); // neg_dist2 getoggelt
+    expect(serf.stateData[3]).toBe(0xff); // neg_dist2 toggled
 
     serf.counter = 0;
-    serf.tick = state.gameTick - 1; // Prolog: delta 1 > 0 → abgelaufen
-    dispatchSerf(state, serf); // neg_dist2 != 0 → fertig
+    serf.tick = state.gameTick - 1; // prologue: delta 1 > 0 → expired
+    dispatchSerf(state, serf); // neg_dist2 != 0 → done
     expect(serf.state).toBe(16); // FreeWalking
     expect(serf.stateData[2]).toBe(0x80);
   });
@@ -130,21 +130,21 @@ describe('Farming (34)', () => {
     expect(serf.stateData[2]).toBe(0x80);
   });
 
-  it('Ernten (neg_dist1≠0): Feld-Objekt reift weiter, neg_dist2=1 (Ware), FreeWalking', () => {
+  it('harvesting (neg_dist1≠0): the field object ripens further, neg_dist2=1 (resource), FreeWalking', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
-    state.mapTiles[pos] = tile({ object: 0x6a }); // reifendes Feld
+    state.mapTiles[pos] = tile({ object: 0x6a }); // ripening field
     const serf = mkSerf({ index: 1, state: 34, stateData: [0, 0, 1, 0, 0] }); // neg_dist1=1
     state.serfs[1] = serf;
 
     dispatchSerf(state, serf);
 
     expect(state.mapTiles[pos].object).toBe(0x6b); // +1
-    expect(serf.stateData[3]).toBe(1); // neg_dist2 = 1 (getragene Ware)
+    expect(serf.stateData[3]).toBe(1); // neg_dist2 = 1 (carried resource)
     expect(serf.state).toBe(16);
   });
 
-  it('Ernten Reife-Wrap: 0x6e → 0x79 (b=0x6f → 0x79)', () => {
+  it('harvest ripeness wrap: 0x6e → 0x79 (b=0x6f → 0x79)', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ object: 0x6e });
@@ -153,10 +153,10 @@ describe('Farming (34)', () => {
 
     dispatchSerf(state, serf);
 
-    expect(state.mapTiles[pos].object).toBe(0x79); // 0x6e+1=0x6f → Sonderfall → 0x79
+    expect(state.mapTiles[pos].object).toBe(0x79); // 0x6e+1=0x6f → special case → 0x79
   });
 
-  it('Ernten Reife-Wrap: 0x6f → 0x6f (b=0x70 → 0x6f, Feld abgeerntet)', () => {
+  it('harvest ripeness wrap: 0x6f → 0x6f (b=0x70 → 0x6f, field harvested)', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ object: 0x6f });
@@ -165,7 +165,7 @@ describe('Farming (34)', () => {
 
     dispatchSerf(state, serf);
 
-    expect(state.mapTiles[pos].object).toBe(0x6f); // 0x6f+1=0x70 → Sonderfall → 0x6f
+    expect(state.mapTiles[pos].object).toBe(0x6f); // 0x6f+1=0x70 → special case → 0x6f
   });
 });
 
@@ -196,7 +196,7 @@ describe('Fishing (32)', () => {
     // A catch happens when rng & 0x3f < 12+4.
     const rng = new Rng([1, 2, 3]);
     rng.next(); // fishing draws exactly one random number on the cast
-    // Deterministisch: Fisch gefangen ⇒ Vorrat 11, neg_dist2=1.
+    // Deterministic: fish caught ⇒ stock 11, neg_dist2=1.
     expect(state.mapTiles[leftTile].resourceAmount).toBe(11);
     expect(serf.stateData[3]).toBe(1);
   });
@@ -205,17 +205,17 @@ describe('Fishing (32)', () => {
 describe('StoneCutting (23)', () => {
   it('approach: counter above the threshold -> wait (neg_dist1 stays 0)', () => {
     const state = makeState();
-    // neg_dist2=5, flags=0 → Schwelle 5; counter nach Prolog = 9 ≥ 5 → warten.
+    // neg_dist2=5, flags=0 → threshold 5; counter after the prologue = 9 ≥ 5 → wait.
     const serf = mkSerf({ index: 1, state: 23, tick: 999, counter: 10, stateData: [0, 0, 0, 5, 0] });
     state.serfs[1] = serf;
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[2]).toBe(0); // neg_dist1 bleibt 0 (wartet)
+    expect(serf.stateData[2]).toBe(0); // neg_dist1 stays 0 (waiting)
     expect(serf.state).toBe(23);
   });
 
-  it('Anmarsch fertig: Counter unter Schwelle → Schneiden beginnt (neg_dist1=1, Anim 0x7b)', () => {
+  it('approach done: counter below the threshold → cutting starts (neg_dist1=1, anim 0x7b)', () => {
     const state = makeState();
     const serf = mkSerf({ index: 1, state: 23, tick: 999, counter: 3, stateData: [0, 0, 0, 5, 0] });
     state.serfs[1] = serf;
@@ -226,7 +226,7 @@ describe('StoneCutting (23)', () => {
     expect(serf.animation).toBe(0x7b);
   });
 
-  it('Abbau: Stein-Objekt dekrementiert + Serf einen Schritt DownRight', () => {
+  it('cutting: the stone object is decremented and the serf takes one step DownRight', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ object: 72 }); // Stone0
@@ -235,13 +235,13 @@ describe('StoneCutting (23)', () => {
 
     dispatchSerf(state, serf);
 
-    expect(state.mapTiles[pos].object).toBe(73); // Stone0 → Stone1 (weniger Stein)
+    expect(state.mapTiles[pos].object).toBe(73); // Stone0 → Stone1 (less stone)
     const dr = neighbor(pos, Direction.DownRight, geo);
-    expect(state.mapTiles[dr].serfIndex).toBe(1); // Serf nach DownRight gesetzt
+    expect(state.mapTiles[dr].serfIndex).toBe(1); // serf moved DownRight
     expect(serf.stateData[2]).toBe(2); // neg_dist1 = 2
   });
 
-  it('Abbau letzter Stein (0x4f) → Objekt entfernt', () => {
+  it('cutting the last stone (0x4f) → the object is removed', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ object: 0x4f }); // Stone7
@@ -250,7 +250,7 @@ describe('StoneCutting (23)', () => {
 
     dispatchSerf(state, serf);
 
-    expect(state.mapTiles[pos].object).toBe(0); // entfernt
+    expect(state.mapTiles[pos].object).toBe(0); // removed
   });
 });
 
@@ -279,7 +279,7 @@ describe('drop_resource (handing goods to the flag on the way back)', () => {
     expect(serf.state).toBe(6); // ReadyToEnter
   });
 
-  it('Steinmetz→Stone(9), Fischer→Fish(0), Bauer→Wheat(3)', () => {
+  it('stonecutter→Stone(9), fisher→Fish(0), farmer→Wheat(3)', () => {
     for (const [type, res] of [[7, 9], [11, 0], [14, 3]] as const) {
       const { state, serf } = returner(type);
       dispatchSerf(state, serf);
@@ -292,7 +292,7 @@ describe('drop_resource (handing goods to the flag on the way back)', () => {
     const { state, serf } = returner(5);
     serf.stateData[3] = 0; // neg_dist2 = 0
     dispatchSerf(state, serf);
-    expect(state.flags[1]!.resourceSlots[0]).toBe(-1); // nichts abgelegt
+    expect(state.flags[1]!.resourceSlots[0]).toBe(-1); // nothing dropped
     expect(state.players[0]!.resourceCount[6]).toBe(0);
     expect(serf.state).toBe(6);
   });
@@ -308,26 +308,26 @@ describe('drop_resource (handing goods to the flag on the way back)', () => {
     const { state, serf } = returner(5);
     state.flags[1]!.resourceSlots = [0, 1, 2, 3, 4, 5, 7, 8]; // all taken (no -1)
     dispatchSerf(state, serf);
-    expect(state.players[0]!.resourceCount[6]).toBe(0); // nichts gutgeschrieben
+    expect(state.players[0]!.resourceCount[6]).toBe(0); // nothing credited
     expect(serf.state).toBe(6);
   });
 });
 
-describe('Planning-Suchen (RNG-Spiral)', () => {
-  it('PlanningLogging (18): Baum am Spiral-Ziel → ReadyToLeave/LeavingBuilding', () => {
+describe('planning searches (RNG spiral)', () => {
+  it('PlanningLogging (18): tree at the spiral target → ReadyToLeave/LeavingBuilding', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 }); // building at that spot
-    state.mapTiles[neighbor(pos, Direction.DownRight, geo)] = tile({ objIndex: 1 }); // Flagge frei
-    // Ersten RNG-Wurf vorhersehen → Baum an spiralPos(pos, dist) platzieren.
+    state.mapTiles[neighbor(pos, Direction.DownRight, geo)] = tile({ objIndex: 1 }); // flag tile free
+    // Predict the first RNG draw → place a tree at spiralPos(pos, dist).
     const dist = ((new Rng([1, 2, 3]).next() >> 2) & 0x7f) + 1;
-    state.mapTiles[spiralPos(pos, dist, geo)] = tile({ object: 10 }); // Baum (8..23)
+    state.mapTiles[spiralPos(pos, dist, geo)] = tile({ object: 10 }); // tree (8..23)
     const serf = mkSerf({ index: 1, state: 18, tick: 999, counter: 0, type: 5 });
     state.serfs[1] = serf;
 
     dispatchSerf(state, serf);
 
-    // gefunden → Austritt eingeleitet (ReadyToLeave 7 blockiert, oder LeavingBuilding 5).
+    // found → exit initiated (ReadyToLeave 7 when blocked, or LeavingBuilding 5).
     expect([5, 7]).toContain(serf.state);
     expect(serf.stateData[4]).toBeDefined();
   });
@@ -339,14 +339,14 @@ describe('Planning-Suchen (RNG-Spiral)', () => {
     state.mapTiles[neighbor(pos, Direction.DownRight, geo)] = tile({ objIndex: 1 });
     const dist = ((new Rng([1, 2, 3]).next() >> 2) & 0x7f) + 1;
     const dp = spiralPos(pos, dist, geo);
-    state.mapTiles[dp] = tile({ object: 0 }); // Ziel begehbar
-    state.mapTiles[neighbor(dp, Direction.UpLeft, geo)] = tile({ object: 72 }); // Stein
+    state.mapTiles[dp] = tile({ object: 0 }); // target walkable
+    state.mapTiles[neighbor(dp, Direction.UpLeft, geo)] = tile({ object: 72 }); // stone
     const serf = mkSerf({ index: 1, state: 21, tick: 999, counter: 0, type: 7 });
     state.serfs[1] = serf;
 
     dispatchSerf(state, serf);
 
     expect([5, 7]).toContain(serf.state);
-    expect(serf.stateData[4]).toBe(0x16); // next_state = 22 (nur bei state 7 sichtbar)
+    expect(serf.stateData[4]).toBe(0x16); // next_state = 22 (only visible in state 7)
   });
 });

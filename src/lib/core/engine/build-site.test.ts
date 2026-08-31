@@ -31,7 +31,7 @@ import type { GameState, Building, Flag, Player, Tile } from './state.js';
 
 /**
  * Synthetic 64x64 map: all grass-5 (buildable), height 10, owner = player 0 (tile owner 1). With no
- * further ingredients the classification yields "free tile, large building possible" — each test then
+ * further ingredients the classification yields "free tile, large building possible" - each test then
  * changes exactly **one** property and checks the rule that depends on it.
  */
 const geo = mapGeometry(3);
@@ -93,17 +93,17 @@ function at(st: GameState, col: number, row: number): Tile {
 describe('binary tables', () => {
   it('OBJECT_CLASS maps the occupied object values onto the expected classes', () => {
     expect(OBJECT_CLASS).toHaveLength(128);
-    expect(OBJECT_CLASS[0]).toBe(0); // frei
-    expect(OBJECT_CLASS[1]).toBe(3); // Flagge
+    expect(OBJECT_CLASS[0]).toBe(0); // free
+    expect(OBJECT_CLASS[1]).toBe(3); // flag
     expect(OBJECT_CLASS[2]).toBe(4); // small building
     expect(OBJECT_CLASS[3]).toBe(5); // large building
-    expect(OBJECT_CLASS[4]).toBe(6); // Schloss
+    expect(OBJECT_CLASS[4]).toBe(6); // castle
     for (let obj = 8; obj <= 27; obj++) expect(OBJECT_CLASS[obj]).toBe(1); // trees
-    for (let obj = 72; obj <= 79; obj++) expect(OBJECT_CLASS[obj]).toBe(2); // Stein-Haufen-Stufen
-    expect(OBJECT_CLASS[127]).toBe(255); // Endmarke
+    for (let obj = 72; obj <= 79; obj++) expect(OBJECT_CLASS[obj]).toBe(2); // stone heap stages
+    expect(OBJECT_CLASS[127]).toBe(255); // end marker
   });
 
-  it('CONSTRUCTION_COST deckt alle 25 Typen ab (Fortress 5/5, Hut 1/1, Schloss 0/0)', () => {
+  it('CONSTRUCTION_COST covers all 25 types (fortress 5/5, hut 1/1, castle 0/0)', () => {
     expect(CONSTRUCTION_COST).toHaveLength(25);
     expect(CONSTRUCTION_COST[11]).toEqual([1, 1]); // Hut
     expect(CONSTRUCTION_COST[22]).toEqual([5, 5]); // Fortress
@@ -111,7 +111,7 @@ describe('binary tables', () => {
   });
 });
 
-describe('persistBuildSiteBits — the two `player+3` bits the classifier writes', () => {
+describe('persistBuildSiteBits - the two `player+3` bits the classifier writes', () => {
   it('sets and clears both bits (@0x3207d/@0x32528, @0x32938/@0x32958)', () => {
     const p = player({ build: 0 });
     persistBuildSiteBits(p, { flagBlocked: true, militaryBlocked: true } as never);
@@ -139,7 +139,7 @@ describe('persistBuildSiteBits — the two `player+3` bits the classifier writes
   });
 });
 
-describe('classifyBuildSite — Cursor-Art', () => {
+describe('classifyBuildSite: cursor kind', () => {
   it('free grass tile in own territory: clear + large building', () => {
     const st = state();
     const site = classifyBuildSite(st, st.players[0]!, 10, 10);
@@ -156,7 +156,7 @@ describe('classifyBuildSite — Cursor-Art', () => {
       cursorType: CURSOR_NONE,
       possibility: BUILD_NONE,
     });
-    at(st, 10, 10).owner = 0; // niemandem
+    at(st, 10, 10).owner = 0; // nobody
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).cursorType).toBe(CURSOR_NONE);
   });
 
@@ -171,7 +171,7 @@ describe('classifyBuildSite — Cursor-Art', () => {
     expect(site.levelingHeight).toBe(10);
   });
 
-  it('road on the tile: path — only a flag can be built', () => {
+  it('road on the tile: path - only a flag can be built', () => {
     const st = state();
     at(st, 10, 10).paths = 0x01 | 0x08; // Right + Left
     const site = classifyBuildSite(st, st.players[0]!, 10, 10);
@@ -193,7 +193,7 @@ describe('classifyBuildSite — Cursor-Art', () => {
   it('flag on the DownRight tile: ClearByFlag; road there: ClearByPath', () => {
     const st = state();
     const dr = neighbor(posOf(10, 10, geo), Direction.DownRight, geo);
-    st.mapTiles[dr].object = 1; // Flagge
+    st.mapTiles[dr].object = 1; // flag
     st.mapTiles[dr].objIndex = 1;
     st.flags[1] = { index: 1, paths: [false, false, false, false, false, false] } as unknown as Flag;
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).cursorType).toBe(CURSOR_CLEAR_BY_FLAG);
@@ -214,12 +214,12 @@ describe('classifyBuildSite — Cursor-Art', () => {
     st.buildings[1]!.burning = true;
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).cursorType).toBe(CURSOR_NONE);
 
-    t.object = 4; // Schloss
+    t.object = 4; // castle
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).cursorType).toBe(CURSOR_NONE);
   });
 });
 
-describe('classifyBuildSite — Flaggen-Zweig (entfernbar?)', () => {
+describe('classifyBuildSite: flag branch (removable?)', () => {
   function withFlag(paths: boolean[], endpointDirs: boolean[], connections: unknown[]): GameState {
     const st = state();
     const t = at(st, 10, 10);
@@ -237,7 +237,7 @@ describe('classifyBuildSite — Flaggen-Zweig (entfernbar?)', () => {
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).cursorType).toBe(CURSOR_REMOVABLE_FLAG);
   });
 
-  it('genau zwei Wege zu verschiedenen Endpunkten: entfernbar (Wege werden zusammengelegt)', () => {
+  it('exactly two roads to different endpoints: removable (the roads are merged)', () => {
     const st = withFlag(
       [true, false, false, true, false, false],
       [true, false, false, true, false, false],
@@ -283,10 +283,10 @@ describe('classifyBuildSite — Flaggen-Zweig (entfernbar?)', () => {
   });
 });
 
-describe('classifyBuildSite — build possibility', () => {
+describe('classifyBuildSite: build possibility', () => {
   it('pure mountain around the map point: mine', () => {
     const st = state();
-    // Die sechs Dreiecke um (10,10): Zentrum (up+down), Left(down), UpLeft(up+down), Up(up).
+    // The six triangles around (10,10): centre (up+down), Left(down), UpLeft(up+down), Up(up).
     for (const [c, r] of [[10, 10], [9, 10], [9, 9], [10, 9]] as [number, number][]) {
       at(st, c, r).terrainUp = 12;
       at(st, c, r).terrainDown = 12;
@@ -298,9 +298,9 @@ describe('classifyBuildSite — build possibility', () => {
 
   it('one water triangle at the map point: no building, but the flag stays possible', () => {
     const st = state();
-    at(st, 10, 10).terrainUp = 0; // Wasser
+    at(st, 10, 10).terrainUp = 0; // water
     // Order of the original: the flag possibility is settled before the terrain class of the six
-    // triangles is checked — a water triangle only stops the building.
+    // triangles is checked - a water triangle only stops the building.
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).possibility).toBe(BUILD_FLAG);
   });
 
@@ -319,7 +319,7 @@ describe('classifyBuildSite — build possibility', () => {
   it('a neighbouring flag prevents flag building (flagBlocked), a building stays possible', () => {
     const st = state();
     const rp = neighbor(posOf(10, 10, geo), Direction.Right, geo);
-    st.mapTiles[rp].object = 1; // Flagge rechts daneben
+    st.mapTiles[rp].object = 1; // flag on the tile to the right
     st.mapTiles[rp].objIndex = 1;
     st.flags[1] = { index: 1, paths: [false, false, false, false, false, false] } as unknown as Flag;
     const site = classifyBuildSite(st, st.players[0]!, 10, 10);
@@ -341,13 +341,13 @@ describe('classifyBuildSite — build possibility', () => {
   it('stone obstacle next to the tile: only a small building', () => {
     const st = state();
     const up = neighbor(posOf(10, 10, geo), Direction.Up, geo);
-    st.mapTiles[up].object = 72; // Stein-Haufen (Klasse 2)
+    st.mapTiles[up].object = 72; // stone heap (class 2)
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).possibility).toBe(BUILD_SMALL);
   });
 
   it('not pure grass-5 (a different grass variant): only a small building', () => {
     const st = state();
-    at(st, 10, 10).terrainUp = 6; // grass variant 6 — buildable, but not large
+    at(st, 10, 10).terrainUp = 6; // grass variant 6 - buildable, but not large
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).possibility).toBe(BUILD_SMALL);
   });
 
@@ -373,10 +373,10 @@ describe('classifyBuildSite — build possibility', () => {
 
   it('a military building in spiral ring 2 sets militaryBlocked', () => {
     const st = state();
-    const ring2 = posOf(12, 11, geo); // Spiral-Index 8
+    const ring2 = posOf(12, 11, geo); // spiral index 8
     st.mapTiles[ring2].object = 2;
     st.mapTiles[ring2].objIndex = 1;
-    st.buildings[1] = { index: 1, type: 11, owner: 0, burning: false } as unknown as Building; // Hut
+    st.buildings[1] = { index: 1, type: 11, owner: 0, burning: false } as unknown as Building; // hut
     expect(classifyBuildSite(st, st.players[0]!, 10, 10).militaryBlocked).toBe(true);
 
     st.buildings[1]!.type = 2; // lumberjack -> no block
@@ -402,17 +402,17 @@ describe('placeBuilding', () => {
     expect(t.object).toBe(2); // SmallBuilding
     expect(t.objIndex).toBe(bld!.index);
     expect(t.blocked).toBe(true);
-    expect(t.paths & 0x02).toBe(0x02); // Weg nach DownRight
+    expect(t.paths & 0x02).toBe(0x02); // road towards DownRight
 
     const ft = at(st, 11, 11);
-    expect(ft.object).toBe(1); // Flagge
+    expect(ft.object).toBe(1); // flag
     expect(ft.objIndex).toBe(bld!.flag);
-    expect(ft.paths & 0x10).toBe(0x10); // Weg nach UpLeft
+    expect(ft.paths & 0x10).toBe(0x10); // road towards UpLeft
 
     const flag = st.flags[bld!.flag]!;
     expect(flag.hasBuilding).toBe(true);
     expect(flag.connections[Direction.UpLeft]).toEqual({ kind: 'building', index: bld!.index });
-    expect(p.incompleteBuildingCount[1]).toBe(1); // Index = Typ−1
+    expect(p.incompleteBuildingCount[1]).toBe(1); // index = type - 1
   });
 
   it('large building: object value 3, progress 0 and levelling height in the record', () => {
@@ -452,7 +452,7 @@ describe('placeBuilding', () => {
       at(st, c, r).terrainDown = 12;
     }
     expect(canPlaceBuilding(st, st.players[0]!, 10, 10, 2)).toBe(false); // lumberjack
-    expect(canPlaceBuilding(st, st.players[0]!, 10, 10, 6)).toBe(true); // Kohlenmine
+    expect(canPlaceBuilding(st, st.players[0]!, 10, 10, 6)).toBe(true); // coal mine
     const mine = placeBuilding(st, st.players[0]!, 10, 10, 6);
     expect(mine!.progress).toBe(1);
     expect(at(st, 10, 10).object).toBe(2); // a mine counts as a small building
@@ -470,7 +470,7 @@ describe('placeBuilding', () => {
     const st = state();
     mountainAt10(st);
     const t = at(st, 10, 10);
-    t.mineral = 3; // Kohle
+    t.mineral = 3; // coal
     t.resourceAmount = 7;
     placeBuilding(st, st.players[0]!, 10, 10, 6);
     expect(t.mineral).toBe(0);
@@ -535,10 +535,10 @@ describe('placeBuilding', () => {
     expect(canPlaceBuilding(st, st.players[0]!, 10, 10, 2)).toBe(true); // Lumberjack
   });
 
-  it('Lagerhaus-Limit greift', () => {
+  it('the warehouse limit applies', () => {
     const st = state();
     const p = st.players[0]!;
-    p.completedBuildingCount[9] = 300; // Typ 10 → Index 9
+    p.completedBuildingCount[9] = 300; // type 10 -> index 9
     p.incompleteBuildingCount[9] = 60;
     st.header.warehouseLimit = 361; // 300 + 60 + 1
     expect(placeBuilding(st, p, 10, 10, 10)).toBeNull();
@@ -553,21 +553,21 @@ describe('placeBuilding', () => {
     expect(p.messageBuildingSlots[0]).toBe(bld.index);
 
     const st2 = state();
-    const p2 = player({ messageFlags: 1 }); // Bit 0 = Hinweise abgeschaltet
+    const p2 = player({ messageFlags: 1 }); // bit 0 = hints switched off
     st2.players[0] = p2;
     const bld2 = placeBuilding(st2, p2, 10, 10, 2)!;
     expect(bld2).not.toBeNull();
     expect(p2.messageBuildingSlots[0]).toBe(0);
   });
 
-  it('lehnt unbaubare Kacheln ab (fremdes Land, besetzte Kachel, falscher Typ)', () => {
+  it('rejects unbuildable tiles (foreign land, occupied tile, wrong type)', () => {
     const st = state();
     const p = st.players[0]!;
     at(st, 20, 20).owner = 2;
     expect(placeBuilding(st, p, 20, 20, 2)).toBeNull();
     placeBuilding(st, p, 10, 10, 2);
     expect(placeBuilding(st, p, 10, 10, 2)).toBeNull(); // already built on
-    expect(placeBuilding(st, p, 30, 30, 0)).toBeNull(); // Typ 0
+    expect(placeBuilding(st, p, 30, 30, 0)).toBeNull(); // type 0
     expect(placeBuilding(st, p, 30, 30, 99)).toBeNull(); // type out of range
   });
 });
@@ -591,13 +591,13 @@ describe('buildFlag (action_build_flag @0x2891e → build_flag @0x2899f)', () =>
     const st = state();
     const p = st.players[0]!;
     const t = at(st, 12, 12);
-    t.object = 74; // Stein-Haufen
-    t.mineral = 3; // Kohle
+    t.object = 74; // stone heap
+    t.mineral = 3; // coal
     t.resourceAmount = 5;
-    // No flag is possible on an occupied tile (possibility 0) — and the abort happens
+    // No flag is possible on an occupied tile (possibility 0) - and the abort happens
     // BEFORE any mutation, so the object stays.
     expect(buildFlag(st, p, 12, 12)).toBeNull();
-    expect(t.object).toBe(74); // unangetastet: Abbruch VOR jeder Mutation
+    expect(t.object).toBe(74); // untouched: the abort happens BEFORE any mutation
 
     // On a free tile with a mineral deposit the stock is pushed away.
     const free = at(st, 20, 20);
@@ -617,11 +617,11 @@ describe('buildFlag (action_build_flag @0x2891e → build_flag @0x2899f)', () =>
     expect(canBuildFlag(st, p, 30, 30)).toBe(false);
     expect(buildFlag(st, p, 30, 30)).toBeNull();
 
-    // freie Kachel (Art 7)
+    // free tile (kind 7)
     expect(classifyBuildSite(st, p, 10, 10).cursorType).toBe(CURSOR_CLEAR);
     expect(canBuildFlag(st, p, 10, 10)).toBe(true);
 
-    // Tile WITH a road (kind 4): allowed — building splits the road (`splitRoadAtFlag`).
+    // Tile WITH a road (kind 4): allowed - building splits the road (`splitRoadAtFlag`).
     // Only the gate and the flag itself here; the road stub (one bit) makes the split a no-op.
     const road = at(st, 40, 40);
     road.paths = 0x01;
@@ -634,7 +634,7 @@ describe('buildFlag (action_build_flag @0x2891e → build_flag @0x2899f)', () =>
   });
 });
 
-describe('buildMenuClickOutcome — the four exits of the placement bodies', () => {
+describe('buildMenuClickOutcome: the four exits of the placement bodies', () => {
   /** Put a finished own building on the tile (cursor kind 3). */
   function putBuilding(st: GameState, col: number, row: number, type: number, object = 2): void {
     const t = at(st, col, row);
@@ -652,13 +652,13 @@ describe('buildMenuClickOutcome — the four exits of the placement bodies', () 
     expect(classifyBuildSite(st, p, 10, 10).possibility).toBe(BUILD_LARGE);
     expect(buildMenuClickOutcome(st, p, 10, 10, 12, false)).toBe('place'); // farm (large)
     expect(buildMenuClickOutcome(st, p, 10, 10, 2, false)).toBe('place'); // lumberjack (small)
-    expect(buildMenuClickOutcome(st, p, 10, 10, 5, false)).toBe('reject'); // Steinmine: braucht Gebirge
+    expect(buildMenuClickOutcome(st, p, 10, 10, 5, false)).toBe('reject'); // stone mine: needs mountains
   });
 
   it('military building blocked => blocked, and SILENTLY (sound null)', () => {
     const st = state();
     const p = st.players[0]!;
-    p.build |= 1; // `player+3` bit 0 — the classifier leaves it alone if ring 2 is never checked
+    p.build |= 1; // `player+3` bit 0 - the classifier leaves it alone if ring 2 is never checked
     // A military building in ring 2 sets it in the original; set directly here plus a ring-2 building,
     // so the classification does not return earlier.
     const st2 = state();
@@ -668,7 +668,7 @@ describe('buildMenuClickOutcome — the four exits of the placement bodies', () 
     st2.mapTiles[ring2].objIndex = 1;
     st2.buildings[1] = { index: 1, type: 11, owner: 0 } as unknown as Building; // guard hut
     expect(classifyBuildSite(st2, p2, 10, 10).militaryBlocked).toBe(true);
-    expect(buildMenuClickOutcome(st2, p2, 10, 10, 21, false)).toBe('blocked'); // Turm
+    expect(buildMenuClickOutcome(st2, p2, 10, 10, 21, false)).toBe('blocked'); // tower
     expect(buildMenuOutcomeSound('blocked')).toBeNull();
     // A NON-military type passes the same block (the gate sits in two icon stubs only).
     expect(buildMenuClickOutcome(st2, p2, 10, 10, 12, false)).not.toBe('blocked');
@@ -684,22 +684,22 @@ describe('buildMenuClickOutcome — the four exits of the placement bodies', () 
     expect(buildMenuClickOutcome(st, p, 10, 10, 12, false)).toBe('keep');
     expect(buildMenuOutcomeSound('keep')).toBeNull();
     expect(buildMenuClickOutcome(st, p, 10, 10, 12, true)).toBe('demolish');
-    // Wrong class: a mine demands `possibility == 2` — 4 here => rejected, even on a special click.
+    // Wrong class: a mine demands `possibility == 2` - 4 here => rejected, even on a special click.
     expect(buildMenuClickOutcome(st, p, 10, 10, 5, true)).toBe('reject');
   });
 
   it('large: the build branch demands EXACTLY 4, the building branch only at least 4', () => {
     // `possibility == 5` (BUILD_CASTLE) is only set by the classifier while the player has NO castle
-    // — that is where the two comparisons of the original part ways (`jne` @0x30365 against
+    // - that is where the two comparisons of the original part ways (`jne` @0x30365 against
     // `jb` @0x302f8).
     const st = state();
     const p = st.players[0]!;
     p.flags = 0; // no castle => BUILD_CASTLE ...
     // ... and then the classifier demands **unowned** land (`wantOwner = 0`, @0x32075): before
-    // Before founding no tile belongs to anyone.
+    // founding no tile belongs to anyone.
     for (const t of st.mapTiles) t.owner = 0;
     expect(classifyBuildSite(st, p, 10, 10).possibility).toBe(BUILD_CASTLE);
-    expect(buildMenuClickOutcome(st, p, 10, 10, 12, false)).toBe('reject'); // Bau-Zweig: 5 != 4
+    expect(buildMenuClickOutcome(st, p, 10, 10, 12, false)).toBe('reject'); // build branch: 5 != 4
     putBuilding(st, 10, 10, 12, 3);
     expect(classifyBuildSite(st, p, 10, 10).possibility).toBe(BUILD_CASTLE);
     expect(buildMenuClickOutcome(st, p, 10, 10, 12, true)).toBe('demolish'); // building branch: 5 >= 4
@@ -714,7 +714,7 @@ describe('buildMenuClickOutcome — the four exits of the placement bodies', () 
   });
 });
 
-describe('demolishForPendingBuild (Zweig @0x30161 + FUN_00031d5c)', () => {
+describe('demolishForPendingBuild (branch @0x30161 + FUN_00031d5c)', () => {
   it('burns the building down, stamps the type and restores the two road bits', () => {
     const st = state();
     const t = at(st, 10, 10);

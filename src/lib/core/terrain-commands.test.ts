@@ -65,7 +65,7 @@ describe('buildTerrainCommands — geometry == verified terrainTriangle', () => 
     groundSprite: number;
   }): string => `${c.kind}|${c.x}|${c.y}|${c.maskIndex}|${c.groundSprite}`;
 
-  /** Die Erwartung in Halbzeilen-Reihenfolge — daraus fallen beide Tests unten ab. */
+  /** The expectation in half-row order — both tests below fall out of it. */
   const expected = (): string[] => {
     const out: string[] = [];
     for (const row of rows) {

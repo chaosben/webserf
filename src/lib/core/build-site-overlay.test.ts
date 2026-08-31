@@ -12,9 +12,9 @@ const site = (cursorType: number, possibility: number): BuildSite =>
   ({ cursorType, possibility, levelingHeight: 0 }) as BuildSite;
 
 describe('buildSiteMarkerSprite (FUN_0003789d)', () => {
-  it('Cursor-Art 0..3 zeigt nichts an', () => {
-    for (let art = 0; art <= 3; art++) {
-      for (let m = 0; m <= 5; m++) expect(buildSiteMarkerSprite(site(art, m))).toBe(0);
+  it('cursor types 0..3 show nothing', () => {
+    for (let type = 0; type <= 3; type++) {
+      for (let m = 0; m <= 5; m++) expect(buildSiteMarkerSprite(site(type, m))).toBe(0);
     }
   });
 
@@ -24,14 +24,14 @@ describe('buildSiteMarkerSprite (FUN_0003789d)', () => {
   });
 
   it('types 5..7: possibility + 0x2e, with the clamp 5 -> 4', () => {
-    for (const art of [5, 6, 7]) {
-      expect(buildSiteMarkerSprite(site(art, 0))).toBe(0);
+    for (const type of [5, 6, 7]) {
+      expect(buildSiteMarkerSprite(site(type, 0))).toBe(0);
       for (let m = 1; m <= 4; m++) {
-        expect(buildSiteMarkerSprite(site(art, m))).toBe(m + CURSOR_MARKER_BUILD_BASE);
+        expect(buildSiteMarkerSprite(site(type, m))).toBe(m + CURSOR_MARKER_BUILD_BASE);
       }
       // Possibility 5 (castle) would fall onto the road symbol, so it is clamped to the castle.
-      expect(buildSiteMarkerSprite(site(art, 5))).toBe(4 + CURSOR_MARKER_BUILD_BASE);
-      expect(buildSiteMarkerSprite(site(art, 5))).not.toBe(CURSOR_MARKER_ROAD_NEW);
+      expect(buildSiteMarkerSprite(site(type, 5))).toBe(4 + CURSOR_MARKER_BUILD_BASE);
+      expect(buildSiteMarkerSprite(site(type, 5))).not.toBe(CURSOR_MARKER_ROAD_NEW);
     }
   });
 

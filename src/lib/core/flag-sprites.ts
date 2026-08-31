@@ -51,14 +51,14 @@ export function flagShadowOffset(frame: number): number {
 
 /**
  * Archive index of a GameObject sprite in the original `draw_game_sprite(i)` space. There index
- * `i` draws sprite `AssetGameObject[i-1]`; here that is `GAME_OBJECT_BASE + i - 1`. The carried
- * Waren, Rauch/Dampf, Baumaterialien, Besatzungsfahnen usw. liegen alle in diesem Raum.
+ * `i` draws sprite `AssetGameObject[i-1]`; here that is `GAME_OBJECT_BASE + i - 1`. Carried
+ * resources, smoke/steam, building materials, garrison flags and so on all live in this space.
  */
 export function gameSprite(index: number): number {
   return GAME_OBJECT_BASE + index - 1;
 }
 
-/** Archiv-Index eines getragenen Waren-Sprites (Ressourcentyp 0..25) — Spezialfall `gameSprite(1+res)`. */
+/** Archive index of a carried resource sprite (resource type 0..25) — special case of `gameSprite(1+res)`. */
 export function resourceSprite(resType: number): number {
   return gameSprite(1 + resType);
 }

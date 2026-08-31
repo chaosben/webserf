@@ -80,7 +80,7 @@ describe('road-split — FUN_0004d9ed', () => {
     splitRoadAtFlag(st, 13, 10);
     const n = st.flags[N]!, a = st.flags[A]!, b = st.flags[B]!;
 
-    // Neue Flagge: Weg nach links zu A, nach rechts zu B.
+    // New flag: road to the left towards A, to the right towards B.
     expect(n.paths[Direction.Left]).toBe(true);
     expect(n.paths[Direction.Right]).toBe(true);
     expect(n.connections[Direction.Left]).toEqual({ kind: 'flag', index: A });

@@ -37,7 +37,7 @@ function makeWorld(over: {
   const level = over.level ?? 7;
   const bld = {
     index: 1,
-    type: over.type ?? 6, // Kohlebergwerk (klein)
+    type: over.type ?? 6, // coal mine (small)
     flag: 1,
     owner: 0,
     col: 10,
@@ -88,7 +88,7 @@ function makeWorld(over: {
     length: new Array(6).fill(0),
     scheduled: new Array(6).fill(false),
     scheduledSlot: new Array(6).fill(0),
-    endpointDirs: [true, false, false, false, false, false], // Landweg nach Right
+    endpointDirs: [true, false, false, false, false, false], // land road towards Right
     bldFlags: 0,
     connections: [conn('flag', 2), null, null, null, null, null],
   } as unknown as Flag;
@@ -152,7 +152,7 @@ function makeWorld(over: {
     serfCount: new Array(27).fill(0),
     messageTypes: [],
     messagePositions: [],
-    // vom Abriss-Zweig gebraucht
+    // needed by the demolition branch
     incompleteBuildingCount: new Array(23).fill(1),
     completedBuildingCount: new Array(23).fill(0),
     totalBuildingScore: 100,

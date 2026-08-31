@@ -346,10 +346,10 @@ export function snapshot(state: GameState): SaveGameState {
     buildings: blockOf(state.buildings, state.blockMeta.buildings),
     inventories: blockOf(state.inventories, state.blockMeta.inventories),
     buildingRecords: sparse(state.buildings) as unknown as SaveGameState['buildingRecords'],
- // **References, not copies** — as for flags, buildings, inventories and tiles next to it. Decoding
- // the union bytes per serf here used to cost 95 % of the snapshot (0.76 of 0.80 ms at 821 serfs),
- // the largest single item of every frame, because the renderer takes a snapshot per image. Only
- // `serfDrawInfo` needed it, and that reads the bytes raw now — like the original.
+ // **References, not copies** — as for flags, buildings, inventories and tiles next to it. Do not
+ // decode the union bytes per serf here: the renderer takes a snapshot per image, and decoding is
+ // 95 % of its cost (0.76 of 0.80 ms at 821 serfs), the largest single item of a frame. Nothing in
+ // the drawing path needs it — `serfDrawInfo` reads the bytes raw, like the original.
     serfRecords: sparse(state.serfs),
     flagRecords: sparse(state.flags) as unknown as SaveGameState['flagRecords'],
     inventoryRecords: sparse(state.inventories),

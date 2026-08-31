@@ -19,24 +19,24 @@ function makeMinimalArchive(entries: { size: number; offset: number }[], payload
   return buf;
 }
 
-describe('PaArchive.parse — synthetisch', () => {
-  it('lehnt Buffer < 8 Bytes ab', () => {
-    expect(() => PaArchive.parse(new Uint8Array(4))).toThrow(/zu klein/);
+describe('PaArchive.parse — synthetic', () => {
+  it('rejects a buffer smaller than 8 bytes', () => {
+    expect(() => PaArchive.parse(new Uint8Array(4))).toThrow(/too small/);
   });
 
-  it('lehnt TPWM-komprimierte Datei ab', () => {
+  it('rejects a TPWM-compressed file', () => {
     const buf = new Uint8Array(16);
     buf.set([0x54, 0x50, 0x57, 0x4d]); // "TPWM"
     expect(() => PaArchive.parse(buf)).toThrow(/TPWM/);
   });
 
-  it('lehnt inkonsistentes file_size-Feld ab', () => {
+  it('rejects an inconsistent file_size field', () => {
     const buf = makeMinimalArchive([{ size: 0, offset: 0 }], 64);
     new DataView(buf.buffer).setUint32(0, 999, true); // falsch
     expect(() => PaArchive.parse(buf)).toThrow(/file_size/);
   });
 
-  it('lehnt entry_count = 0 ab', () => {
+  it('rejects entry_count = 0', () => {
     const buf = makeMinimalArchive([], 0);
     expect(() => PaArchive.parse(buf)).toThrow(/entry_count/);
   });
@@ -46,10 +46,10 @@ describe('PaArchive.parse — synthetisch', () => {
     expect(() => PaArchive.parse(buf)).toThrow(/past the end of the file/);
   });
 
-  it('parst valide synthetische Datei', () => {
+  it('parses a valid synthetic file', () => {
     const buf = makeMinimalArchive([
       { size: 0, offset: 0 },           // undefiniert
-      { size: 16, offset: 8 + 8 * 2 },  // valider Eintrag direkt nach TOC
+      { size: 16, offset: 8 + 8 * 2 },  // valid entry right after the TOC
     ], 32);
     const arch = PaArchive.parse(buf);
     expect(arch.entries.length).toBe(2);
@@ -59,14 +59,14 @@ describe('PaArchive.parse — synthetisch', () => {
     expect(arch.getRaw(1)?.byteLength).toBe(16);
   });
 
-  it('getRaw wirft bei out-of-range Index', () => {
+  it('getRaw throws on an out-of-range index', () => {
     const buf = makeMinimalArchive([{ size: 0, offset: 0 }], 8);
     const arch = PaArchive.parse(buf);
     expect(() => arch.getRaw(99)).toThrow(RangeError);
   });
 });
 
-describe('PaArchive.parse — DOS-Load-TOC-Fixup (Block-Replikation)', () => {
+describe('PaArchive.parse — DOS load TOC fixup (block replication)', () => {
   // Builds an archive with `count` entries; every used entry points at a unique 1-byte slot in the
   // payload (offset = payloadStart + index), so copies are recognisable by their offset.
   function makeArchiveWithEntries(count: number, definedIdx: number[]): PaArchive {
@@ -100,13 +100,13 @@ describe('PaArchive.parse — DOS-Load-TOC-Fixup (Block-Replikation)', () => {
 
   it('replicates the three extra groups (3761-3763->3764-3766, 1351->1362-1367, 1601->1612-1617)', () => {
     const arch = makeArchiveWithEntries(3800, [3761, 3762, 3763, 1351, 1601]);
-    // Gruppe 2: parallel verschoben um 3
+    // Group 2: shifted in parallel by 3
     for (let d = 0; d < 3; d++)
       expect(arch.entries[3764 + d]!.offset).toBe(arch.entries[3761 + d]!.offset);
-    // Gruppe 3: 1351 → 1362..1367
+    // Group 3: 1351 → 1362..1367
     for (let d = 0; d < 6; d++)
       expect(arch.entries[1362 + d]!.offset).toBe(arch.entries[1351]!.offset);
-    // Gruppe 4: 1601 → 1612..1617
+    // Group 4: 1601 → 1612..1617
     for (let d = 0; d < 6; d++)
       expect(arch.entries[1612 + d]!.offset).toBe(arch.entries[1601]!.offset);
   });
@@ -115,8 +115,8 @@ describe('PaArchive.parse — DOS-Load-TOC-Fixup (Block-Replikation)', () => {
     // Ordinary serf heads (~3227) sit before 3449 -> no replication.
     const arch = makeArchiveWithEntries(3800, [3227, 3228, 100, 3737]);
     expect(arch.entries[3228]!.offset).not.toBe(arch.entries[3227]!.offset);
-    expect(arch.entries[101]!.offset).toBe(0); // 100 belegt, 101 bleibt leer
-    expect(arch.entries[3738]!.offset).toBe(0); // 3737 belegt, 3738 (nach Block-Ende) bleibt leer
+    expect(arch.entries[101]!.offset).toBe(0); // 100 used, 101 stays empty
+    expect(arch.entries[3738]!.offset).toBe(0); // 3737 used, 3738 (past the block end) stays empty
   });
 
   it('is a no-op for archives that are too small (not a complete sprite pack)', () => {
@@ -146,7 +146,7 @@ describe.runIf(loadOrigFile('SPAD.PA') !== null)('PaArchive.parse — Original S
     expect(dv.getUint16(4, true)).toBe(200);    // height
     expect(dv.getInt16(6, true)).toBe(0);       // offset_x
     expect(dv.getInt16(8, true)).toBe(0);       // offset_y
-    // Solid-Encoding-Check: size - 10 == width * height
+    // Solid encoding check: size - 10 == width * height
     expect(raw.byteLength - 10).toBe(640 * 200);
   });
 

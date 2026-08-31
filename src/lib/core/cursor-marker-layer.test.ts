@@ -12,7 +12,7 @@ const anchor = { x: 100, y: 200 };
 const flat = () => 10;
 
 describe('buildCursorMarkers (FUN_00015daf)', () => {
-  it('liefert 7 Records: Cursor + 6 Nachbarn in DIR_DELTA-Reihenfolge', () => {
+  it('returns 7 records: cursor + 6 neighbours in DIR_DELTA order', () => {
     const m = buildCursorMarkers({
       anchor,
       col: 20,
@@ -46,7 +46,7 @@ describe('buildCursorMarkers (FUN_00015daf)', () => {
     });
  // From the binary: +0x20, -0x10, -0x20, -0x10, +0x10, +0x20 (cumulative from the cursor x)
     expect(m.map((r) => r.x - m[0]!.x)).toEqual([0, 32, 16, -16, -32, -16, 16]);
- // y-Extra: 0, 0, +0x14, +0x14, 0, −0x14, −0x14
+ // y extra: 0, 0, +0x14, +0x14, 0, -0x14, -0x14
     expect(m.map((r) => r.y - m[0]!.y)).toEqual([0, 0, 20, 20, 0, -20, -20]);
   });
 
@@ -57,11 +57,11 @@ describe('buildCursorMarkers (FUN_00015daf)', () => {
  // height differences below — so the height term is backed by real pixels.
     const dh = new Map([
       ['-1,-1', 4], // UpLeft is 4 steps higher => -20 - 16
-      ['0,-1', 4], // Up ebenso
+      ['0,-1', 4], // Up likewise
       ['1,0', 0],
       ['-1,0', 0],
-      ['1,1', -2], // DownRight 2 Stufen tiefer ⇒ +20 + 8
-      ['0,1', -3], // Down 3 Stufen tiefer ⇒ +20 + 12
+      ['1,1', -2], // DownRight is 2 steps lower => +20 + 8
+      ['0,1', -3], // Down is 3 steps lower => +20 + 12
     ]);
     const h0 = 12;
     const heightAt = (c: number, r: number): number =>
@@ -96,7 +96,7 @@ describe('buildCursorMarkers (FUN_00015daf)', () => {
       markers: null,
       heightUnit: 4,
     });
-    expect(m[1]!.y - m[0]!.y).toBe(-12); // Right: 4·(10−13)
+    expect(m[1]!.y - m[0]!.y).toBe(-12); // Right: 4*(10-13)
     expect(m[2]!.y - m[0]!.y).toBe(20); // DownRight unchanged
   });
 
@@ -129,7 +129,7 @@ describe('buildCursorMarkers (FUN_00015daf)', () => {
       markers: { primary: 0x32, secondary: CURSOR_MARKER_FLAG },
       heightUnit: 4,
     });
-    expect(m[0]!.sprite).toBe(0x32); // Haupt-Symbol (hier: Burg)
+    expect(m[0]!.sprite).toBe(0x32); // main icon (here: castle)
     expect(m[2]!.sprite).toBe(CURSOR_MARKER_FLAG);
  // Record 2 sits on DownRight (+1,+1) — exactly the tile the building's flag lands on.
     expect(DIR_DELTA[1]).toEqual([1, 1]);
@@ -141,7 +141,7 @@ describe('buildCursorMarkers (FUN_00015daf)', () => {
     );
   });
 
-  it('respektiert heightUnit 0 (flache Top-Down-Ansicht)', () => {
+  it('respects heightUnit 0 (flat top-down view)', () => {
     const heightAt = (c: number): number => (c === 21 ? 31 : 0);
     const m = buildCursorMarkers({
       anchor,

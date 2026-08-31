@@ -3,8 +3,7 @@
  *
  * The bank is fixed to the **AIL (SimFarm, Settlers, Serf City)** FM patch bank shipped with Miles
  * Sound System. That gives the sound DOSBox produces when playing the original — same OPL3 emulator
- * code base, same
- * Patches.
+ * code base, same patches.
  *
  * libADLMIDI consumes **XMI directly**, so no detour through an SMF converter.
  */
@@ -78,7 +77,7 @@ export class FmPlayer {
   }
 
   /**
-   * XMI- oder MIDI-Bytes laden. libADLMIDI erkennt beides automatisch am Header.
+   * Load XMI or MIDI bytes. libADLMIDI detects either automatically from the header.
    */
   async loadSong(bytes: Uint8Array, name: string | null = null): Promise<void> {
     this.setState('loading');
@@ -139,7 +138,7 @@ export class FmPlayer {
    * Deliberately the library's own loop rather than restarting at the end: `onPlaybackEnded` +
    * `seek(0)` + `play()` would leave an audible gap, because that round trip goes through the main
    * thread.
-   * `setLoopCount(-1)` == unbegrenzt.
+   * `setLoopCount(-1)` == unlimited.
    */
   setLoop(enabled: boolean): void {
     if (!this.synth) return;
@@ -186,7 +185,7 @@ export class FmPlayer {
     try {
       this.synth?.close();
     } catch {
-      // ignorieren
+      // ignore
     }
     // After `close()` the worklet node is gone; the gain node must go with it, otherwise the next
     // `ensureGain()` finds a stale gain on the context and the new path would be damped twice.

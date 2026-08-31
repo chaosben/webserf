@@ -39,7 +39,7 @@ function makeState(): {
     hasResources: false,
   } as unknown as Flag;
 
-  // Flagge #3: drei Waren, alle in Richtung 2 eingeplant, Slot 1 zeigt aufs Lager.
+  // Flag #3: three resources, all scheduled towards direction 2; slot 1 points at the warehouse.
   const otherFlag = {
     index: 3,
     owner: 0,
@@ -86,7 +86,7 @@ function makeState(): {
   return { state, inv, invFlag, otherFlag };
 }
 
-describe('Screen 0x2c — Waren-Modus', () => {
+describe('screen 0x2c: resource mode', () => {
   it('stock-in sets mode 0 and the accept bit of the flag without clearing', () => {
     const { state, inv, invFlag, otherFlag } = makeState();
     invFlag.acceptsResources = false;
@@ -124,7 +124,7 @@ describe('Screen 0x2c — Waren-Modus', () => {
   });
 });
 
-describe('Screen 0x2c — Siedler-Modus', () => {
+describe('screen 0x2c: serf mode', () => {
   it('serf-in sets the accept bit without clearing', () => {
     const { state, inv, invFlag } = makeState();
     invFlag.acceptsSerfs = false;
@@ -155,18 +155,18 @@ describe('Screen 0x2c — Siedler-Modus', () => {
 
   it('bit 7 of `serf[0xb]` is the condition: without it nothing is cancelled', () => {
     const { state } = makeState();
-    state.serfs[6]!.stateData[0] = 0x03; // Bit 7 klar
+    state.serfs[6]!.stateData[0] = 0x03; // bit 7 clear
     cancelSerfDestinations(state, 7);
     expect(state.serfs[6]!.stateData[0]).toBe(0x03);
     expect(state.serfs[6]!.stateData[1]).toBe(7);
   });
 });
 
-describe('Geteilter Netz-Lauf @0x17a52', () => {
+describe('shared network pass @0x17a52', () => {
   it('picks the slot with the highest flagPriority for the freed direction', () => {
     const { state, otherFlag } = makeState();
     // Slot 1 (resource 9, highest priority) drops out, leaving slot 0 (resource 4, prio 5) and
-    // Slot 2 (Ware 2, prio 9) in Richtung 2 — Slot 2 muss gewinnen.
+    // slot 2 (resource 2, prio 9) in direction 2 - slot 2 has to win.
     clearDestinationFromNetwork(state, 7);
     expect(otherFlag.scheduled[2]).toBe(true);
     expect(otherFlag.scheduledSlot[2]).toBe(2);
@@ -193,7 +193,7 @@ describe('Geteilter Netz-Lauf @0x17a52', () => {
 
   it('packs the outgoing queue of the inventory to the front', () => {
     const { state, inv } = makeState();
-    clearDestinationFromNetwork(state, 7); // Slot 0 zeigt aufs Ziel
+    clearDestinationFromNetwork(state, 7); // slot 0 points at the destination
     expect(inv.outQueue[0]!.type).toBe(5);
     expect(inv.outQueue[0]!.dest).toBe(12);
     expect(inv.outQueue[1]!.type).toBe(-1);

@@ -9,7 +9,7 @@
  * if (!(vp[1] & 8)) return;                 // special click only (manual p. 44)
  * classify_build_site()
  * if (player[0x100] == 2) return FUN_00048c8a();   // cursor type 2 = flag -> demolish IMMEDIATELY
- * vp[0x70] = 0x37                                  // sonst: dieses Fenster
+ * vp[0x70] = 0x37                                  // otherwise: this window
  * ```
  *
  * A flag therefore vanishes without asking, a **building** only after the confirm button is
@@ -17,7 +17,7 @@
  *
  * ## Zones (`@0x2c6f6`, 5-byte entries `{action, x0, x1, y0, y1}`, `0xFF`-terminated)
  *
- * | Aktion | Rechteck | Handler | Wirkung |
+ * | Action | Rectangle | Handler | Effect |
  * |---|---|---|---|
  * | `0x27` | 112..127 x 128..143 | `@0x2827c` | close only (a copy of `close_popup_restore_bar`) |
  * | `0xfe` | 56..71 x 45..60 | `@0x2d648` | **`FUN_00048c8a`** (demolish), then the same close |
@@ -44,7 +44,7 @@ export const DEMOLISH_SCREEN = 0x37;
 /** Background tile (`draw_popup_background(0x13a)`) — the same as the message window's. */
 export const DEMOLISH_BG_ICON = 0x13a;
 
-/** „RAUS" unten rechts (`draw_panel_icon(col 0xe, row 0x80, icon 0x3c)`). */
+/** "RAUS" button at the bottom right (`draw_panel_icon(col 0xe, row 0x80, icon 0x3c)`). */
 export const DEMOLISH_CLOSE_ICON = { icon: 0x3c, col: 0xe, row: 0x80 } as const;
 
 /** Confirm button in the middle of the window (`draw_panel_icon(col 7, row 0x2d, icon 0x120)`). */
@@ -66,7 +66,7 @@ export const DEMOLISH_ACTION_CONFIRM = 0xfe;
 /** Action id of the exit button (close only). */
 export const DEMOLISH_ACTION_CLOSE = 0x27;
 
-/** Klick-Zonen `@0x2c6f6`, in Tabellen-Reihenfolge. */
+/** Click zones `@0x2c6f6`, in table order. */
 export const DEMOLISH_HITBOXES: readonly HitRect[] = [
   { action: DEMOLISH_ACTION_CLOSE, x0: 112, x1: 127, y0: 128, y1: 143 },
   { action: DEMOLISH_ACTION_CONFIRM, x0: 56, x1: 71, y0: 45, y1: 60 },

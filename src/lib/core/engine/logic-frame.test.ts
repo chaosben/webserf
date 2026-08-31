@@ -6,18 +6,18 @@ import { FRAME_TICKS, logicFrame } from './tick.js';
  * animation phases), which is why it lives in one place.
  */
 describe('logicFrame: the original frame number', () => {
-  it('wechselt genau alle FRAME_TICKS gameTicks', () => {
+  it('changes exactly every FRAME_TICKS gameTicks', () => {
     expect(FRAME_TICKS).toBe(8);
-    const wechsel = [];
-    for (let t = 1; t <= 64; t++) if (logicFrame(t) !== logicFrame(t - 1)) wechsel.push(t);
-    expect(wechsel).toEqual([8, 16, 24, 32, 40, 48, 56, 64]);
+    const changes = [];
+    for (let t = 1; t <= 64; t++) if (logicFrame(t) !== logicFrame(t - 1)) changes.push(t);
+    expect(changes).toEqual([8, 16, 24, 32, 40, 48, 56, 64]);
   });
 
   /**
    * At 100 ticks per second (the original rate) this is 12.5 frames per second - the rate at which
    * the original draws, and the reason for the draw cadence in `MapView`.
    */
-  it('ergibt bei Original-Taktrate 12,5 Bilder je Sekunde', () => {
+  it('yields 12.5 frames per second at the original tick rate', () => {
     const TICKS_PER_SECOND = 100;
     expect(TICKS_PER_SECOND / FRAME_TICKS).toBe(12.5);
     expect(logicFrame(TICKS_PER_SECOND) - logicFrame(0)).toBe(12);
@@ -41,10 +41,10 @@ describe('logicFrame: the original frame number', () => {
    * than for greater.
    */
   it('after the u16 wrap the frame number is small again, and thus unequal to the last one', () => {
-    const vorher = logicFrame(65535);
-    const nachher = logicFrame(0);
-    expect(vorher).toBe(8191);
-    expect(nachher).toBe(0);
-    expect(nachher).not.toBe(vorher);
+    const before = logicFrame(65535);
+    const after = logicFrame(0);
+    expect(before).toBe(8191);
+    expect(after).toBe(0);
+    expect(after).not.toBe(before);
   });
 });

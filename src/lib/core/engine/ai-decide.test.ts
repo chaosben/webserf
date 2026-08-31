@@ -44,7 +44,7 @@ function player(over: Partial<Player> = {}): Player {
 }
 
 /**
- * The decider touches the game state only through the probing branch, so a stub state is enough — but
+ * The decider touches the game state only through the probing branch, so a stub state is enough - but
  * it needs a random stream (the tail jump @0x5126d draws) and an EMPTY map, so probing finds nothing.
  */
 function makeState(): GameState {
@@ -66,7 +66,7 @@ describe('ai decide: table and numbering', () => {
     expect(AI_EVALUATORS.filter((e) => e.group === 'b')).toHaveLength(10);
   });
 
-  it('ordnet jedem Slot 0..24 genau einen Bewerter zu (Permutation)', () => {
+  it('assigns exactly one evaluator to each slot 0..24 (a permutation)', () => {
     const slots = AI_EVALUATORS.map((e) => e.slot).sort((a, b) => a - b);
     expect(slots).toEqual(Array.from({ length: AI_URGENCY_SLOTS }, (_, i) => i));
   });
@@ -94,7 +94,7 @@ describe('ai decide: table and numbering', () => {
   it('names the three emergency evaluators with bit and building slot', () => {
     expect(AI_EMERGENCY_EVALUATORS.map((e) => [e.addr, e.bit, e.hintSlot]))
       .toEqual([[0x58833, 3, 0], [0x5a177, 4, 1], [0x58c89, 5, 2]]);
-    expect(evaluatorAt(0x5a177)?.group).toBe('b'); // steht im vollen Satz in Gruppe b
+    expect(evaluatorAt(0x5a177)?.group).toBe('b'); // sits in group b within the full set
   });
 });
 

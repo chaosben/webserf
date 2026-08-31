@@ -334,10 +334,10 @@
 
   // Player colours (4 slots) — category colours, not an original palette.
   const PLAYER_COLORS: readonly [number, number, number][] = [
-    [0x00, 0xe3, 0xe3], // Spieler 0 – Cyan
-    [0xcf, 0x63, 0x63], // Spieler 1 – Rot
-    [0xdf, 0x7f, 0xef], // Spieler 2 – Violett
-    [0xef, 0xef, 0x8f], // Spieler 3 – Gelb
+    [0x00, 0xe3, 0xe3], // player 0 – cyan
+    [0xcf, 0x63, 0x63], // player 1 – red
+    [0xdf, 0x7f, 0xef], // player 2 – violet
+    [0xef, 0xef, 0x8f], // player 3 – yellow
   ];
 
   let showObjects = $state(true);
@@ -609,8 +609,8 @@
    */
   function markEngineMutated(map = false): void {
     engineDirty = true;
-    if (map) mapVersion += 1; // Basis-Layer (Wege/Objekte) neu zeichnen
-    frameVersion += 1; // Render + Aktions-Gating neu berechnen
+    if (map) mapVersion += 1; // redraw the base layer (roads/objects)
+    frameVersion += 1; // recompute rendering and action gating
   }
 
   /**
@@ -692,10 +692,9 @@
   /**
    * **Apply a command now and log it** — the only way a command enters the state.
    *
-   * `recordAction` used to hang on {@link flushCommands}, i.e. on the QUEUE. Two commands are applied
-   * immediately (demolish confirmation, "attach road") and were therefore missing from the log
-   * although they had long been commands. Hence the logging now sits at the application and not at
-   * the transport.
+   * The logging sits at the APPLICATION, not at the transport: hanging `recordAction` on
+   * {@link flushCommands} would tie it to the queue, and the commands applied immediately (demolish
+   * confirmation, "attach road") would be missing from the log.
    */
   function runCommand(cmd: Command): boolean {
     const ok = applyCommand(engineState, cmd);
@@ -761,8 +760,8 @@
       actions: actionLog,
       screenshotDataUrl: png,
       sourceFile,
-      // The drawing costs of this machine. They used to have a display in the developer overlay; that
-      // is gone, the measuring continues — for exactly this line.
+      // The drawing costs of this machine. Nothing displays them; the measurement exists for exactly
+      // this line of the report.
       render: metrics.report(),
       view: {
         camX,
@@ -867,7 +866,7 @@
   // state serialised fresh per frame (whose `header.tick == gameTick`).
   const renderState = $derived.by((): SaveGameState => {
     if (!playing && !engineDirty) return save;
-    void frameVersion; // pro Frame / nach Aktionen neu rechnen
+    void frameVersion; // recompute per frame / after actions
     return snapshot(engineState);
   });
 
@@ -969,12 +968,12 @@
     const slot = hitPopupPlayerButton(x - 8, y - 9);
     if (slot === null) return false;
     if (!runCommand({ kind: 'switchSpectatorPlayer', slot })) {
-      playUiSound(UI_SOUND_REJECT); // Klang 4 @0x2bf88 — leerer Slot
+      playUiSound(UI_SOUND_REJECT); // sound 4 @0x2bf88 — empty slot
       return true;
     }
     buildPlayer = slot; // `vp[0x82] = player` @0x2bf71
     noteMessageShown(messageOverlay); // `vp[0x87] &= 0xfe` @0x2bf79 - the note is acknowledged
-    playUiSound(UI_SOUND_PANEL_BUTTON); // Klang 8 @0x2bf85
+    playUiSound(UI_SOUND_PANEL_BUTTON); // sound 8 @0x2bf85
     note(`view: player ${slot + 1}`);
     return true;
   }
@@ -2631,7 +2630,7 @@
         delayRow: recallClockRow(dy),
         target: { kind: 'map', col: center.col, row: center.row },
       });
-      what = 'an diese Stelle';
+      what = 'to this place';
     } else if (recallIsBuildingScreen(screen)) {
       // `player+0x176` is `objectSubject` here (see there) — the index the open building window
       // refers to.
@@ -2643,7 +2642,7 @@
           delayRow: recallClockRowEighths(dy),
           target: { kind: 'building', col: target.col, row: target.row },
         });
-        what = 'zu diesem Lager';
+        what = 'to this warehouse';
       }
     } else {
       const menu = recallMenuIndex(screen);
@@ -3189,7 +3188,7 @@
     // the table entry.
     if (command === 'toggleRoadBuilding') {
       const player = engineState.players[buildPlayer];
-      if (!player || !player.active) return 'Kein Spieler.';
+      if (!player || !player.active) return 'no player.';
       if (roadBuild().active) {
         runCommand({ kind: 'cancelRoadBuilding', player: buildPlayer });
         barIcons = [barIcons[0], barIcons[1], ...ROAD_BAR_ICONS_LEAVE];
@@ -3197,7 +3196,7 @@
         refreshContextIcons(player.cursorCol, player.cursorRow);
         // The abort CLEARS THE PROVISIONAL ROAD BITS — a real map change.
         markEngineMutated(true);
-        return `${label} — abgebrochen`;
+        return `${label} — aborted`;
       }
       // `btr $0x6` on `vp[0]` @0x28615 — entering the mode CLEARS the build helper, and does so as
       // the very first thing, i.e. BEFORE the flag gate (@0x28637/@0x28643): a refused start clears
@@ -3210,7 +3209,7 @@
       barIcons = [...ROAD_BAR_ICONS_ENTER];
       syncRoadView();
       markEngineMutated(); // cursor set to the starting flag - the map is still unchanged
-      return `${label} — Nachbarfeld anklicken, Leisten-Icon bricht ab.`;
+      return `${label} — click a neighbouring tile; the bar icon aborts.`;
     }
     if (command === 'demolishRoad') {
       // `action_demolish_road` @0x4a493 starts with `btr $0x6` on `vp[0]` — the build helper display
@@ -3308,7 +3307,7 @@
   // for state changes beside it is `markEngineMutated`.
   const entityIndex = $derived(engineEntityIndex(engineState));
 
-  const MINERAL_NAMES = ['—', 'Gold', 'Eisen', 'Kohle', 'Stein'];
+  const MINERAL_NAMES = ['—', 'Gold', 'Iron', 'Coal', 'Stone'];
 
   /**
    * Display zoom. The original has none — {@link DEFAULT_ZOOM} is our default, and afterwards the
@@ -3507,7 +3506,7 @@
    * values do not propagate further in Svelte 5.
    */
   const territoryVersion = $derived.by(() => {
-    void frameVersion; // pro Frame / nach Aktionen nachlesen
+    void frameVersion; // re-read per frame / after actions
     return engineState.territoryVersion;
   });
 
@@ -4008,9 +4007,9 @@
       lastY = e.clientY;
       return;
     }
-    // A hit test used to stand here whose result nobody read — `getBoundingClientRect` (forces
-    // layout) plus `windowToTile` on EVERY mouse move. Whoever builds a hover display gets it back
-    // here.
+    // Deliberately NO hit test here: it costs `getBoundingClientRect` (forces layout) plus
+    // `windowToTile` on EVERY mouse move, and nothing reads the result. A hover display belongs
+    // here and would have to pay that.
   }
   /**
    * Where the pointer is, in canvas pixels — kept only for the screen recording, which has to draw

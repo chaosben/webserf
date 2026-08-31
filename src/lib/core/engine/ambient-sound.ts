@@ -59,7 +59,7 @@ export interface AmbientState {
   waterTiles: number;
   /** `vp+0x1b6` — visible tree objects, counted by the drawing pass. */
   treeObjects: number;
-  /** Vom letzten Pass einzureihender Klang (`null` = keiner). Der Renderer holt ihn ab. */
+  /** Sound to enqueue from the last pass (`null` = none). The renderer picks it up. */
   sound: number | null;
   /** Volume of the water voice (`[gs+0xe8]+0x158` @0xefe9); `null` = not set in this pass. */
   waterVolume: number | null;

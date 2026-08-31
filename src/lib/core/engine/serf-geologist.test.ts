@@ -68,10 +68,10 @@ describe('serf-geologist — SamplingGeoSpot (43)', () => {
     expect((serf.stateData[2] << 24) >> 24).toBe(-128); // neg_dist1 = −128
   });
 
-  it('kleines Kohle-Vorkommen (<12) → Schild-Variante 0x75', () => {
+  it('small coal deposit (<12) → sign variant 0x75', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
-    state.mapTiles[pos] = tile({ mineral: 3, resourceAmount: 5 }); // Coal, klein
+    state.mapTiles[pos] = tile({ mineral: 3, resourceAmount: 5 }); // coal, small
     const serf = mkSerf({ index: 5, type: 20, stateData: [0, 0, 0, 0, 0] });
 
     samplingGeoSpot(state, serf);
@@ -86,10 +86,10 @@ describe('serf-geologist — SamplingGeoSpot (43)', () => {
     // All four minerals, both size variants: the size must NOT change the type.
     for (const [mineral, amount, expectedType] of [
       [1, 15, 12], // gold, large
-      [1, 5, 12], // Gold, klein  → derselbe Typ
+      [1, 5, 12], // gold, small  → the same type
       [2, 11, 13], // iron, small (sign 0x73 == 115)
-      [3, 20, 14], // Kohle
-      [4, 3, 15], // Stein
+      [3, 20, 14], // coal
+      [4, 3, 15], // stone
     ] as const) {
       const state = makeState();
       const pos = posOf(20, 20, geo);
@@ -99,9 +99,9 @@ describe('serf-geologist — SamplingGeoSpot (43)', () => {
       samplingGeoSpot(state, serf);
 
       const p = state.players[1]!;
-      expect(p.messageTypes, `Mineral ${mineral}/${amount}`).toEqual([expectedType]);
+      expect(p.messageTypes, `mineral ${mineral}/${amount}`).toEqual([expectedType]);
       expect(p.messagePositions).toEqual([pos]);
-      expect(p.flags & 0x08).toBe(0x08); // Wecker „neue Meldung"
+      expect(p.flags & 0x08).toBe(0x08); // wake-up flag "new message"
       // The owner gets it, nobody else.
       expect(state.players[0]!.messageTypes).toEqual([]);
     }
@@ -145,7 +145,7 @@ describe('serf-geologist — SamplingGeoSpot (43)', () => {
 describe('serf-geologist — LookingForGeoSpot (42)', () => {
   it('mountains all around -> spot found -> FreeWalking with mirrored neg_dist', () => {
     const state = makeState((t) => {
-      t.terrainUp = 12; // Tundra (Gebirge)
+      t.terrainUp = 12; // tundra (mountains)
       t.terrainDown = 12;
       return t;
     });
@@ -153,8 +153,8 @@ describe('serf-geologist — LookingForGeoSpot (42)', () => {
 
     lookingForGeoSpot(state, serf);
 
-    expect(serf.state).toBe(16); // FreeWalking zum Spot
-    // neg_dist1 = −dist_col, neg_dist2 = −dist_row (Normalisierung gegen -0).
+    expect(serf.state).toBe(16); // FreeWalking to the spot
+    // neg_dist1 = −dist_col, neg_dist2 = −dist_row (normalised against -0).
     const distCol = (serf.stateData[0] << 24) >> 24;
     const distRow = (serf.stateData[1] << 24) >> 24;
     expect((serf.stateData[2] << 24) >> 24).toBe(-distCol + 0);
@@ -164,7 +164,7 @@ describe('serf-geologist — LookingForGeoSpot (42)', () => {
   });
 
   it('no mountains -> back into the network after 8 attempts (Walking, dir1=-2)', () => {
-    const state = makeState(); // alles Gras
+    const state = makeState(); // all grass
     const serf = mkSerf({ index: 5, type: 20, state: 42, stateData: [0, 0, 0, 0, 0] });
 
     lookingForGeoSpot(state, serf);
@@ -182,7 +182,7 @@ describe('serf-geologist — LookingForGeoSpot (42)', () => {
 
     lookingForGeoSpot(state, serf);
 
-    expect(serf.state).toBe(2); // Walking (nach 2 Schildern abgebrochen)
+    expect(serf.state).toBe(2); // Walking (aborted after 2 signs)
     expect((serf.stateData[0] << 24) >> 24).toBe(-2);
   });
 });

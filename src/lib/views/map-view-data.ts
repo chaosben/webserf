@@ -56,9 +56,9 @@ export function buildOptionsView(
  * index, and that is exactly how they already sit in the live state (`state.serfs[i]`, densely
  * index-addressed like the original's arrays).
  *
- * Building three fresh `Map`s per frame for the same mapping cost 0.14 ms at 821 serfs — after the
- * snapshot decoding was dropped the second largest item of an idle frame, plus about a thousand
- * entries of garbage per frame. The lookup here is an array access.
+ * Building three fresh `Map`s per frame for the same mapping costs 0.14 ms at 821 serfs plus about a
+ * thousand entries of garbage — enough to be the second largest item of an otherwise idle frame. The
+ * lookup here is an array access.
  *
  * IT IS CONSISTENT WITH `renderState`, not beside it: while paused and untouched the view draws
  * `save`, and `engineState` is exactly its `loadState`; as soon as anything runs, `renderState` is a

@@ -26,7 +26,7 @@ function stateWith(left: number, right: number): GameState {
   return { header: { viewOptions: [left, right] } } as unknown as GameState;
 }
 
-describe('Options-Byte: Bit-Belegung', () => {
+describe('option byte: bit layout', () => {
   it('the factory setting 0x39 is road-building scrolling plus message level 3', () => {
     // `mov $0x39,%al` @0x2e0f/@0x2e1a, and the value of the right half in every real save.
     expect(VIEW_OPTIONS_DEFAULT & VIEW_OPTION_ROAD_SCROLL).toBe(VIEW_OPTION_ROAD_SCROLL);
@@ -56,9 +56,9 @@ describe('Options-Byte: Bit-Belegung', () => {
   });
 });
 
-describe('Meldungs-Stufe weiterschalten', () => {
+describe('cycling the message level', () => {
   it('cycles 3 -> 2 -> 1 -> 0 -> 3 and leaves the other bits alone', () => {
-    let v = 0x39; // Stufe 3 + Wegebau-Scrolling
+    let v = 0x39; // level 3 + road-building scrolling
     const seen: number[] = [];
     for (let i = 0; i < 5; i++) {
       seen.push(messageLevel(v));
@@ -77,8 +77,8 @@ describe('Meldungs-Stufe weiterschalten', () => {
 
 describe('toggling on the byte', () => {
   // The plain byte form exists because the option bytes are GLOBAL in the original (`gs+0x3d8/0x3d9`)
-  // and exist before any save game - the main menu serves the same screen without
- // einen `GameState`. Der Zustands-Wrapper darunter muss dasselbe tun.
+  // and exist before any save game - the main menu serves the same screen without a
+  // `GameState`. The state wrapper below it has to do the same.
   it('flips exactly the mask and stays inside the byte', () => {
     expect(toggleOption(0x39, VIEW_OPTION_FAST_MAP_CLICK)).toBe(0x39 ^ VIEW_OPTION_FAST_MAP_CLICK);
     expect(toggleOption(toggleOption(0x39, 0x04), 0x04)).toBe(0x39);

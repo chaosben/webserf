@@ -3,11 +3,11 @@ import { CONTROL_PANEL_BOUNDS, POPUP_BOUNDS, UI_SCREEN } from '../core/ui-render
 import { boxPixel, originBoxRect, uiScaleFor, type BoxRect } from './ui-layout.js';
 
 /**
- * The arrangement used to live in a CSS string (`left: calc(50% + Npx)` on a box shifted by
- * `translateX(-50%)`, plus `bottom`). This reproduces exactly that computation, so the move to
- * numbers can be shown NOT to have changed the layout.
+ * The arrangement as a CSS string — `left: calc(50% + Npx)` on a box shifted by `translateX(-50%)`,
+ * plus `bottom`. That formula is the SPECIFICATION {@link originBoxRect} is pinned against, so the
+ * numbers can be shown to place the box exactly where the browser would.
  */
-function legacyCssRect(
+function cssArrangementRect(
   b: { x: number; y: number; width: number; height: number },
   s: number,
   vw: number,
@@ -62,7 +62,7 @@ describe('originBoxRect', () => {
     expect(bar.y - (pop.y + pop.h)).toBe(19 * s);
   });
 
-  it('matches the layout the CSS produced, at every window size and scale', () => {
+  it('matches the layout the CSS formula produces, at every window size and scale', () => {
     for (const b of [POPUP_BOUNDS, CONTROL_PANEL_BOUNDS]) {
       for (const [vw, vh] of [
         [640, 480],
@@ -72,13 +72,13 @@ describe('originBoxRect', () => {
       ]) {
         for (const zoom of [0.08, 1, 1.5, 2, 2.75, 4]) {
           const s = uiScaleFor(zoom, vw);
-          const old = legacyCssRect(b, s, vw, vh);
+          const css = cssArrangementRect(b, s, vw, vh);
           const now = originBoxRect(b, s, vw, vh);
-          expect(now.w).toBe(old.w);
-          expect(now.h).toBe(old.h);
-          expect(now.y).toBe(old.top);
+          expect(now.w).toBe(css.w);
+          expect(now.h).toBe(css.h);
+          expect(now.y).toBe(css.top);
           // The only difference is the deliberate rounding of the left edge to a whole pixel.
-          expect(Math.abs(now.x - old.left)).toBeLessThanOrEqual(0.5);
+          expect(Math.abs(now.x - css.left)).toBeLessThanOrEqual(0.5);
         }
       }
     }

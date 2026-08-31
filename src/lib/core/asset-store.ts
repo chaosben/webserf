@@ -28,9 +28,8 @@ let dbPromise: Promise<IDBPDatabase> | null = null;
 
 function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
-    // DB version 2: an earlier iteration had a 'soundfonts' store, now obsolete. It is left
-    // untouched by the upgrade, because removing it would need another version bump to carry the
-    // migration; until then it sits there empty.
+    // DB version 2. A 'soundfonts' store may sit in an existing database; the upgrade leaves it
+    // alone, because removing it would need another version bump to carry the migration.
     dbPromise = openDB(DB_NAME, VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains(ARCHIVE_STORE)) {

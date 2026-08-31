@@ -122,7 +122,7 @@ import {
  * 2. **The player blocks are a RAM dump.** Four `copy_bytes` of `0x21b4` == 8628 bytes to
  *    `ptr_c + 0xfa / 0x22ae / 0x4462 / 0x6616` (== 250 + n·8628), source `gs->playerN - 0x80` each.
  *    That is also the direct evidence for the layout rule "block offset X ==
- *    `player + (X − 0x80)`", which was previously inferred from individual fields.
+ *    `player + (X − 0x80)`" — it does not have to be inferred from individual fields.
  *
  * ## Base buffer
  *

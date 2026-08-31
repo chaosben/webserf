@@ -9,7 +9,7 @@ import {
 } from './terrain-mask.js';
 import { MAP_GROUND_BASE } from './map-render.js';
 
-describe('Terrain-Maskentabellen', () => {
+describe('terrain mask tables', () => {
   it('have the reference sizes (81/81/128)', () => {
     expect(TRI_MASK_UP).toHaveLength(81);
     expect(TRI_MASK_DOWN).toHaveLength(81);
@@ -28,8 +28,8 @@ describe('Terrain-Maskentabellen', () => {
   });
 });
 
-describe('Maskenindex', () => {
-  it('flach (m=left=right) → Index 40, Variante 4 (beide Richtungen)', () => {
+describe('mask index', () => {
+  it('flat (m=left=right) → index 40, variant 4 (both directions)', () => {
     expect(upMaskIndex(10, 10, 10)).toBe(40);
     expect(downMaskIndex(10, 10, 10)).toBe(40);
     expect(TRI_MASK_UP[40]).toBe(4);
@@ -43,23 +43,23 @@ describe('Maskenindex', () => {
 });
 
 describe('groundSpriteForTriangle', () => {
-  it('flaches Gras → Boden-Sprite-Index relativ zu MAP_GROUND_BASE', () => {
-    // Grass0 (Typ 4), flach → Variante 4 → TRI_SPR[36] = 4.
+  it('flat grass → ground sprite index relative to MAP_GROUND_BASE', () => {
+    // Grass0 (type 4), flat → variant 4 → TRI_SPR[36] = 4.
     expect(groundSpriteForTriangle('up', 4, 10, 10, 10)).toBe(MAP_GROUND_BASE + 4);
     expect(groundSpriteForTriangle('down', 4, 10, 10, 10)).toBe(MAP_GROUND_BASE + 4);
   });
 
-  it('flaches Wasser → Sprite 32', () => {
+  it('flat water → sprite 32', () => {
     expect(groundSpriteForTriangle('up', 0, 5, 5, 5)).toBe(MAP_GROUND_BASE + 32);
   });
 
   it('returns null for an invalid slope (index outside 0..80)', () => {
-    // m-left = 10 → erster Term 14, Index 140 ≥ 81.
+    // m-left = 10 → first term 14, index 140 ≥ 81.
     expect(groundSpriteForTriangle('up', 4, 20, 10, 10)).toBeNull();
   });
 
   it('returns null when the mask hits a -1 cell (an error in the original)', () => {
-    // m=10,left=9,right=14 → Index 5; TRI_MASK_UP[5] = -1.
+    // m=10,left=9,right=14 → index 5; TRI_MASK_UP[5] = -1.
     expect(upMaskIndex(10, 9, 14)).toBe(5);
     expect(TRI_MASK_UP[5]).toBe(-1);
     expect(groundSpriteForTriangle('up', 4, 10, 9, 14)).toBeNull();

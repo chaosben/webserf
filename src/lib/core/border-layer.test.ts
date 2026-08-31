@@ -23,10 +23,10 @@ class Recorder implements Blitter<Img> {
     this.draws.push({ index: image.index, x, y });
   }
   blitPartial(): void {
-    throw new Error('Grenzsteine zeichnen nie teilweise');
+    throw new Error('border markers never draw partially');
   }
   blitOverIndex(): void {
-    throw new Error('Grenzsteine zeichnen nie bedingt');
+    throw new Error('border markers never draw conditionally');
   }
 }
 
@@ -55,7 +55,7 @@ function run(tiles: BorderTileData[], frame: ReturnType<typeof frameAround>, hei
   return rec;
 }
 
-describe('drawBorderLayer — Bedingung', () => {
+describe('drawBorderLayer — condition', () => {
   it('same owner -> no border marker', () => {
     // Whole map to one player: no owner difference anywhere.
     const all = new Map(Array.from({ length: geo.tileCount }, (_, p) => [p, { owner: 1 }] as const));
@@ -104,11 +104,11 @@ describe('borderSlopeVariant / borderGroundIndex — NOT the road pass threshold
   it('terrain groups: water < 4, desert/tundra > 10, snow >= 15', () => {
     expect(borderGroundIndex(0, 0)).toBe(9);
     expect(borderGroundIndex(3, 2)).toBe(9);
-    expect(borderGroundIndex(4, 1)).toBe(1); // Gras
+    expect(borderGroundIndex(4, 1)).toBe(1); // grass
     expect(borderGroundIndex(10, 1)).toBe(1); // 10 is STILL grass (road: already desert)
     expect(borderGroundIndex(11, 1)).toBe(4); // desert/tundra
     expect(borderGroundIndex(14, 0)).toBe(3); // 14 is STILL tundra (road: already snow)
-    expect(borderGroundIndex(15, 0)).toBe(6); // Schnee
+    expect(borderGroundIndex(15, 0)).toBe(6); // snow
   });
 
   it('covers exactly the 10 sprites of the bank', () => {
@@ -124,7 +124,7 @@ describe('borderSlopeVariant / borderGroundIndex — NOT the road pass threshold
   });
 });
 
-describe('drawBorderLayer — Anker', () => {
+describe('drawBorderLayer — anchor', () => {
   it('x offset: Right +15, DownRight +7, Down -9 (half a tile, as in the road pass)', () => {
     const a = posOf(10, 8, geo);
     const frame = frameAround(10, 8);
@@ -141,7 +141,7 @@ describe('drawBorderLayer — Anker', () => {
     const ys = rec.draws.filter((d) => d.x === anchor!.x + 7).map((d) => d.y);
     expect(ys).toContain(anchor!.y + 6); // DownRight
     const down = rec.draws.filter((d) => d.x === anchor!.x - 9).map((d) => d.y);
-    expect(down).toContain(anchor!.y + 6); // Down — halbe Kachel nach links
+    expect(down).toContain(anchor!.y + 6); // Down — half a tile to the left
   });
 
   it('height: y drops by (h1+h2)*heightUnit/2 — the MEAN edge height, not the max', () => {

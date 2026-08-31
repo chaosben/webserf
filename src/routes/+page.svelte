@@ -69,8 +69,8 @@
 	const NO_MARKS: readonly DrawerMark[] = [];
 
 	/**
-	 * The tabs of the import/export screen. Both halves used to sit below each other in one overlay
-	 * — but they have nothing to do with each other: one is about save games, the other about the
+	 * The tabs of the import/export screen. The two halves are tabs and not one list below each other
+	 * because they have nothing to do with each other: one is about save games, the other about the
 	 * asset file, and only one of them is what you are looking for when you click the icon.
 	 */
 	const IO_TABS: readonly OverlayTab[] = [

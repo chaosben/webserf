@@ -69,8 +69,8 @@ function mkSerf(over: Partial<Serf> & { index: number; state: number }): Serf {
   } as unknown as Serf;
 }
 
-describe('serf-production — Sawing (24) Einzel-Dauer', () => {
-  it('Phase A: Holz (stock[1]) vorhanden → verbrauchen, Anim/Dauer setzen, Phase B', () => {
+describe('serf-production — Sawing (24) single duration', () => {
+  it('phase A: timber (stock[1]) present → consume it, set anim/duration, phase B', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -80,11 +80,11 @@ describe('serf-production — Sawing (24) Einzel-Dauer', () => {
 
     dispatchSerf(state, serf);
 
-    expect(state.buildings[1]!.stock[1].available).toBe(2); // 1 Holz verbraucht
-    expect(serf.stateData[0]).toBe(0xff); // Phase B
+    expect(state.buildings[1]!.stock[1].available).toBe(2); // one timber consumed
+    expect(serf.stateData[0]).toBe(0xff); // phase B
     expect(serf.animation).toBe(0x7c);
     expect(serf.counter).toBe(0x93f);
-    expect(state.mapTiles[pos].serfIndex).toBe(1); // am Feld registriert
+    expect(state.mapTiles[pos].serfIndex).toBe(1); // registered on the tile
   });
 
   it('phase A: no timber -> wait (no mutation)', () => {
@@ -97,7 +97,7 @@ describe('serf-production — Sawing (24) Einzel-Dauer', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(0); // bleibt Phase A
+    expect(serf.stateData[0]).toBe(0); // stays in phase A
     expect(serf.state).toBe(24);
   });
 
@@ -112,7 +112,7 @@ describe('serf-production — Sawing (24) Einzel-Dauer', () => {
     expect(serf.counter).toBe(4900);
   });
 
-  it('Phase B: abgelaufen → Plank aufnehmen, Produktions-Stat++, MoveResourceOut', () => {
+  it('phase B: elapsed → pick up the plank, production stat++, MoveResourceOut', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1, serfIndex: 1 });
@@ -122,18 +122,18 @@ describe('serf-production — Sawing (24) Einzel-Dauer', () => {
     const serf = mkSerf({ index: 1, state: 24, tick: 900, counter: 5, stateData: [0xff, 0, 0, 0, 0] });
     state.serfs[1] = serf;
 
-    dispatchSerf(state, serf); // delta 100 > 5 → abgelaufen
+    dispatchSerf(state, serf); // delta 100 > 5 → elapsed
 
-    expect(serf.stateData[0]).toBe(8); // getragene Ware = Plank+1
-    expect(serf.stateData[4]).toBe(0xd); // Folgezustand DropResourceOut
-    expect(state.players[0]!.resourceCount[7]).toBe(1); // Plank(7)-Produktion +1
-    expect(state.mapTiles[pos].serfIndex).toBe(0); // Feld frei
-    expect([5, 11]).toContain(serf.state); // LeavingBuilding (Austritt) oder MoveResourceOut (blockiert)
+    expect(serf.stateData[0]).toBe(8); // carried resource = plank+1
+    expect(serf.stateData[4]).toBe(0xd); // follow-up state DropResourceOut
+    expect(state.players[0]!.resourceCount[7]).toBe(1); // plank(7) production +1
+    expect(state.mapTiles[pos].serfIndex).toBe(0); // tile free
+    expect([5, 11]).toContain(serf.state); // LeavingBuilding (exit) or MoveResourceOut (blocked)
   });
 });
 
-describe('serf-production — Butchering (38) Einzel-Dauer', () => {
-  it('Phase A: Schwein (stock[0]) → verbrauchen, Anim 0x8c/Dauer 0x5ff', () => {
+describe('serf-production — Butchering (38) single duration', () => {
+  it('phase A: pig (stock[0]) → consume it, anim 0x8c/duration 0x5ff', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -148,7 +148,7 @@ describe('serf-production — Butchering (38) Einzel-Dauer', () => {
     expect(serf.counter).toBe(0x5ff);
   });
 
-  it('Phase B abgelaufen → Meat (res+1=3) aufnehmen + Stat++', () => {
+  it('phase B elapsed → pick up the meat (res+1=3) + stat++', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1, serfIndex: 1 });
@@ -159,12 +159,12 @@ describe('serf-production — Butchering (38) Einzel-Dauer', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(3); // Meat+1
-    expect(state.players[0]!.resourceCount[2]).toBe(1); // Meat(2)-Produktion +1
+    expect(serf.stateData[0]).toBe(3); // meat+1
+    expect(state.players[0]!.resourceCount[2]).toBe(1); // meat(2) production +1
   });
 });
 
-describe('serf-production — Multi-Step-Verarbeiter', () => {
+describe('serf-production — multi-step processors', () => {
   function withFlag(): { state: GameState; pos: number } {
     const state = makeState();
     const pos = posOf(20, 20, geo);
@@ -173,7 +173,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
     return { state, pos };
   }
 
-  it('Baking (36) Phase A: Mehl (stock[0]) verbrauchen, Schritt 1, Anim 0x8a', () => {
+  it('Baking (36) phase A: consume flour (stock[0]), step 1, anim 0x8a', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -189,7 +189,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
     expect(serf.counter).toBe(0x2ff);
   });
 
-  it('Baking (36) letzter Schritt (2→3) → Bread (res+1=6), active aus', () => {
+  it('Baking (36) last step (2→3) → bread (res+1=6), active off', () => {
     const { state, pos } = withFlag();
     state.buildings[1] = bld({ type: 16, active: true });
     const serf = mkSerf({ index: 1, state: 36, tick: 900, counter: 5, stateData: [2, 0, 0, 0, 0] });
@@ -197,13 +197,13 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(6); // Bread+1
+    expect(serf.stateData[0]).toBe(6); // bread+1
     expect(state.buildings[1]!.active).toBe(false);
     expect(state.players[0]!.resourceCount[5]).toBe(1); // Bread(5)
     void pos;
   });
 
-  it('Milling (35) Phase A: active-Bit + Getreide verbrauchen, Schritt 1', () => {
+  it('Milling (35) phase A: active bit + consume wheat, step 1', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -230,12 +230,12 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
     dispatchSerf(state, serf); // 2→3
 
     expect(serf.stateData[0]).toBe(3);
-    expect(state.mapTiles[pos].serfIndex).toBe(1); // wieder registriert
+    expect(state.mapTiles[pos].serfIndex).toBe(1); // registered again
     expect(serf.counter).toBe(0x17f);
-    expect(serf.state).toBe(35); // bleibt Milling
+    expect(serf.state).toBe(35); // stays in Milling
   });
 
-  it('Milling (35) letzter Schritt (4→5) → Flour (res+1=5)', () => {
+  it('Milling (35) last step (4→5) → flour (res+1=5)', () => {
     const { state } = withFlag();
     state.buildings[1] = bld({ type: 15, active: true });
     const serf = mkSerf({ index: 1, state: 35, tick: 900, counter: 5, stateData: [4, 0, 0, 0, 0] });
@@ -243,7 +243,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(5); // Flour+1
+    expect(serf.stateData[0]).toBe(5); // flour+1
     expect(state.buildings[1]!.active).toBe(false);
     expect(state.players[0]!.resourceCount[4]).toBe(1); // Flour(4)
   });
@@ -263,10 +263,10 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
     expect(state.buildings[1]!.stock[1].available).toBe(2);
     expect(serf.stateData[0]).toBe(0xff);
     expect(serf.stateData[1]).toBe(0x14);
-    expect(serf.animation).toBe(0x82); // Stahl (field_0xd==0)
+    expect(serf.animation).toBe(0x82); // steel (field_0xd==0)
   });
 
-  it('Smelting (30) Phase A GoldSmelter (field_0xd≠0) → Anim 0x81', () => {
+  it('Smelting (30) phase A gold smelter (field_0xd≠0) → anim 0x81', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -279,7 +279,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
     expect(serf.animation).toBe(0x81);
   });
 
-  it('Smelting (30) Countdown zu Ende (field_0xc=0) → Steel (0xc)', () => {
+  it('Smelting (30) countdown finished (field_0xc=0) → steel (0xc)', () => {
     const { state } = withFlag();
     state.buildings[1] = bld({ type: 18, active: true });
     const serf = mkSerf({ index: 1, state: 30, tick: 900, counter: 5, stateData: [0xff, 0, 0, 0, 0] });
@@ -287,12 +287,12 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(0xc); // Steel+1
+    expect(serf.stateData[0]).toBe(0xc); // steel+1
     expect(state.buildings[1]!.active).toBe(false);
     expect(state.players[0]!.resourceCount[11]).toBe(1); // Steel(11)
   });
 
-  it('Smelting (30) Gold (field_0xd≠0) am Ende → GoldBar (0xf)', () => {
+  it('Smelting (30) gold (field_0xd≠0) at the end → gold bar (0xf)', () => {
     const { state } = withFlag();
     state.buildings[1] = bld({ type: 23, active: true });
     const serf = mkSerf({ index: 1, state: 30, tick: 900, counter: 5, stateData: [0xff, 0, 1, 0, 0] });
@@ -300,11 +300,11 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(0xf); // GoldBar+1
+    expect(serf.stateData[0]).toBe(0xf); // gold bar+1
     expect(state.players[0]!.resourceCount[14]).toBe(1); // GoldBar(14)
   });
 
-  it('MakingWeapon (39) Schwert-Zyklus Phase A: Kohle+Stahl verbrauchen, Schritt 1', () => {
+  it('MakingWeapon (39) sword cycle phase A: consume coal+steel, step 1', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -321,7 +321,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
     expect(serf.animation).toBe(0x8f);
   });
 
-  it('MakingWeapon (39) Schild-Zyklus Phase A (playingSfx): KEIN Verbrauch', () => {
+  it('MakingWeapon (39) shield cycle phase A (playingSfx): NO consumption', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
@@ -331,7 +331,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(1); // startet trotz leerem Stock (Material im Schwert-Zyklus verbraucht)
+    expect(serf.stateData[0]).toBe(1); // starts despite the empty stock (the material went into the sword cycle)
     expect(serf.animation).toBe(0x8f);
   });
 
@@ -343,13 +343,13 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(0x19); // Sword+1
-    expect(state.buildings[1]!.playingSfx).toBe(true); // Bit getoggelt
+    expect(serf.stateData[0]).toBe(0x19); // sword+1
+    expect(state.buildings[1]!.playingSfx).toBe(true); // bit toggled
     expect(state.buildings[1]!.active).toBe(false);
     expect(state.players[0]!.resourceCount[24]).toBe(1); // Sword(24)
   });
 
-  it('MakingWeapon (39) Abschluss im Schild-Zyklus (playingSfx) → Schild (0x1a)', () => {
+  it('MakingWeapon (39) finish in the shield cycle (playingSfx) → shield (0x1a)', () => {
     const { state } = withFlag();
     state.buildings[1] = bld({ type: 20, active: true, playingSfx: true });
     const serf = mkSerf({ index: 1, state: 39, tick: 900, counter: 5, stateData: [6, 0, 0, 0, 0] });
@@ -357,7 +357,7 @@ describe('serf-production — Multi-Step-Verarbeiter', () => {
 
     dispatchSerf(state, serf);
 
-    expect(serf.stateData[0]).toBe(0x1a); // Shield+1
+    expect(serf.stateData[0]).toBe(0x1a); // shield+1
     expect(state.buildings[1]!.playingSfx).toBe(false); // toggled back
     expect(state.players[0]!.resourceCount[25]).toBe(1); // Shield(25)
   });

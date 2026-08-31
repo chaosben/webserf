@@ -14,7 +14,7 @@ describe('ai-candidate-upkeep: the seven passes', () => {
     }
   });
 
-  it('jeder Durchgang umfasst ganze Zeilen', () => {
+  it('every pass covers whole rows', () => {
     for (const p of AI_UPKEEP_PASSES) expect(p.slots % 8).toBe(0);
   });
 

@@ -23,11 +23,11 @@ describe('music — the gate is a conjunction (@0x4500 / @0x450f)', () => {
     expect(musicShouldPlay(false, true)).toBe(false);
   });
 
-  it('bleibt ohne Haken stumm', () => {
+  it('stays silent without the option ticked', () => {
     expect(musicShouldPlay(true, false)).toBe(false);
   });
 
-  it('bleibt ohne beides stumm', () => {
+  it('stays silent without either', () => {
     expect(musicShouldPlay(false, false)).toBe(false);
   });
 });

@@ -89,7 +89,7 @@ describe('screen 0x25 — layout against the click table', () => {
     const masks = [VIEW_OPTION_ROAD_SCROLL, VIEW_OPTION_FAST_MAP_CLICK, VIEW_OPTION_FAST_BUILD_CLICK];
     expect(OPTION_CHECKBOXES.slice(0, 3).map((c) => c.mask)).toEqual(masks);
     expect(OPTION_CHECKBOXES.slice(3).map((c) => c.mask)).toEqual(masks);
-    // Zeilen paarweise gleich, Spalten 0 (links) bzw. 14 (rechts).
+    // Rows equal in pairs, columns 0 (left) and 14 (right).
     for (let i = 0; i < 3; i++) {
       expect(OPTION_CHECKBOXES[i]!.row).toBe(OPTION_CHECKBOXES[i + 3]!.row);
       expect(OPTION_CHECKBOXES[i]!.col).toBe(0);
@@ -98,7 +98,7 @@ describe('screen 0x25 — layout against the click table', () => {
   });
 });
 
-describe('Meldungs-Zeile', () => {
+describe('message row', () => {
   it('inserts the two levels into the 16-character template', () => {
     expect(OPTIONS_MESSAGE_TEMPLATE).toHaveLength(16);
     expect(optionsMessageLine([0x39, 0x39])).toBe('3 MITTEILUNGEN 3');
@@ -115,7 +115,7 @@ describe('Meldungs-Zeile', () => {
 describe('action resolution', () => {
   it('maps every zone id to an effect', () => {
     for (const z of [...OPTIONS_POPUP_HITBOXES, ...QUIT_POPUP_HITBOXES]) {
-      expect(optionsPopupAction(z.action), `Aktion 0x${z.action.toString(16)}`).not.toBeNull();
+      expect(optionsPopupAction(z.action), `action 0x${z.action.toString(16)}`).not.toBeNull();
     }
   });
 
@@ -159,7 +159,7 @@ describe('action resolution', () => {
   });
 });
 
-describe('Screen 0x22 — ENDE', () => {
+describe('screen 0x22 — QUIT', () => {
   it('has four text lines and two zones on the answer row', () => {
     expect(QUIT_POPUP_LABELS).toHaveLength(4);
     expect(QUIT_POPUP_HITBOXES).toHaveLength(2);
@@ -168,12 +168,12 @@ describe('Screen 0x22 — ENDE', () => {
     expect(answers.text).toContain('NEIN');
     for (const z of QUIT_POPUP_HITBOXES) {
       expect(z.y0).toBe(answers.row);
-      expect(z.y1).toBe(answers.row + 7); // 8 Pixel hohe Text-Zeile
+      expect(z.y1).toBe(answers.row + 7); // text row 8 pixels high
     }
   });
 });
 
-describe('Screen-Liste', () => {
+describe('screen list', () => {
   it('carries exactly the two footer screens', () => {
     expect([...OPTIONS_SCREENS].sort()).toEqual([0x22, 0x25]);
     expect(optionsPopupHitboxes(0x25)).toBe(OPTIONS_POPUP_HITBOXES);
@@ -279,8 +279,9 @@ describe('drawMenuPopup — position on the menu area', () => {
  * The check therefore takes the **drawn** point of every control and demands that it hits that
  * control's zone. It does not check the tables (the binary guards do that) but the chain.
  *
- * The final test reproduces the old bug: it must miss **every** element — otherwise the chain would
- * also be satisfiable with a wrong offset and the check above would say nothing.
+ * The final test subtracts the frame offset a second time and demands that the point then misses
+ * **every** element — otherwise the chain would also be satisfiable with a wrong offset and the
+ * check above would say nothing.
  */
 describe('clickMenuPopup — the drawn point hits its own zone', () => {
   /** Control -> expected effect, in drawing columns/rows as in the renderer. */

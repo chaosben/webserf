@@ -1074,7 +1074,7 @@ const FREE_WALKING_STATES = new Set([
 ]);
 const WORKING_MODE_STATES = new Set([
   24, // Sawing
-  25, // Lost (field_B, gleiches 1-Byte-Layout)
+  25, // Lost (field_B, same 1-byte layout)
   35, // Milling
   36, // Baking
   37, // PigFarming
@@ -1232,7 +1232,7 @@ function decodeFlag(dv: DataView, base: number, index: number): FlagRecord {
     endpointDirs.push((endpoint & (1 << j)) !== 0);
     transporters.push((transporterByte & (1 << j)) !== 0);
     length.push(dv.getUint8(base + 6 + j));
- // Byte 60+dir: Bit 7 = scheduled (Ware wartet), Bits 3–5 = Gegenrichtung, Bits 0–2 = Slot.
+ // Byte 60+dir: bit 7 = scheduled (a resource is waiting), bits 3-5 = opposite direction, bits 0-2 = slot.
     const schedByte = dv.getUint8(base + 60 + j);
     otherEndDir.push((schedByte >> 3) & 7);
     scheduled.push((schedByte & 0x80) !== 0);
@@ -1304,7 +1304,7 @@ function decodeInventory(dv: DataView, base: number, index: number): InventoryRe
   const resources: number[] = [];
   for (let j = 0; j < 26; j++) resources.push(dv.getUint16(base + 6 + j * 2, true));
 
- // Ausgangs-Warteschlange: 2× type (Byte 58/59, `b-1`) + 2× dest (u16 ab Byte 60).
+ // Outgoing queue: 2x type (bytes 58/59, `b-1`) + 2x dest (u16 from byte 60).
   const outQueue: InventoryOutQueueSlot[] = [];
   for (let j = 0; j < 2; j++) {
     outQueue.push({

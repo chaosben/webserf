@@ -145,7 +145,7 @@ function runLengths(
   }
 }
 
-/** RLE-Lauf `(drop, fill)` ohne Per-Pixel-Bytes (`overlay`/`mask`). */
+/** RLE run `(drop, fill)` without per-pixel bytes (`overlay`/`mask`). */
 function runLengthsNoData(src: Uint8Array, total: number, write: (pp: number) => void): void {
   const len = src.byteLength;
   let sp = 0;

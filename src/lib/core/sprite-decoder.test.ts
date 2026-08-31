@@ -57,7 +57,7 @@ describe('readSpriteHeader', () => {
     expect(h.offsetY).toBe(7);
   });
 
-  it('wirft bei <10 Bytes', () => {
+  it('throws on fewer than 10 bytes', () => {
     expect(() => readSpriteHeader(new Uint8Array(8))).toThrow(/too small/);
   });
 });
@@ -67,7 +67,7 @@ describe('isPlausibleSpriteHeader', () => {
     expect(isPlausibleSpriteHeader({ deltaX: 0, deltaY: 0, width: 16, height: 16, offsetX: 0, offsetY: 0 })).toBe(true);
     expect(isPlausibleSpriteHeader({ deltaX: 0, deltaY: 0, width: 640, height: 200, offsetX: 0, offsetY: 0 })).toBe(true);
   });
-  it('lehnt 0-Dimensionen ab', () => {
+  it('rejects zero dimensions', () => {
     expect(isPlausibleSpriteHeader({ deltaX: 0, deltaY: 0, width: 0, height: 16, offsetX: 0, offsetY: 0 })).toBe(false);
     expect(isPlausibleSpriteHeader({ deltaX: 0, deltaY: 0, width: 16, height: 0, offsetX: 0, offsetY: 0 })).toBe(false);
   });
@@ -95,7 +95,7 @@ describe('resolveSpriteType', () => {
   });
 
   it('falls back to the heuristic for `auto` without a registry match', () => {
-    // our entry 1 → dos_index 2 → Unknown → Fallback-Heuristik
+    // our entry 1 → dos_index 2 → Unknown → heuristic fallback
     expect(resolveSpriteType('auto', 100, 100, 1)).toBe('solid'); // payload == w*h → solid
     expect(resolveSpriteType('auto', 50, 100, 1)).toBe('transparent'); // sonst transparent
   });
@@ -121,7 +121,7 @@ describe('decodeSprite — Solid', () => {
     expect([decoded.pixels[12], decoded.pixels[13], decoded.pixels[14], decoded.pixels[15]]).toEqual([0, 0, 0, 255]);
   });
 
-  it('wirft bei zu kleinem Solid-Payload', () => {
+  it('throws on a solid payload that is too small', () => {
     const raw = makeSpriteEntry(4, 4, new Uint8Array(8));
     expect(() => decodeSprite(raw, palette, { type: 'solid' })).toThrow(/payload too small/);
   });
@@ -130,7 +130,7 @@ describe('decodeSprite — Solid', () => {
 describe('decodeSprite — Transparent RLE', () => {
   const palette = makeTestPalette();
 
-  it('decodiert (drop=0, fill=2, [1,2]) als 2 sichtbare Pixel', () => {
+  it('decodes (drop=0, fill=2, [1,2]) as 2 visible pixels', () => {
     const payload = new Uint8Array([0, 2, 1, 2]);
     const raw = makeSpriteEntry(2, 1, payload);
     const decoded = decodeSprite(raw, palette, { type: 'transparent' });
@@ -176,7 +176,7 @@ describe('decodeSprite — Overlay RLE', () => {
     expect(decoded.pixels[7]).toBe(10); // fill: Alpha == value
   });
 
-  it('Default value 0x80 → Alpha 128', () => {
+  it('default value 0x80 → alpha 128', () => {
     const payload = new Uint8Array([0, 1]);
     const raw = makeSpriteEntry(1, 1, payload);
     const decoded = decodeSprite(raw, palette, { type: 'overlay' });
@@ -188,11 +188,11 @@ describe('decodeSprite — Mask RLE', () => {
   const palette = makeTestPalette();
 
   it('writes opaque white pixels for fill, transparent for drop', () => {
-    // 4 Pixel: drop=2, fill=2
+    // 4 pixels: drop=2, fill=2
     const payload = new Uint8Array([2, 2]);
     const raw = makeSpriteEntry(4, 1, payload);
     const decoded = decodeSprite(raw, palette, { type: 'mask' });
-    // Pixel 0, 1: transparent
+    // Pixels 0, 1: transparent
     expect(decoded.pixels[3]).toBe(0);
     expect(decoded.pixels[7]).toBe(0);
     // pixels 2, 3: opaque white
@@ -202,9 +202,9 @@ describe('decodeSprite — Mask RLE', () => {
 });
 
 describe.runIf(loadOrigFile('SPAD.PA') !== null && loadOrigFile('0.PAL') !== null)(
-  'decodeSprite — gegen Original SPAD.PA + 0.PAL',
+  'decodeSprite — against the original SPAD.PA + 0.PAL',
   () => {
-    it('decodiert Entry 0 (640×200 Solid)', () => {
+    it('decodes entry 0 (640×200 solid)', () => {
       const arch = PaArchive.parse(loadOrigFile('SPAD.PA')!);
       const palette = parsePalette(loadOrigFile('0.PAL')!);
       const raw = arch.getRaw(0)!;
@@ -254,7 +254,7 @@ describe.runIf(loadOrigFile('SPAD.PA') !== null && loadOrigFile('0.PAL') !== nul
       const arch = PaArchive.parse(loadOrigFile('SPAD.PA')!);
       const palette = parsePalette(loadOrigFile('0.PAL')!);
       const raw = arch.getRaw(4)!;
-      // w=5, h=2 → 10 Pixel; size 20 = 10 + 10 (header) → Solid match
+      // w=5, h=2 → 10 pixels; size 20 = 10 + 10 (header) → solid match
       const decoded = decodeSprite(raw, palette, { type: 'auto', physicalIndex: 4 });
       expect(decoded.width).toBe(5);
       expect(decoded.height).toBe(2);

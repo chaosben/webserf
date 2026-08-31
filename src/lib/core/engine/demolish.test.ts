@@ -24,7 +24,7 @@ import type { Building, GameState, Player, Serf, Tile } from './state.js';
  * standing, so such a building is unprotected. Reading the three comparison values as a type list
  * silently adds a lock the original does not have.
  */
-const geo = mapGeometry(3); // 64×64
+const geo = mapGeometry(3); // 64x64
 
 function tile(over: Partial<Tile> = {}): Tile {
   return {
@@ -72,8 +72,8 @@ function putKnight(st: GameState, spiralIndex: number, owner: number): void {
   st.mapTiles[spiralPos(posOf(10, 10, geo), spiralIndex, geo)]!.serfIndex = idx;
 }
 
-describe('enemyKnightNearby — the guard on razing a military building', () => {
-  it('tastet genau 127 Spiral-Positionen ab (0..126)', () => {
+describe('enemyKnightNearby: the guard on demolishing a military building', () => {
+  it('probes exactly 127 spiral positions (0..126)', () => {
     expect(DEMOLISH_GUARD_SPIRAL_LEN).toBe(127);
     const pos = posOf(10, 10, geo);
 
@@ -86,10 +86,10 @@ describe('enemyKnightNearby — the guard on razing a military building', () => 
     expect(enemyKnightNearby(outside, pos, 0)).toBe(false);
   });
 
-  it('sieht nur FREMDE Ritter', () => {
+  it('sees only FOREIGN knights', () => {
     const pos = posOf(10, 10, geo);
     const own = withBuilding(11);
-    putKnight(own, 5, 0); // eigener Ritter
+    putKnight(own, 5, 0); // own knight
     expect(enemyKnightNearby(own, pos, 0)).toBe(false);
 
     const foe = withBuilding(11);
@@ -121,7 +121,7 @@ describe('canDemolishAtCursor / demolishAtCursor', () => {
       putKnight(st, 3, 1);
       expect(canDemolishAtCursor(st, st.players[0]!, 10, 10)).toBe(false);
       expect(demolishAtCursor(st, st.players[0]!, 10, 10)).toBe('rejected');
-      expect(st.buildings[1]!.burning).toBe(false); // wirklich nichts passiert
+      expect(st.buildings[1]!.burning).toBe(false); // truly nothing happened
     }
   });
 
@@ -144,11 +144,11 @@ describe('canDemolishAtCursor / demolishAtCursor', () => {
  * The three sounds hang on the same three branches; the original enqueues them BEFORE the effect
  * (`mov $0x8/$0x4c/$0x4` @0x48ca9/@0x48e62/@0x48ea4). Tested here is the branch-to-sound coupling.
  */
-describe('demolishOutcomeAt + Klang', () => {
+describe('demolishOutcomeAt + sound', () => {
   it('returns the same branch the execution takes, without changing anything', () => {
     const st = withBuilding(9);
     expect(demolishOutcomeAt(st, st.players[0]!, 10, 10)).toBe('building');
-    expect(st.buildings[1]!.burning).toBe(false); // seiteneffektfrei
+    expect(st.buildings[1]!.burning).toBe(false); // free of side effects
     expect(demolishAtCursor(st, st.players[0]!, 10, 10)).toBe('building');
     expect(st.buildings[1]!.burning).toBe(true);
   });

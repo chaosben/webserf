@@ -71,7 +71,7 @@ describe('tileToWindow — torus wrap', () => {
     const xs: number[] = [];
     for (let k = 0; k < 12; k++) xs.push(tileToWindow((58 + k) % geo.cols, 20, c, geo).x);
     for (let i = 1; i < xs.length; i++) {
-      expect(xs[i]! - xs[i - 1]!, `Naht bei Schritt ${i}`).toBe(TILE_W);
+      expect(xs[i]! - xs[i - 1]!, `seam at step ${i}`).toBe(TILE_W);
     }
   });
 
@@ -80,8 +80,8 @@ describe('tileToWindow — torus wrap', () => {
     let prev = tileToWindow(20, 58, c, geo);
     for (let k = 1; k < 12; k++) {
       const cur = tileToWindow(20, (58 + k) % geo.rows, c, geo);
-      expect(cur.y - prev.y, `Zeile ${k}`).toBe(TILE_H);
-      expect(cur.x - prev.x, `Scherung bei Zeile ${k}`).toBe(-TILE_W / 2);
+      expect(cur.y - prev.y, `row ${k}`).toBe(TILE_H);
+      expect(cur.x - prev.x, `shear at row ${k}`).toBe(-TILE_W / 2);
       prev = cur;
     }
   });
@@ -153,9 +153,9 @@ describe('cameraScroll', () => {
       [-1, -1],
     ] as const) {
       const s = cameraScroll(cam(ox, oy));
-      expect(s.pixelY, `Rest y bei ${oy}`).toBeGreaterThanOrEqual(0);
+      expect(s.pixelY, `remainder y at ${oy}`).toBeGreaterThanOrEqual(0);
       expect(s.pixelY).toBeLessThan(TILE_H);
-      expect(s.pixelX, `Rest x bei ${ox}`).toBeGreaterThanOrEqual(0);
+      expect(s.pixelX, `remainder x at ${ox}`).toBeGreaterThanOrEqual(0);
       expect(s.pixelX).toBeLessThan(TILE_W);
     }
   });
@@ -240,7 +240,7 @@ describe('camera == half-row traversal (the seam between the layers)', () => {
         const pos = row.tiles[k]!;
         const col = pos % geo.cols;
         const r = (pos - col) / geo.cols;
-        expect(tileToWindow(col, r, c, geo), `Halbzeile ${i}, Kachel ${k}`).toEqual({
+        expect(tileToWindow(col, r, c, geo), `half row ${i}, tile ${k}`).toEqual({
           x: row.xOffset + k * TILE_W,
           y: i * TILE_H,
         });
@@ -293,7 +293,7 @@ describe('repetition when zooming out', () => {
   // counters of the traversal. This test pins down that the traversal visits the same tile several
   // times — and that the counters give distinct positions for those visits.
   const { ax, by } = wrapLattice(geo);
-  const big = cam(0, 0, ax * 2, by * 2); // Fenster = zwei Karten-Perioden
+  const big = cam(0, 0, ax * 2, by * 2); // window = two map periods
   const span = viewportSpan(big.width, big.height);
   const rows = buildHalfRows({ col: 0, row: 0 }, geo, span);
 
@@ -346,18 +346,18 @@ describe('centre tile of the view (`vp+0x46/0x48`)', () => {
       for (const [col, row] of [[10, 10], [33, 7], [0, 0], [63, 63]]) {
         const c = cameraCenteredOnTile(col, row, w, h);
         const p = tileToWindow(col, row, { ...c, width: w, height: h }, geo);
-        expect(Math.abs(p.x - w / 2), `Kachel ${col},${row} @${w}×${h}`).toBeLessThanOrEqual(1);
-        expect(Math.abs(p.y - h / 2), `Kachel ${col},${row} @${w}×${h}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(p.x - w / 2), `tile ${col},${row} @${w}×${h}`).toBeLessThanOrEqual(1);
+        expect(Math.abs(p.y - h / 2), `tile ${col},${row} @${w}×${h}`).toBeLessThanOrEqual(1);
       }
     }
   });
 
-  it('Rundlauf: zentrieren → auslesen liefert dieselbe Kachel', () => {
+  it('round trip: centring → reading back yields the same tile', () => {
     for (const [w, h] of [[640, 480], [800, 500], [1920, 1080]]) {
       for (const [col, row] of [[10, 10], [33, 7], [0, 0], [63, 63], [1, 62]]) {
         const c = cameraCenteredOnTile(col, row, w, h);
         const back = cameraCenterTile({ ...c, width: w, height: h }, geo, flat, HEIGHT_UNIT);
-        expect(back, `Kachel ${col},${row} @${w}×${h}`).toEqual({ col, row });
+        expect(back, `tile ${col},${row} @${w}×${h}`).toEqual({ col, row });
       }
     }
   });
@@ -371,10 +371,10 @@ describe('centre tile of the view (`vp+0x46/0x48`)', () => {
   });
 });
 
-describe('viewport-camera — Rand-Scroll (Verbraucher-Block @0xd64e ff.)', () => {
+describe('viewport-camera — edge scroll (consumer block @0xd64e ff.)', () => {
   const g = mapGeometry(3); // 64 × 64
 
-  it('waagerecht: ±2 Spalten', () => {
+  it('horizontally: ±2 columns', () => {
     expect(scrollCenterTileByEdgeMask({ col: 30, row: 30 }, 1, g)).toEqual({ col: 28, row: 30 });
     expect(scrollCenterTileByEdgeMask({ col: 30, row: 30 }, 2, g)).toEqual({ col: 32, row: 30 });
   });
@@ -415,15 +415,14 @@ describe('gotoOwnCastle (@0x56d8) — jump to the own castle', () => {
   it('yields the castle tile and drags the CURSOR along (@0x5783)', () => {
     const p = player();
     expect(gotoOwnCastle(p, buildings, g)).toEqual({ col: 40, row: 33 });
-    // The cursor is block 380/382 and has to move along — exactly what the old copy of this
-    // computation in the view was missing.
+    // The cursor is block 380/382 and has to move along with the camera.
     expect([p.cursorCol, p.cursorRow]).toEqual([40, 33]);
   });
 
   it('the gate is `build` bit 3, not `flags` bit 0 (@0x56ec) — without a castle NOTHING happens', () => {
     const p = player({ build: 0x04 }); // bit 2 set, bit 3 not
     expect(gotoOwnCastle(p, buildings, g)).toBeNull();
-    expect([p.cursorCol, p.cursorRow]).toEqual([11, 12]); // Cursor bleibt stehen
+    expect([p.cursorCol, p.cursorRow]).toEqual([11, 12]); // the cursor stays put
   });
 
   it('an empty castle slot bails out instead of jumping to tile 0', () => {

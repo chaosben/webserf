@@ -36,14 +36,14 @@ function makeState(serfs: (Serf | null)[]): GameState {
   } as unknown as GameState;
 }
 
-/** `state`, `serf[0xb]`, `serf[0xc]` (Ziel 7), `serf[0xf]`. */
+/** `state`, `serf[0xb]`, `serf[0xc]` (destination 7), `serf[0xf]`. */
 function serf(state: number, b: number, dest: number, f = 0): Serf {
   return { index: 1, type: 0, state, stateData: [b, dest & 0xff, dest >> 8, 0, f] } as unknown as Serf;
 }
 
-describe('cancel_transport_on_delete — Serf-Kaskade', () => {
+describe('cancel_transport_on_delete — serf cascade', () => {
   it('cancels walking serfs with `serf[0xb] = 0xfe` (branch 1)', () => {
-    const s = serf(2, 0x83, 7); // Walking, Bit 7 gesetzt
+    const s = serf(2, 0x83, 7); // Walking, bit 7 set
     const st = makeState([s]);
     cancelTransportOnDelete(st, 7);
     expect(s.stateData[0]).toBe(0xfe);
@@ -55,7 +55,7 @@ describe('cancel_transport_on_delete — Serf-Kaskade', () => {
     const st = makeState([s]);
     cancelTransportOnDelete(st, 7);
     expect(s.stateData[1]).toBe(0);
-    expect(s.stateData[0]).toBe(0x0a); // `serf[0xb]` bleibt — nur Zweig 1 schreibt 0xfe
+    expect(s.stateData[0]).toBe(0x0a); // `serf[0xb]` stays — only branch 1 writes 0xfe
   });
 
   it('clears BOTH classes in one pass - what sets this routine apart from the single passes', () => {
@@ -84,19 +84,19 @@ describe('cancel_transport_on_delete — Serf-Kaskade', () => {
     cancelTransportOnDelete(st, 7);
     expect(walker.stateData[0]).toBe(0x03);
     expect(walker.stateData[1]).toBe(7); // untouched
-    expect(carrier.stateData[1]).toBe(0); // Zweig 2 hat gegriffen
+    expect(carrier.stateData[1]).toBe(0); // branch 2 applied
   });
 
-  it('Zustand 5: `serf[0xf]` entscheidet, welcher Zweig greift (2 → Siedler, 0xd → Ware)', () => {
+  it('state 5: `serf[0xf]` decides which branch applies (2 → serf, 0xd → resource)', () => {
     const leavingSerf = serf(5, 0x83, 7, 2);
     const leavingRes = serf(5, 0x83, 7, 0x0d);
     const leavingNeither = serf(5, 0x83, 7, 5);
     const st = makeState([leavingSerf, leavingRes, leavingNeither]);
     cancelTransportOnDelete(st, 7);
     expect(leavingSerf.stateData[0]).toBe(0xfe);
-    expect(leavingRes.stateData[0]).toBe(0x83); // Zweig 2: `serf[0xb]` bleibt
+    expect(leavingRes.stateData[0]).toBe(0x83); // branch 2: `serf[0xb]` stays
     expect(leavingRes.stateData[1]).toBe(0);
-    expect(leavingNeither.stateData[1]).toBe(7); // weder noch
+    expect(leavingNeither.stateData[1]).toBe(7); // neither of the two
   });
 
   it('runs the shared network tail too (the flag`s resource slot is released)', () => {

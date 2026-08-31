@@ -13,19 +13,19 @@ import {
   FLAG_RES_FRONT,
 } from './flag-sprites.js';
 
-describe('flag-sprites Konstanten', () => {
+describe('flag-sprites constants', () => {
   it('re-exports the map object and shadow bases', () => {
     expect(MAP_OBJECT_BASE).toBe(1249);
     expect(MAP_SHADOW_BASE).toBe(1499);
   });
-  it('GameObject-Basis 0-basiert 320, Flag-Basis 0x80', () => {
+  it('GameObject base 0-based 320, flag base 0x80', () => {
     expect(GAME_OBJECT_BASE).toBe(320);
     expect(FLAG_BASE).toBe(0x80);
   });
 });
 
 describe('flagFrame', () => {
-  it('wechselt alle 8 Ticks, zyklisch modulo 4', () => {
+  it('changes every 8 ticks, cyclic modulo 4', () => {
     expect(flagFrame(0)).toBe(0);
     expect(flagFrame(7)).toBe(0);
     expect(flagFrame(8)).toBe(1);
@@ -35,8 +35,8 @@ describe('flagFrame', () => {
   });
 });
 
-describe('flag Sprite-Offsets', () => {
-  it('Bild = 0x80+f, Variante = 0x80+4+f', () => {
+describe('flag sprite offsets', () => {
+  it('frame = 0x80+f, variant = 0x80+4+f', () => {
     expect(flagSpriteOffset(0, 0)).toBe(0x80);
     expect(flagSpriteOffset(3, 0)).toBe(0x83);
     // One pre-drawn set per player — four frames apart.
@@ -53,8 +53,8 @@ describe('flag Sprite-Offsets', () => {
   });
 });
 
-describe('resourceSprite + Waren-Layout', () => {
-  it('Waren-Sprite = GAME_OBJECT_BASE + Ressourcentyp', () => {
+describe('resourceSprite + resource layout', () => {
+  it('resource sprite = GAME_OBJECT_BASE + resource type', () => {
     expect(resourceSprite(0)).toBe(320);
     expect(resourceSprite(25)).toBe(345);
   });

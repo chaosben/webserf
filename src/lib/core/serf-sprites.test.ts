@@ -33,8 +33,8 @@ function ctx(over: Partial<SerfBodyContext>): SerfBodyContext {
   };
 }
 
-describe('serf-sprites Konstanten', () => {
-  it('Asset-Basen 0-basiert (spaIndex − 1)', () => {
+describe('serf-sprites constants', () => {
+  it('asset bases are 0-based (spaIndex − 1)', () => {
     expect(SERF_TORSO_BASE).toBe(2499);
     expect(SERF_ARMS_BASE).toBe(1849);
     expect(SERF_HEAD_BASE).toBe(3149);
@@ -69,7 +69,7 @@ describe('serfBody', () => {
     expect(serfBody(ctx({ type: 4, state: 10 }))).toBe(-1);
   });
 
-  it('Digger: t<0x80 → +0x300, t≥0x80 → +0x380', () => {
+  it('digger: t<0x80 → +0x300, t≥0x80 → +0x380', () => {
     expect(serfBody(ctx({ type: 2, animSprite: 0x10 }))).toBe(0x310);
     expect(serfBody(ctx({ type: 2, animSprite: 0x84 }))).toBe(0x84 + 0x380);
   });
@@ -81,18 +81,18 @@ describe('serfBody', () => {
     expect(serfBody(ctx({ type: 22, animSprite: 0xc5 }))).toBe(0xc5 + 0x7d90); // t≥0xc0
   });
 
-  it('Dead → +0x8700', () => {
+  it('dead → +0x8700', () => {
     expect(serfBody(ctx({ type: 27, animSprite: 3 }))).toBe(3 + 0x8700);
   });
 
-  it('Lumberjack: freilaufend-tragend (+0x1000) vs. Standard (+0xb00)', () => {
+  it('lumberjack: free-walking while carrying (+0x1000) vs. standard (+0xb00)', () => {
     expect(serfBody(ctx({ type: 5, state: 16, negDist1: -128, negDist2: 1, animSprite: 0x10 }))).toBe(0x1010);
     expect(serfBody(ctx({ type: 5, state: 2, animSprite: 0x10 }))).toBe(0x10 + 0xb00);
   });
 });
 
 describe('bodyToSprites', () => {
-  it('body 0 → Torso/Kopf 0', () => {
+  it('body 0 → torso/head 0', () => {
     expect(bodyToSprites(0)).toEqual({ torso: 0, head: 0 });
   });
   it('uses the hi/lo split via INDEX1/INDEX2', () => {
@@ -163,7 +163,7 @@ describe('serfDrawInfo', () => {
   });
 
   it('animPhaseOffset runs DOWNWARDS (like the counting-down counter in the original)', () => {
-    // animation 2: 3 Frames (sprites 0x01,0x02,0x03). counter 0 → gespeicherte Phase 0.
+    // animation 2: 3 frames (sprites 0x01,0x02,0x03). counter 0 → stored phase 0.
     const s = serf({ animation: 2, counter: 0 });
     // Offset 1 must give the PREVIOUS phase (0-1 -> 2), not the next one.
     const p2 = serfDrawInfo(serf({ animation: 2, counter: 16 }), anim, 0); // Phase 2 (sprite 0x03)
@@ -181,7 +181,7 @@ describe('serfDrawInfo', () => {
     expect(ground!.dx).toBe(1);
   });
 
-  it('ruhender Weg-Serf (IdleOnPath) → null', () => {
+  it('a serf idling on a road (IdleOnPath) → null', () => {
     expect(serfDrawInfo(serf({ state: 66 }), anim)).toBeNull();
   });
 
@@ -251,7 +251,7 @@ describe('serfDrawInfo', () => {
 });
 
 describe('idle carriers', () => {
-  it('isIdlePathState erkennt State 66..69', () => {
+  it('isIdlePathState detects states 66..69', () => {
     expect(isIdlePathState(65)).toBe(false);
     expect(isIdlePathState(66)).toBe(true);
     expect(isIdlePathState(69)).toBe(true);

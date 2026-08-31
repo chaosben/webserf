@@ -17,9 +17,9 @@ interface BuildingFx {
   col: number;
   row: number;
   constructing?: boolean;
-  /** Statusbits (Byte 5). */
+  /** Status bits (byte 5). */
   statusByte?: number;
-  /** Rohe Stock-Bytes (Byte 8/9); 0xFF = Inventar-Marker. */
+  /** Raw stock bytes (bytes 8/9); 0xFF = inventory marker. */
   stockBytes?: [number, number];
   /** u32 inventory offset (byte 14); read only for a finished inventory building. */
   inventoryOffset?: number;
@@ -51,21 +51,21 @@ interface FlagFx {
   hasResources?: boolean;
   /** Road bitmask over 6 directions (bit j = direction j). */
   pathCon?: number;
-  /** Endpunkt-Offsets je Richtung (roher int32; -1 ⇒ NULL). */
+  /** Endpoint offsets per direction (raw int32; -1 ⇒ NULL). */
   endpoints?: number[];
-  /** Bis zu 8 Waren-Slot-Ressourcentypen (-1 = leer). */
+  /** Up to 8 resource slot types (-1 = empty). */
   resourceSlots?: number[];
   searchNum?: number;
   searchDir?: number;
   /** Carrier bitmask (byte 5, bits 0-5) + serf_request_fail (bit 7). */
   transporterByte?: number;
-  /** Bis zu 6 rohe length-Bytes (Byte 6..11). */
+  /** Up to 6 raw length bytes (bytes 6..11). */
   length?: number[];
   /** Up to 8 slot pickup directions (-1 = not scheduled, otherwise 0..5). */
   slotDir?: number[];
-  /** Bis zu 8 Slot-Ziele (u16). */
+  /** Up to 8 slot destinations (u16). */
   slotDest?: number[];
-  /** Bis zu 6 rohe other_end_dir-Bytes (Byte 60..65). */
+  /** Up to 6 raw other_end_dir bytes (bytes 60..65). */
   otherEndDirByte?: number[];
   bldFlags?: number;
   bld2Flags?: number;
@@ -81,10 +81,10 @@ interface InventoryFx {
   building?: number;
   /** Up to 26 resource counts (index = resource type). */
   resources?: number[];
-  /** Bis zu 2 Ausgangs-Slots (type -1 = leer, dest = Ziel-Flagge). */
+  /** Up to 2 out-queue slots (type -1 = empty, dest = target flag). */
   outQueue?: { type: number; dest: number }[];
   genericCount?: number;
-  /** Bis zu 27 Serf-Indizes je Typ (0 = keiner). */
+  /** Up to 27 serf indices per type (0 = none). */
   serfIndices?: number[];
 }
 
@@ -129,9 +129,9 @@ interface PlayerFx {
   steelDistribution?: number[];
   coalDistribution?: number[];
   wheatDistribution?: number[];
-  /** Einzelne Stat-Historie-Zellen setzen: [mode, sample, value]. */
+  /** Sets individual stat history cells: [mode, sample, value]. */
   statCells?: [number, number, number][];
-  /** Einzelne Waren-Historie-Zellen setzen: [resource, sample, value]. */
+  /** Sets individual resource history cells: [resource, sample, value]. */
   resourceCells?: [number, number, number][];
 }
 
@@ -278,7 +278,7 @@ function buildSave(fx: Fixture): Uint8Array {
     if (pd.totalBuildingScore !== undefined) dv.setUint32(base + 406, pd.totalBuildingScore, true);
     if (pd.totalMilitaryScore !== undefined) dv.setUint32(base + 410, pd.totalMilitaryScore, true);
     if (pd.castleCaptureBalance !== undefined) dv.setInt16(base + 478, pd.castleCaptureBalance, true);
-    // Statistik-Historie: stat @2884 [16][112], resource @4676 [26][120], beide u8.
+    // Statistics history: stat @2884 [16][112], resource @4676 [26][120], both u8.
     for (const [m, s, v] of pd.statCells ?? []) dv.setUint8(base + 2884 + m * 112 + s, v);
     for (const [r, s, v] of pd.resourceCells ?? []) dv.setUint8(base + 4676 + r * 120 + s, v);
   }
@@ -302,7 +302,7 @@ function buildSave(fx: Fixture): Uint8Array {
     dv.setUint16(gameOff + 2, t.serfIndex ?? 0, true);
   }
 
-  // Serf-Bitmap liegt direkt nach Header + Players + Map.
+  // The serf bitmap sits directly after header + players + map.
   const serfBitmapOffset = 250 + playersBytes + mapBytes;
   const serfRecordsOffset = serfBitmapOffset + bitmapBytes(fx.maxSerfIndex);
   const serfRowShift = 5 + Math.floor(fx.mapSize / 2);
@@ -339,7 +339,7 @@ function buildSave(fx: Fixture): Uint8Array {
     for (let j = 0; j < 6; j++) dv.setUint8(base + 6 + j, len[j] ?? 0);
     const eps = f.endpoints ?? [];
     for (let j = 0; j < 6; j++) dv.setInt32(base + 36 + j * 4, eps[j] ?? -1, true);
-    // Waren-Slots: Byte 12+j packt type (Bits 0-4) + dir (Bits 5-7); dest als u16 ab Byte 20.
+    // Resource slots: byte 12+j packs type (bits 0-4) + dir (bits 5-7); dest as u16 from byte 20.
     const slots = f.resourceSlots ?? [];
     const sdir = f.slotDir ?? [];
     const sdest = f.slotDest ?? [];
@@ -357,7 +357,7 @@ function buildSave(fx: Fixture): Uint8Array {
     dv.setUint8(base + 69, f.stockPriority?.[1] ?? 0);
   }
 
-  // Building-Block: nach Serfs + Flags.
+  // Building block: after serfs + flags.
   const buildingBitmapOffset = serfBitmapOffset + serfBytes + flagBytes;
   const buildingRecordsOffset = buildingBitmapOffset + bitmapBytes(fx.maxBuildingIndex);
   const rowShift = 5 + Math.floor(fx.mapSize / 2);
@@ -376,7 +376,7 @@ function buildSave(fx: Fixture): Uint8Array {
     dv.setUint8(base + 17, b.stockMaximum?.[1] ?? 0);
   }
 
-  // Inventory-Block: letzter Block, nach Buildings.
+  // Inventory block: the last block, after the buildings.
   const invBitmapOffset = buildingBitmapOffset + buildingBytes;
   const invRecordsOffset = invBitmapOffset + bitmapBytes(fx.maxInventoryIndex);
   for (const inv of fx.inventories ?? []) {
@@ -413,17 +413,17 @@ const baseFixture: Fixture = {
   activePlayers: [0, 1],
   occupiedSerfs: [0, 2],
   buildings: [
-    { index: 0, type: 24, owner: 0, col: 25, row: 46 }, // Castle Spieler 0
-    { index: 1, type: 11, owner: 1, col: 51, row: 42 }, // Hut Spieler 1
+    { index: 0, type: 24, owner: 0, col: 25, row: 46 }, // castle, player 0
+    { index: 1, type: 11, owner: 1, col: 51, row: 42 }, // hut, player 1
   ],
 };
 
 describe('mapGeometry', () => {
-  it('size=3 → 64×64 = 4096 Tiles (verifiziert gegen SAVE0.DS)', () => {
+  it('size=3 → 64×64 = 4096 tiles (verified against SAVE0.DS)', () => {
     expect(mapGeometry(3)).toEqual({ cols: 64, rows: 64, tileCount: 4096 });
   });
 
-  it('size=4 → 128×64 = 8192 Tiles', () => {
+  it('size=4 → 128×64 = 8192 tiles', () => {
     expect(mapGeometry(4)).toEqual({ cols: 128, rows: 64, tileCount: 8192 });
   });
 });
@@ -431,15 +431,15 @@ describe('mapGeometry', () => {
 describe('parseSaveGame — menu player settings (.DS@144..163)', () => {
   /** Four slots with distinguishable values, so a swap shows up. */
   const MENU = [
-    11, 12, 13, 14, // 144..147 Gesicht
-    21, 22, 23, 24, // 148..151 Intelligenz
-    31, 32, 33, 34, // 152..155 Vorrat
-    41, 42, 43, 44, // 156..159 Fortpflanzung
+    11, 12, 13, 14, // 144..147 face
+    21, 22, 23, 24, // 148..151 intelligence
+    31, 32, 33, 34, // 152..155 supply
+    41, 42, 43, 44, // 156..159 reproduction
     51, 52, // 160/161 supplies of the humans
     61, 62, // 162/163 reproduction of the humans
   ];
 
-  it('dekodiert alle sechs Gruppen bei gameType > 1', () => {
+  it('decodes all six groups at gameType > 1', () => {
     const state = parseSaveGame(buildSave({ ...baseFixture, gameType: 2, menuBytes: MENU }));
     const m = state.header.menuSetup;
     expect(m).toBeDefined();
@@ -461,7 +461,7 @@ describe('parseSaveGame — menu player settings (.DS@144..163)', () => {
   });
 
   it('does not shift the following fields (cursor arithmetic)', () => {
-    // The actual regression guard: the new read block must not slip the cursor.
+    // The sharp part: reading the block must not slip the cursor for everything behind it.
     const state = parseSaveGame(buildSave({ ...baseFixture, gameType: 2, menuBytes: MENU }));
     expect(state.header.maxInventoryIndex).toBe(1);
     expect(state.header.mapSize).toBe(3);
@@ -520,7 +520,7 @@ describe('parseSaveGame', () => {
     expect(state.serfs.recordSize).toBe(16);
   });
 
-  it('dekodiert Building-Records (Typ, Owner, Position)', () => {
+  it('decodes building records (type, owner, position)', () => {
     const state = parseSaveGame(buildSave(baseFixture));
     expect(state.buildingRecords).toHaveLength(2);
     const castle = state.buildingRecords[0];
@@ -589,7 +589,7 @@ describe('parseSaveGame', () => {
     expect(state.buildingRecords[0].typeName).toBe('Unknown(25)');
   });
 
-  it('dekodiert Serf-Records (Typ, Owner, State, Position)', () => {
+  it('decodes serf records (type, owner, state, position)', () => {
     const fx: Fixture = {
       ...baseFixture,
       maxSerfIndex: 4,
@@ -641,7 +641,7 @@ describe('parseSaveGame', () => {
   });
 
   it('decodes the state-dependent serf union fields (stateFields per variant)', () => {
-    // stateData = [Byte11, Byte12, Byte13, Byte14, Byte15]; u16-Felder = lo|hi<<8.
+    // stateData = [byte11, byte12, byte13, byte14, byte15]; u16 fields = lo|hi<<8.
     const fx: Fixture = {
       ...baseFixture,
       maxSerfIndex: 10,
@@ -715,7 +715,7 @@ describe('parseSaveGame', () => {
     expect(state.serfRecords[0].typeName).toBe('Unknown(30)');
   });
 
-  it('dekodiert Flag-Records (owner, Wege, Endpunkte, Waren-Slots)', () => {
+  it('decodes flag records (owner, roads, endpoints, resource slots)', () => {
     const fx: Fixture = {
       ...baseFixture,
       maxFlagIndex: 5,
@@ -780,12 +780,12 @@ describe('parseSaveGame', () => {
           searchDir: 2,
           // Carrier on direction 0; serf_request_fail (bit 7) set.
           transporterByte: (1 << 0) | (1 << 7),
-          // length[0] = category 3, count 1 = 0x31; Rest 0.
+          // length[0] = category 3, count 1 = 0x31; rest 0.
           length: [0x31, 0, 0, 0, 0x11, 0],
           resourceSlots: [9, -1, -1, -1, -1, -1, -1, -1], // Stone in Slot 0
           slotDir: [2, -1, -1, -1, -1, -1, -1, -1],
           slotDest: [7, 0, 0, 0, 0, 0, 0, 0],
-          // other_end_dir[0]: Bits 3-5 = Richtung 3 → 3<<3 = 0x18.
+          // other_end_dir[0]: bits 3-5 = direction 3 → 3<<3 = 0x18.
           otherEndDirByte: [0x18, 0, 0, 0, 0, 0],
           bldFlags: (1 << 6) | (1 << 7), // has_inventory + accepts_serfs
           bld2Flags: 1 << 7, // accepts_resources
@@ -864,7 +864,7 @@ describe('parseSaveGame', () => {
           ],
           resourceCells: [
             [6, 0, 9], // Lumber, sample 0
-            [25, 119, 5], // letzte Ware (Shield), letztes Sample
+            [25, 119, 5], // last resource (shield), last sample
           ],
         },
       ],
@@ -925,7 +925,7 @@ describe('parseSaveGame', () => {
     expect([...p0.inventoryPriority].sort((a, b) => a - b)).toEqual(
       Array.from({ length: 26 }, (_, j) => j + 1),
     );
-    // knight_occupation-Nibbles: min ≤ max ≤ 4.
+    // knight_occupation nibbles: min ≤ max ≤ 4.
     for (const b of p0.knightOccupation) {
       expect(b & 0xf).toBeLessThanOrEqual((b >> 4) & 0xf);
       expect((b >> 4) & 0xf).toBeLessThanOrEqual(4);
@@ -940,7 +940,7 @@ describe('parseSaveGame', () => {
       players: [
         {
           slot: 0,
-          build: 0x0e, // Bits 2|3 = Castle-Besitzer
+          build: 0x0e, // bits 2|3 = castle owner
           lastTick: 33016,
           reproductionCounter: 696,
           reproductionReset: 2000, // = (60-20)*50
@@ -981,7 +981,7 @@ describe('parseSaveGame', () => {
     expect(p0.attackingKnights.reduce((a, b) => a + b, 0)).toBe(p0.totalAttackingKnights);
     expect(p0.currentSett5Item).toBe(8);
     expect(p0.currentSett6Item).toBe(15);
-    // Bau-/Karten-Cursor (Block 380/382 == `player+0xfc`/`0xfe`). Pinnt beide Offsets gegeneinander:
+    // Build/map cursor (block 380/382 == `player+0xfc`/`0xfe`). Pins the two offsets against each other:
     // one u16 off would read the row as the column. The cursor is stored state — the original knows
     // no "no tile selected".
     expect(p0.cursorCol).toBe(37);
@@ -1057,7 +1057,7 @@ describe('parseSaveGame', () => {
     });
   });
 
-  it('dekodiert Inventory-Records (owner, flag, building, Ressourcen, Serf-Indizes)', () => {
+  it('decodes inventory records (owner, flag, building, resources, serf indices)', () => {
     const resources = Array.from({ length: 26 }, (_, j) => (j === 9 ? 21 : j === 6 ? 3 : 0));
     const serfIndices = Array.from({ length: 27 }, (_, j) => (j === 0 ? 497 : j === 3 ? 15 : 0));
     const fx: Fixture = {
@@ -1075,7 +1075,7 @@ describe('parseSaveGame', () => {
           genericCount: 215,
           resources,
           outQueue: [
-            { type: 9, dest: 3 }, // Stone → Flagge 3
+            { type: 9, dest: 3 }, // Stone → flag 3
             { type: -1, dest: 0 }, // leer
           ],
           serfIndices,
@@ -1112,7 +1112,7 @@ describe('parseSaveGame', () => {
     expect(() => parseSaveGame(buf)).toThrow(/map size/);
   });
 
-  it('wirft bei zu kleiner Datei', () => {
+  it('throws on a file that is too small', () => {
     expect(() => parseSaveGame(new Uint8Array(100))).toThrow(/too small/);
   });
 

@@ -5,7 +5,7 @@ import { loadState, type GameState } from './state.js';
 import type { SaveGameState } from '../types.js';
 
 /**
- * Tests zur Karten-Fortschreibung (`map_object_growth` @0xf2d5).
+ * Tests for the map growth pass (`map_object_growth` @0xf2d5).
  *
  * Only what synthetic data can check.
  */
@@ -92,10 +92,10 @@ function run(state: GameState, n: number): void {
   }
 }
 
-describe('map-growth: Takt', () => {
-  it('tut ohne Tick-Fortschritt nichts (Delta 0)', () => {
+describe('map-growth: cadence', () => {
+  it('does nothing without tick progress (delta 0)', () => {
     const st = loadState(emptySave());
-    st.mapTiles[100]!.object = 0x69; // frische Saat
+    st.mapTiles[100]!.object = 0x69; // fresh seed
     const before = st.header.mapCursorRaw;
     for (let i = 0; i < 500; i++) mapObjectGrowth(st);
     expect(st.mapTiles[100]!.object).toBe(0x69);
@@ -106,19 +106,19 @@ describe('map-growth: Takt', () => {
     expect(tilesPerRound(mapGeometry(3))).toBe(4);
   });
 
-  it('bearbeitet ~tilesPerRound Kacheln je 20 Ticks', () => {
+  it('processes ~tilesPerRound tiles every 20 ticks', () => {
     const st = loadState(emptySave());
     // Fill everything with tree stumps: every visit draws a random value, the cursor advances per tile.
     const start = decodeMapCursor(st.header.mapCursorRaw, st.geo);
-    run(st, 2000); // 100 Runden à 4 Kacheln = 400 Kachel-Besuche
+    run(st, 2000); // 100 rounds of 4 tiles = 400 tile visits
     const end = decodeMapCursor(st.header.mapCursorRaw, st.geo);
- // 2000 Ticks / 20 = 100 Runden à 4 Kacheln = genau 400 Cursor-Schritte à 23 Kacheln.
+ // 2000 ticks / 20 = 100 rounds of 4 tiles = exactly 400 cursor steps of 23 tiles each.
     expect(end).toBe((start + 400 * 23) & (st.geo.tileCount - 1));
   });
 });
 
-describe('map-growth: Cursor-Kodierung', () => {
-  it('decode/encode sind zueinander invers', () => {
+describe('map-growth: cursor encoding', () => {
+  it('decode and encode are inverse to each other', () => {
     const geo = mapGeometry(3);
     for (const pos of [0, 1, 63, 64, 1234, geo.tileCount - 1]) {
       expect(decodeMapCursor(encodeMapCursor(pos, geo), geo)).toBe(pos);
@@ -127,7 +127,7 @@ describe('map-growth: Cursor-Kodierung', () => {
 
   it('encodes with the gap bit, like the serf and building records', () => {
     const geo = mapGeometry(3);
- // row 2, col 5 → ((2 << 7) | 5) << 2
+ // row 2, col 5 -> ((2 << 7) | 5) << 2
     const pos = (2 << geo.rowShift) | 5;
     expect(encodeMapCursor(pos, geo)).toBe((((2 << (geo.rowShift + 1)) | 5) << 2) >>> 0);
   });
@@ -173,14 +173,14 @@ describe('map-growth: object transitions', () => {
     expect([0, 0x53]).toContain(st.mapTiles[500]!.object);
   });
 
-  it('Getreide reift 0x69 → … → 0x6e → 0x79', () => {
+  it('wheat ripens 0x69 -> ... -> 0x6e -> 0x79', () => {
     const st = loadState(emptySave());
     st.mapTiles[700]!.object = 0x69;
     run(st, 20_000);
     expect(st.mapTiles[700]!.object).not.toBe(0x69);
   });
 
-  it('Objekte unter 0x53 bleiben unangetastet', () => {
+  it('objects below 0x53 stay untouched', () => {
     const st = loadState(emptySave());
     for (const o of [0, 1, 4, 0x10, 0x30, 0x52]) {
       const pos = 200 + o;

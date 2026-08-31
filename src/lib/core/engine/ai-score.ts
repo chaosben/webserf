@@ -434,22 +434,22 @@ export const AI_FLAG_BOAT_SLOT = 8;
  * and six branches. The 40000 appears as such in real saves.
  *
  * ```
- * T0[1] + T0[2] != 0 → 0 # @0x5e2ae — herrenloses ODER fremdes Land liegt an
+ * T0[1] + T0[2] != 0 → 0 # @0x5e2ae — unowned OR foreign land adjoins
  * T0[37] == 0 -> 40000 # @0x5e2be — the pre-check head did not run at all
- * T0[37] != 0xffff → 0 # @0x5e2c5 — Kopf war erfolgreich (100) ⇒ nichts zu tun
+ * T0[37] != 0xffff → 0 # @0x5e2c5 — the head succeeded (100), so nothing to do
  * T0[5] < 12 → 0 # @0x5e2cf
  * player[0x368] != 0 → 35000 # @0x5e2de
  * player[0x3ac] != 0 → 35000 # @0x5e2ed
- * sonst → 0
+ * otherwise → 0
  * ```
  *
  * **The 35000 branch is the landing stage.** The two fields it reads lie **inside the census** —
  * `0x366 + 2 * 1` and `0x39c + 2 * 8`:
  *
- * | ASM | Feld | Index | Bedeutung |
+ * | ASM | Field | Index | Meaning |
  * |---|---|---|---|
- * | `mov 0x368(%ebx),%ax` @0x5e2d4 | `aiIdleSerfs` (Block 998, Basis `0x366`) | 1 | ruhende **Segler** |
- * | `mov 0x3ac(%ebx),%ax` @0x5e2e3 | `aiStockpile` (Block 1052, Basis `0x39c`) | 8 | **Boote** im Lager |
+ * | `mov 0x368(%ebx),%ax` @0x5e2d4 | `aiIdleSerfs` (block 998, base `0x366`) | 1 | idle **sailors** |
+ * | `mov 0x3ac(%ebx),%ax` @0x5e2e3 | `aiStockpile` (block 1052, base `0x39c`) | 8 | **boats** in the warehouse |
  *
  * So the branch reads cleanly: much water around (slot 5 >= 12) **and** a sailor or a boat available
  * => a flag for a water road pays off here. Without either the spot is worthless, because nobody could
@@ -535,7 +535,7 @@ export const ATTACK_PROLOG_CHAIN: readonly ScoreOp[] = [
 /**
  * The nine target chains, ids 26..34.
  *
- * Jede Kette summiert mehrere Vier-Radien-Terme im **zweiten** Akkumulator (`SUM_*`), klemmt
+ * Each chain sums several four-radius terms in the **second** accumulator (`SUM_*`), clamps
  * **once** and multiplies **once** — unlike the build-site chains, which multiply per factor. The
  * weights are throughout `8*T3 + 4*T2 + 2*T1 + T0`, so the innermost radius counts most.
  *
@@ -548,7 +548,7 @@ export const ATTACK_PROLOG_CHAIN: readonly ScoreOp[] = [
  * | 28 | coal mine, gold mine, **gold smelter** | the gold chain |
  * | 29 | fisher, farm, butcher, pig farm, mill, bakery | the food chain |
  * | 30 | lumberjack, stonecutter, forester, stone mine | the building material chain |
- * | 31..34 | Bodenproben-Schild + passende Mine | Gold-/Eisen-/Kohle-/Stein-Vorkommen |
+ * | 31..34 | soil sample sign + matching mine | gold / iron / coal / stone deposits |
  *
  * Mapping the sign slots 33..36 to gold/iron/coal/stone is not an assumption here: branch A's four
  * mine evaluators already fix it (projects 5..8 read 36/35/34/33), and here every deposit id reads

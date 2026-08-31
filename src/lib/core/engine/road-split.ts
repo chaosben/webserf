@@ -113,7 +113,7 @@ export function linkRoadHalf(
         continue;
       }
       serf.stateData[4] = 0xff; // field_0xf = -1 => at the next flag: head back to the warehouse
-      const carried = serf.stateData[0]!; // field_0xb (getragene Ware, roher Byte-Wert)
+      const carried = serf.stateData[0]!; // field_0xb (carried resource, raw byte value)
       if (carried !== 0) {
         const dest = serf.stateData[1]! | (serf.stateData[2]! << 8); // field_0xc
         cancelTransitResource(state, carried, dest);
@@ -159,7 +159,7 @@ export function transferRoadSerfRequest(
 
   let foundAtB = false;
   for (const serf of state.serfs) {
-    if (!serf) continue; // unbelegter Slot: `vreg1` bleibt unangetastet
+    if (!serf) continue; // unoccupied slot: `vreg1` stays untouched
     foundAtB = false;
     const dest = serf.stateData[1]! | (serf.stateData[2]! << 8); // field_0xc
     const dir = i8(serf.stateData[0]!); // field_0xb
@@ -200,7 +200,7 @@ export function splitRoadAtFlag(state: GameState, col: number, row: number): voi
   const restingByPos = indexRestingCarriers(state);
   const traceA = traceRoadCarriers(state, pos, dirA as Direction, restingByPos);
   const traceB = traceRoadCarriers(state, pos, dirB as Direction, restingByPos);
-  if (traceA.farIdx === 0 || traceB.farIdx === 0) return; // Trace ins Nichts (defensiv)
+  if (traceA.farIdx === 0 || traceB.farIdx === 0) return; // trace into nothing (defensive)
 
   transferRoadSerfRequest(state, traceA, traceB);
 

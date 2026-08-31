@@ -69,11 +69,11 @@ describe('minimapOffset (block interleaved like gs+0x8c)', () => {
     expect(minimapOffset(0, 0, colShift)).toBe(0);
     expect(minimapOffset(1, 0, colShift)).toBe(1);
     expect(minimapOffset(0, 1, colShift)).toBe(16);
-    // Pixel (16,0) → Block (1,0) → Offset 256
+    // Pixel (16,0) → block (1,0) → offset 256
     expect(minimapOffset(16, 0, colShift)).toBe(256);
-    // Pixel (0,16) → Block (0,1) → Offset (1<<2)·256 = 1024
+    // Pixel (0,16) → block (0,1) → offset (1<<2)·256 = 1024
     expect(minimapOffset(0, 16, colShift)).toBe(1024);
-    // Pixel (17,16) → Block (1,1), innen px=1/py=0 → ((1<<2)|1)·256 + 0·16+1 = 5·256+1 = 1281
+    // Pixel (17,16) → block (1,1), inside px=1/py=0 → ((1<<2)|1)·256 + 0·16+1 = 5·256+1 = 1281
     expect(minimapOffset(17, 16, colShift)).toBe(5 * 256 + 1);
   });
 });
@@ -89,7 +89,7 @@ describe('buildMinimap (port of FUN_0000af12)', () => {
     }
   });
 
-  it('flaches Gras (terrainUp 4, height 0) → base 17 + shade 8 = SHADE_LUT[25] = 24', () => {
+  it('flat grass (terrainUp 4, height 0) → base 17 + shade 8 = SHADE_LUT[25] = 24', () => {
     const cols = 16;
     const rows = 16;
     const mm = buildMinimap(makeMap(cols, rows, () => 4), cols, rows);
@@ -153,7 +153,7 @@ describe('drawMinimapWindow (port of FUN_00042637, 8x8 block window)', () => {
       const y = MINIMAP_WINDOW_Y + by * 16;
       return fb.rgba[(y * fb.width + x) * 4]!;
     };
-    // Screen-Block-Spalte 0 → Quell-Block 0 (Wert 1); Spalte 1 → Block 1 (Wert 2);
+    // Screen block column 0 -> source block 0 (value 1); column 1 -> block 1 (value 2);
     // column 2 -> wraps to block 0 (value 1); column 3 -> block 1 (value 2).
     expect(R(0, 0)).toBe(1);
     expect(R(1, 0)).toBe(2);

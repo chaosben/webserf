@@ -49,7 +49,7 @@ describe('composeTerrainTile', () => {
   });
 
   it('tiles the texture MASK-LOCALLY (x % gw, y % gh) — the basis for caching', () => {
-    // Textur 8×4, Maske 20×4: Spalte 9 muss Textur-Spalte 1 zeigen, Zeile 3 → Textur-Zeile 3.
+    // Texture 8×4, mask 20×4: column 9 must show texture column 1, row 3 → texture row 3.
     const t = composeTerrainTile(
       sprite(20, 4, () => [255, 255, 255, 255]),
       coordTexture(8, 4),
@@ -93,7 +93,7 @@ describe('key construction', () => {
       for (let mask = 0; mask < 81; mask++) {
         for (let ground = 259; ground < 259 + 33; ground++) {
           const k = terrainTileKey(terrainMaskSprite(kind, mask), ground);
-          expect(seen.has(k), `Kollision bei ${kind}/${mask}/${ground}`).toBe(false);
+          expect(seen.has(k), `collision at ${kind}/${mask}/${ground}`).toBe(false);
           seen.add(k);
         }
       }
@@ -135,7 +135,7 @@ describe('TerrainTileCache', () => {
     expect(cache.size).toBe(1);
   });
 
-  it('trennt Paare nach Maske, Boden UND Dreiecksart', () => {
+  it('separates pairs by mask, ground AND triangle kind', () => {
     const { cache } = fixture();
     cache.get('up', 40, 259);
     cache.get('up', 41, 259);
@@ -161,7 +161,7 @@ describe('TerrainTileCache', () => {
     expect(cache.composedCount).toBe(0);
   });
 
-  it('clear() verwirft alles', () => {
+  it('clear() discards everything', () => {
     const { cache } = fixture();
     cache.get('up', 40, 259);
     cache.clear();

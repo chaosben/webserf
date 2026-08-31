@@ -12,7 +12,7 @@ function ctx(seed: [number, number, number] = [1, 2, 3]): GameState {
   return { rng: new Rng(seed), ambient: createAmbientState() } as unknown as GameState;
 }
 
-describe('ambient-sound: Zufalls-Zug', () => {
+describe('ambient-sound: random draw', () => {
   it('draws even when nothing is visible', () => {
     const st = ctx();
     const before = st.rng.getState().join(',');
@@ -48,7 +48,7 @@ describe('ambient-sound: Zufalls-Zug', () => {
   });
 });
 
-describe('ambient-sound: Vogel-Zweig', () => {
+describe('ambient-sound: bird branch', () => {
   it('stays silent without visible trees', () => {
     const st = ctx();
     for (let i = 0; i < 200; i++) {
@@ -96,7 +96,7 @@ describe('ambient-sound: water and wind', () => {
     };
     expect(vol(8)).toBe(3);
     expect(vol(80)).toBe(12);
-    expect(vol(9999)).toBe(0x16); // geklemmt: 0x14 + 2
+    expect(vol(9999)).toBe(0x16); // clamped: 0x14 + 2
   });
 
   it('without visible water the water volume stays unset', () => {
@@ -122,7 +122,7 @@ describe('ambient-sound: water and wind', () => {
     expect([...seen].sort()).toEqual([2, 3]);
   });
 
-  it('weder Wasser noch Wind erzeugen einen einzureihenden Klang', () => {
+  it('neither water nor wind enqueues a sound', () => {
   // The original calls NO `enqueue_sound_priority` in either branch - only the birds are audible.
     const st = ctx();
     st.ambient.waterTiles = 2000;

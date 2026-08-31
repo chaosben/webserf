@@ -1,11 +1,11 @@
 <script lang="ts">
 	/**
-	 * WHAT THIS IS AND WHERE IT COMES FROM — the screen that used to be "developer tools".
+	 * WHAT THIS IS AND WHERE IT COMES FROM — the one question a visitor arrives with: what am I
+	 * looking at, who made it, and where is the source.
 	 *
-	 * It replaced them because the two notes there addressed a developer standing in front of their
-	 * own devtools, while the one question a visitor actually arrives with had no place at all:
-	 * what am I looking at, who made it, and where is the source. The log hint survives as the last
-	 * paragraph — it costs one line and helps exactly the person who now has to write a report.
+	 * It is deliberately not a developer screen: notes for someone standing in front of their own
+	 * devtools have no audience here. The log hint is the exception and stays as the last paragraph —
+	 * it costs one line and helps exactly the person who has to write a report.
 	 */
 	import { commitDateText, commitUrl, shortCommit } from "./build-info.js";
 	import { shellLanguage, st } from "./i18n.js";

@@ -20,7 +20,7 @@ function makeArchiv(slots: Array<[string, boolean]>): Uint8Array {
 }
 
 describe('parseArchiv', () => {
-  it('liefert exakt 10 Slots', () => {
+  it('returns exactly 10 slots', () => {
     const slots = parseArchiv(makeArchiv([]));
     expect(slots).toHaveLength(ARCHIV_SLOT_COUNT);
   });
@@ -43,14 +43,14 @@ describe('parseArchiv', () => {
 
   it('returns the 14 name characters verbatim, without trimming', () => {
     const slots = parseArchiv(makeArchiv([['ERSTER VERS', true]]));
-    expect(slots[0].name).toBe('ERSTER VERS   '); // 14 Zeichen, verbatim -- s. `decodeName`
+    expect(slots[0].name).toBe('ERSTER VERS   '); // 14 characters, verbatim -- see `decodeName`
   });
 
   it('the slot size is 16 bytes', () => {
     expect(ARCHIV_SLOT_SIZE).toBe(16);
   });
 
-  it('wirft bei zu kleiner Datei', () => {
+  it('throws when the file is too small', () => {
     expect(() => parseArchiv(new Uint8Array(159))).toThrow();
   });
 
@@ -66,7 +66,6 @@ describe('encodeArchiv — the placeholder of free slots', () => {
  // `ARCHIV_FREE_NAME` is the sequence `0x46cda` puts into its buffer ten times before reading the
  // file over it. Here it is about the encoder, which must produce it so that an empty slot in the
  // disk menu does not appear as an empty line.
- // als leere Zeile erscheint.
     expect(ARCHIV_FREE_NAME).toBe('     FREI     ');
     expect(ARCHIV_FREE_NAME.length).toBe(14);
     const enc = encodeArchiv([{ index: 0, name: 'BELEGT', used: true }]);

@@ -6,14 +6,14 @@ import {
   devicePopupAction,
 } from './device-popup.js';
 
-describe('Screen 0x3c — Klick-Zonen (`@0x2c6c6`)', () => {
+describe('screen 0x3c — click zones (`@0x2c6c6`)', () => {
   it('lists the seven zones in table order', () => {
     expect(DEVICE_POPUP_HITBOXES.map((z) => z.action)).toEqual([
       0xa4, 0xa3, 0xa2, 0xa1, 0xa0, 0x9f, 0x9e,
     ]);
   });
 
-  it('jede Zone deckt genau ihr Icon (`x0 == col·8`, `y0 == row`)', () => {
+  it('every zone covers exactly its icon (`x0 == col*8`, `y0 == row`)', () => {
     // The layout table @0x3b620 and the zone table @0x2c6c6 are independent in the binary — that
     // they coincide is the test that neither was transcribed wrongly.
     for (const [i, zone] of DEVICE_POPUP_HITBOXES.entries()) {
@@ -31,7 +31,7 @@ describe('Screen 0x3c — Klick-Zonen (`@0x2c6c6`)', () => {
   });
 });
 
-describe('Screen 0x3c — Aktionen', () => {
+describe('screen 0x3c — actions', () => {
   it('maps the seven ids onto the cascade `@0x2f196`/`@0x2f328`', () => {
     expect(devicePopupAction(0xa4)).toEqual({ kind: 'cycleMode' });
     expect(devicePopupAction(0xa3)).toEqual({ kind: 'step', row: 0, delta: -1 });
@@ -51,7 +51,7 @@ describe('Screen 0x3c — Aktionen', () => {
 /** Drawing pixel of a zone point — `hitTestPanel` subtracts the click origin (8, 9). */
 const at = (x: number, y: number): [number, number] => [x + 8, y + 9];
 
-describe('Screen 0x3c — Treffer-Test', () => {
+describe('screen 0x3c — hit test', () => {
   it('hits the buttons in both corners', () => {
     expect(clickDevicePopup(...at(8, 16))).toEqual({ kind: 'cycleMode' });
     expect(clickDevicePopup(...at(23, 31))).toEqual({ kind: 'cycleMode' });
@@ -60,7 +60,7 @@ describe('Screen 0x3c — Treffer-Test', () => {
   });
 
   it('hits nothing beside the buttons', () => {
-    expect(clickDevicePopup(...at(7, 16))).toBeNull(); // links vom Umschalter
+    expect(clickDevicePopup(...at(7, 16))).toBeNull(); // left of the toggle
     expect(clickDevicePopup(...at(8, 32))).toBeNull(); // one row below
     expect(clickDevicePopup(...at(40, 48))).toBeNull(); // right of the plus button
     expect(clickDevicePopup(...at(0, 0))).toBeNull();

@@ -78,10 +78,10 @@ describe('fitScale', () => {
 });
 
 describe('scenePoint / anchorCamera', () => {
-	// The wheel handler used to carry this expression itself. The test pins the expression TREE, not
-	// just the value: `Math.round(cam + p * (1 / zoom - 1 / next))` is the same in algebra and not in
-	// floating point, so a later "simplification" has to fail here rather than in a screenshot.
-	const old = (cam: number, zoom: number, next: number, p: number) => {
+	// Reference expression of the anchoring. The test pins the expression TREE, not just the value:
+	// `Math.round(cam + p * (1 / zoom - 1 / next))` is the same in algebra and not in floating point,
+	// so a "simplification" has to fail here rather than in a screenshot.
+	const reference = (cam: number, zoom: number, next: number, p: number) => {
 		const scene = cam + p / zoom;
 		return Math.round(scene - p / next);
 	};
@@ -97,7 +97,7 @@ describe('scenePoint / anchorCamera', () => {
 	it('reproduces the wheel arithmetic bit for bit', () => {
 		for (const [cam, zoom, next, p] of cases) {
 			// `toBe` is Object.is, so a -0 that turned into 0 counts as a failure.
-			expect(anchorCamera(scenePoint(cam, zoom, p), next, p)).toBe(old(cam, zoom, next, p));
+			expect(anchorCamera(scenePoint(cam, zoom, p), next, p)).toBe(reference(cam, zoom, next, p));
 		}
 	});
 

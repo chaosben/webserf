@@ -183,10 +183,10 @@ export const milling = (state: GameState, serf: Serf): void => {
 };
 
 /**
- * 30 Smelting (`serf_state_30_Smelting` @0x1a736) — Zwei-Eingang-Verarbeiter (Erz `stock[0]` + Kohle
- * `stock[1]`). `field_0xd` diskriminiert Stahl- (0 → Steel `0xc`, Anim 0x82) vs. Gold-Schmelze
- * (≠0 → GoldBar `0xf`, Anim 0x81). Der Schritt-Countdown liegt in `field_0xc` (0x14 Schritte,
- * Counter-Nachlauf `+= 0x180`).
+ * 30 Smelting (`serf_state_30_Smelting` @0x1a736) — two-input processor (ore `stock[0]` + coal
+ * `stock[1]`). `field_0xd` discriminates the steel smelter (0 → Steel `0xc`, anim 0x82) from the gold
+ * smelter (!= 0 → GoldBar `0xf`, anim 0x81). The step countdown lives in `field_0xc` (0x14 steps,
+ * counter follow-up `+= 0x180`).
  */
 export const smelting = (state: GameState, serf: Serf): void => {
   if (serf.col === null || serf.row === null) return;
@@ -194,14 +194,14 @@ export const smelting = (state: GameState, serf: Serf): void => {
   if (serf.stateData[0] === 0) {
     const bld = state.buildings[state.mapTiles[pos].objIndex];
     if (!bld) return;
-    if (bld.stock[0].available === 0) return; // Erz?
-    if (bld.stock[1].available === 0) return; // Kohle?
+    if (bld.stock[0].available === 0) return; // ore?
+    if (bld.stock[1].available === 0) return; // coal?
     bld.active = true;
     bld.stock[0].available -= 1;
     bld.stock[1].available -= 1;
-    serf.stateData[0] = 0xff; // ~0 → Phase B
+    serf.stateData[0] = 0xff; // ~0 → phase B
     serf.animation = serf.stateData[2] !== 0 ? 0x81 : 0x82;
-    serf.stateData[1] = 0x14; // field_0xc = Schritt-Countdown
+    serf.stateData[1] = 0x14; // field_0xc = step countdown
     serf.counter = 0x17f;
     serf.tick = state.gameTick;
     state.mapTiles[pos].serfIndex = serf.index;
@@ -481,7 +481,7 @@ export const makingTool = (state: GameState, serf: Serf): void => {
   if (serf.stateData[0] === 0) {
     const bld = state.buildings[state.mapTiles[pos].objIndex];
     if (!bld) return;
-    if (bld.stock[0].available === 0 || bld.stock[1].available === 0) return; // braucht Stahl + Bretter
+    if (bld.stock[0].available === 0 || bld.stock[1].available === 0) return; // needs steel + planks
     bld.stock[0].available -= 1;
     bld.stock[1].available -= 1;
     serf.stateData[0] = 1;
@@ -494,7 +494,7 @@ export const makingTool = (state: GameState, serf: Serf): void => {
   if (!advance(serf, state.gameTick)) return;
   for (;;) {
     serf.stateData[0] = (serf.stateData[0] + 1) & 0xff;
-    if (serf.stateData[0] === 4) break; // Werkzeug fertig
+    if (serf.stateData[0] === 4) break; // tool finished
     if (!addCounterContinue(serf, 0x600)) return;
   }
   // RNG-weighted choice of tool type over the nine tool priorities.
@@ -539,7 +539,7 @@ export const pigFarming = (state: GameState, serf: Serf): void => {
   if (serf.stateData[0] === 0) {
     const bld = state.buildings[state.mapTiles[pos].objIndex];
     if (!bld) return;
-    if (bld.stock[0].available === 0) return; // braucht Getreide
+    if (bld.stock[0].available === 0) return; // needs wheat
     bld.stock[0].available -= 1;
     serf.stateData[0] = 1;
     serf.animation = 0x8b;
@@ -558,7 +558,7 @@ export const pigFarming = (state: GameState, serf: Serf): void => {
     if (bld) {
       const pigs = rawByte9(bld);
       if (pigs !== 8 && state.rng.next() < (PIG_BREEDING_PROB[pigs] ?? 0)) {
-        setByte9(bld, (pigs + 1) & 0xff); // Ferkel setzen
+        setByte9(bld, (pigs + 1) & 0xff); // spawn a piglet
       }
     }
     if (!addCounterContinue(serf, 0x800)) return;
@@ -611,7 +611,7 @@ export const buildingBoat = (state: GameState, serf: Serf): void => {
   if (serf.stateData[0] === 0) {
     const bld = state.buildings[state.mapTiles[pos].objIndex];
     if (!bld) return;
-    if (bld.stock[0].available === 0) return; // braucht Bretter
+    if (bld.stock[0].available === 0) return; // needs planks
     bld.stock[0].available -= 1;
     setByte9(bld, 0); // reset the boat progress
     serf.stateData[0] = 1;

@@ -30,8 +30,8 @@ function makePlayer(over: Partial<Player> = {}): Player {
     slot: 0,
     index: 0,
     active: true,
-    flags: 0x41, // Bit0 = Reproduktions-Takt an, Bit6 = aktiv
-    build: 0xe, // Bit2 = can_spawn
+    flags: 0x41, // bit 0 = reproduction clock on, bit 6 = active
+    build: 0xe, // bit 2 = can_spawn
     serfCount: new Array(27).fill(0),
     completedBuildingCount: [],
     incompleteBuildingCount: [],
@@ -146,7 +146,7 @@ describe('economy: serf reproduction', () => {
     expect(player.reproductionCounter).toBe(90);
   });
 
-  it('Ritter-Zweig: konvertiert zu Knight0 bei Schwert+Schild', () => {
+  it('knight branch: converts to Knight0 given sword and shield', () => {
     const player = makePlayer({ knightsToSpawn: 2 });
     const inv = makeInventory({ resources: (() => { const r = new Array(26).fill(0); r[24] = 3; r[25] = 3; return r; })() });
     const state = makeState(player, inv);

@@ -37,7 +37,7 @@ function mkState(over: Partial<{
 const bld = (failed: boolean): Bld => ({ serfRequestFailed: failed });
 const flg = (failed: boolean): Flg => ({ serfRequestFail: failed });
 
-describe('roundRobinServiceReset — FUN_0000eced Teil 1+2', () => {
+describe('roundRobinServiceReset — FUN_0000eced parts 1+2', () => {
   it('does not gate itself: it sweeps regardless of frameAccum - the caller owns the frame gate', () => {
     // frameAccum is irrelevant here; updateEconomy/advanceFrameClock check the frame boundary.
     const s = mkState({ frameAccum: 3, buildings: [bld(true), bld(true)] });
@@ -51,7 +51,7 @@ describe('roundRobinServiceReset — FUN_0000eced Teil 1+2', () => {
     const s = mkState({ buildings, serviceBudget: 55 });
     roundRobinServiceReset(s);
     for (const b of buildings) expect((b as { serfRequestFailed: boolean }).serfRequestFailed).toBe(false);
-    expect(s.buildingServiceCursor).toBe(4); // Fenster = min(55, 4) = 4
+    expect(s.buildingServiceCursor).toBe(4); // window = min(55, 4) = 4
   });
 
   it('limits the window to serviceBudget (cursor += budget)', () => {
@@ -72,7 +72,7 @@ describe('roundRobinServiceReset — FUN_0000eced Teil 1+2', () => {
     const buildings = Array.from({ length: 10 }, () => bld(false));
     const s = mkState({ buildings, serviceBudget: 55, buildingServiceCursor: 10 });
     roundRobinServiceReset(s);
-    expect(s.buildingServiceCursor).toBe(10); // wrap→0, dann Fenster min(55,10)=10 → 0+10
+    expect(s.buildingServiceCursor).toBe(10); // wrap→0, then window min(55,10)=10 → 0+10
   });
 
   it('stops after 10 real clears and leaves the cursor on the 10th hit', () => {
@@ -90,7 +90,7 @@ describe('roundRobinServiceReset — FUN_0000eced Teil 1+2', () => {
     const s = mkState({ buildings, serviceBudget: 55 });
     roundRobinServiceReset(s);
     expect((buildings[1] as { serfRequestFailed: boolean }).serfRequestFailed).toBe(false);
-    expect(s.buildingServiceCursor).toBe(3); // alle 3 Slots besucht
+    expect(s.buildingServiceCursor).toBe(3); // all 3 slots visited
   });
 
   it('clears serfRequestFail on flags in the same way', () => {

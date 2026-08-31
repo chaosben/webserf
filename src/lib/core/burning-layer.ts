@@ -8,11 +8,18 @@
  * because the countdown falls, so the flames run forwards. Every further flame of the same building
  * starts three phases later, so they do not all flicker in step.
  *
- * Deliberate deviation: the original subtracts the countdown IN the drawing pass, the same calculation
- * the tick driver performs; because both stamp the tick, the two sites are idempotent together. Our
- * renderer must not write game state, so it only reads the countdown. The original's abort branch (the
- * countdown underflows, draw nothing) needs no counterpart: there the tick driver finishes the burn in
- * the same tick and the record is gone afterwards.
+ * **The countdown is advanced by the drawing pass, once per drawn frame** (@0x34a90/@0x34aa3): the
+ * branch stamps `building[0xe] = gameTick` and subtracts the elapsed ticks from `building[0xa]`. The
+ * tick driver does the very same delta step and, because both sites stamp, they are idempotent
+ * together — for a visible building the drawing pass consumes the delta, for an off-screen one the
+ * driver does. The game tick grows by 8 per frame, so `(countdown >> 3) & 7` steps by exactly one per
+ * frame: eight flame frames in eight frames.
+ *
+ * Deliberate deviation, and the reason {@link effectiveBurnCountdown} exists: our renderer must not
+ * write game state (it is decoupled from the logic clock and may run more than once per logic frame),
+ * so it reproduces that subtraction READ-ONLY at every read instead of storing it. Reading the stored
+ * counter alone is wrong even though the counter is delta based: the driver only visits a building once
+ * per rotation cycle, so the stored value stands still for seconds while the drawn phase must not.
  *
  * The flame table has one entry per building type, each a relative offset to a list of triples
  * `(size, dx, dy)` terminated by a byte with bit 7 set; `dx`/`dy` are signed and `size` selects between
@@ -77,10 +84,39 @@ const FLAME_LAYOUT: readonly (readonly (readonly [number, number, number])[])[] 
 export const FLAME_LAYOUT_COUNT = FLAME_LAYOUT.length;
 
 /**
+ * The countdown a drawn frame sees: the stored `building[0xa]` minus the ticks elapsed since the last
+ * step, i.e. @0x34a98/@0x34aa3 without their two writes. `null` means burnt out — the original clamps
+ * the counter to 0 and RETURNS (@0x34ab3), so that frame draws neither flames nor building body; only
+ * the tick driver ends the fire, which may be up to one rotation cycle later.
+ *
+ * `stamp` is `building[0xe]`, and it is stamped with the LIVE game tick. Pass the same clock: in a
+ * snapshot that is `header.tick`, which mirrors it. Two names, one clock — mixing them in would look
+ * right and be off by however far the save has run.
+ *
+ * `stamp === null` is the one case the port cannot resolve: for a warehouse or castle the decoded
+ * record spends byte 14 on the inventory link, so a burning one loaded straight from a file arrives
+ * without its stamp. Falling back to the stored counter costs at most one rotation cycle of animation,
+ * because the tick driver stamps it again on its first visit. Measured: 0 of 74 saved states contain a
+ * burning inventory building, so this is a fallback, not a path.
+ */
+export function effectiveBurnCountdown(
+  stored: number,
+  stamp: number | null,
+  tick: number,
+): number | null {
+  const cd = stored & 0xffff;
+  if (stamp === null) return cd;
+  const elapsed = (tick - stamp) & 0xffff;
+  if (elapsed > cd) return null;
+  return cd - elapsed;
+}
+
+/**
  * The flames of a burning building, in drawing order (above the building body).
  *
- * `burnCountdown` is `building[0xa]` — in the port the burn union `firstKnight`. `progress` and
- * `constructing` only select the flame set.
+ * `burnCountdown` is the value a drawn frame sees, i.e. the result of
+ * {@link effectiveBurnCountdown} — not the stored `building[0xa]`. `progress` and `constructing` only
+ * select the flame set.
  */
 export function burningFlames(
   type: number,

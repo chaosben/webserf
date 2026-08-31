@@ -1,5 +1,5 @@
 /**
- * **VIDEOAUFNAHME DER SPIELOBERFLÄCHE** — the browser edge behind the recording bus.
+ * **VIDEO RECORDING OF THE GAME SCREEN** — the browser edge behind the recording bus.
  *
  * It records the ONE canvas the game screen lives on. That this is possible at all is the point of
  * composing bar and popup into the map canvas: a recording of a single canvas now shows the game

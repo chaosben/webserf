@@ -6,13 +6,12 @@
  * sprites** = 3 directions x 9 height-difference steps (dir 0/Right: 0..8, width 32; dir 1/DownRight:
  * 9..17, width 16; dir 2/Down: 18..26, width 16), symmetric around `h_diff = 0`. The ground group from
  * {@link PATH_GROUND_BASE} holds **exactly 10 sprites** (32x20 each) = 3 slope variants x {grass,
- * desert, snow} + 1 water. From that follows the
- * Auswahl unten direkt.
+ * desert, snow} + 1 water. The selection below follows directly from that.
  */
 
-/** Weg-Masken-Sprite-Gruppe (Typ mask), Archiv-Index = `PATH_MASK_BASE + maskIndex(0..26)`. */
+/** Road mask sprite group (type mask), archive index = `PATH_MASK_BASE + maskIndex(0..26)`. */
 export const PATH_MASK_BASE = 229;
-/** Weg-Boden-Textur-Gruppe (Typ solid), Archiv-Index = `PATH_GROUND_BASE + groundIndex(0..9)`. */
+/** Road ground texture group (type solid), archive index = `PATH_GROUND_BASE + groundIndex(0..9)`. */
 export const PATH_GROUND_BASE = 299;
 
 /** Only these 3 "forward" directions carry a drawn segment (Right=0, DownRight=1, Down=2). */
@@ -41,16 +40,16 @@ export function pathMaskIndex(dir: number, h1: number, h2: number): number {
  * `border-layer.borderGroundIndex`.
  */
 export function pathGroundIndex(type: number, slopeVariant: number): number {
-  if (type <= 3) return 9; // Wasser
+  if (type <= 3) return 9; // water
   let s = slopeVariant;
-  if (type >= 14) s += 6; // Schnee
+  if (type >= 14) s += 6; // snow
   else if (type >= 8) s += 3; // desert/tundra
   return s;
 }
 
 /**
  * Slope variant (0..2) from the secondary cross slope `hDiff2`: steeply uphill -> 0, moderate -> 1,
- * steil bergab → 2. **Byte-gelesen** (`FUN_0000e5cd`/`e6ca`/`e791`, jeweils
+ * steeply downhill -> 2. **Read from the bytes** (`FUN_0000e5cd`/`e6ca`/`e791`, each
  * `if (hDiff2 - 5 < 0) { if (hDiff2 + 5 < 0) -> 302 else -> 301 } else -> 300`). The **computation**
  * of `hDiff2` is direction dependent and lives in `road-layer.ts`.
  */

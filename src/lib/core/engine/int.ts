@@ -31,12 +31,12 @@ export function i8(x: number): number {
   return (x << 24) >> 24;
 }
 
-/** 16-Bit-Rotation nach rechts um 1 (x86 `ror r16,1`). */
+/** 16-bit rotate right by 1 (x86 `ror r16,1`). */
 export function ror16(x: number): number {
   return ((x >>> 1) | (x << 15)) & 0xffff;
 }
 
-/** 16-Bit-Rotation nach links um 1 (x86 `rol r16,1`). */
+/** 16-bit rotate left by 1 (x86 `rol r16,1`). */
 export function rol16(x: number): number {
   return ((x << 1) | (x >>> 15)) & 0xffff;
 }

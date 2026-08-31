@@ -58,8 +58,9 @@ export const RES_STOCK_CATEGORY = [
  *    bookkeeping trivia: the value is the denominator of knight morale, so a cancelled gold delivery
  *    RAISES the morale value of every remaining bar.
  * 2. Return it at the destination building (flag `dest`, endpoint towards UpLeft): decrement the stock
- *    slot chosen by {@link RES_STOCK_CATEGORY} — except for warehouse(10) and castle(24), which keep no
- *    stock nibbles.
+ *    slot chosen by {@link RES_STOCK_CATEGORY} — except for a **finished** warehouse or castle, which
+ *    keep an inventory marker there instead of nibbles. The gate is the CODED type `bld[4] & 0xfc`,
+ *    which keeps the `constructing` bit, so a shell of either type is booked back normally.
  *
  * `resType` is the raw resource byte; its low five bits index the table.
  *
@@ -96,7 +97,16 @@ export function returnTransitResourceToStock(
   const conn = destFlag.connections[Direction.UpLeft];
   if (!conn || conn.kind !== 'building') return;
   const bld = state.buildings[conn.index];
-  if (!bld || bld.type === 10 || bld.type === 24) return; // warehouse/castle keep no stock nibbles
+  // `andw $0xfc,bld[4]` @0x4a439 keeps bit 7 (`constructing`), then compares against `0x60` (castle)
+  // and `0x28` (warehouse) @0x4a43f/@0x4a446. A warehouse UNDER CONSTRUCTION therefore carries
+  // `0x28 | 0x80 == 0xa8`, matches neither, and IS booked back — while it is a building site its two
+  // nibbles are the plank/stone stock, not an inventory marker. Testing `bld.type` alone skips it and
+  // leaves a phantom `requested` behind; since the demand tail falls silent at
+  // `available + requested == stockMaximum`, that site never asks for material again — measured on a
+  // reported game: a warehouse shell stood at `0/2` planks for 160k ticks while the castle held 56.
+  if (!bld) return;
+  const coded = ((bld.type << 2) & 0xfc) | (bld.constructing ? 0x80 : 0);
+  if (coded === 0x60 || coded === 0x28) return; // finished castle / warehouse: no stock nibbles
   const slot = bld.stock[cat];
   if (slot) decrementStockByte(slot);
 }

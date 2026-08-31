@@ -6,22 +6,37 @@
  * - **burning** => burn-down countdown (`bld+10` counter, `bld+0xe` tick stamp), at 0 the finale
  *   (`FUN_00013562`).
  *
- * **Rotation:** the original processes 1/32 of the buildings per sub-tick (`gs->field_0x26c`); this
- * port processes **every** building every logic tick. That is equivalent here because the priority is
- * a pure function of the stock level and the burn counter is delta based. Phase A (`request_serf`) is
- * the exception and stays rotation gated — see {@link updateBuildings}.
+ * **Rotation — the driver is a 1/32 slice per FRAME, not a sweep per tick.** `FUN_000130f2` opens
+ * with `mov 0x26c(%ebx),%ax` / `cmpw $0x20,(%edi)` / `jae -> ret` @0x130f5..@0x13105: at rotation >= 32
+ * it does nothing at all. `shlw $0x5` @0x13127 makes `rotation * 32` the first index and `vreg5 = 0x1f`
+ * the count, bounded by `cmp 0x260(%ebx)` (maxBuildingIndex) @0x13174 — and the outer loop @0x132c2
+ * repeats that window every 1024 indices (`addw $0x3e0` @0x132d5). One building therefore gets ONE
+ * priority write per wrap cycle (~49 frames), not one per tick. See {@link buildingDriverBlock}.
+ *
+ * **Do not widen this into a sweep per tick.** The rate is behaviour, not bookkeeping: the flag
+ * scheduler SPENDS the priority as a token (`shrb $1 ; jb` @0x4c0b2, halved per routed good), so how
+ * often it is refreshed decides how many goods may be routed to one building. Refreshing on every
+ * tick gives a production building effectively unlimited priority; goods then pile onto its flag up
+ * to the 8-slot ceiling, and a flag with >= 7 waiting slots loses its transporter bits
+ * (`requestTransporters`, original behaviour) and never drains again.
+ *
+ * **What this cadence does NOT own: the burn animation.** The burn counter is delta based, so the burn
+ * DURATION is right at any visiting rate — but its RESOLUTION is not, and the flames step with
+ * `(counter >> 3) & 7`. The original advances the same counter a second time, in the drawing pass
+ * (@0x34a90/@0x34aa3), which is why it animates at frame rate; both sites stamp the tick, so they are
+ * idempotent together. The port reproduces that read-only (`effectiveBurnCountdown`). Do not widen the
+ * sweep here to fix an animation — that would trade a visual bug for an economic one.
  */
 
 import type { GameState, Building, Player, Serf } from './state.js';
 import { setSerfType } from './state.js';
-import { requestBuildingWorkers } from './serf-request.js';
+import { requestBuildingWorkers, buildingDriverBlock } from './serf-request.js';
 import { posOf, colOf, rowOf, neighbor, Direction } from './position.js';
 import { BUILDING_SCORE } from './building-tables.js';
 import { recomputeTerritory } from './territory.js';
 import { freeBuildingSlot, freeInventorySlot } from './alloc.js';
 import { cancelTransportOnDelete } from './transport-cancel.js';
 import { cancelTransitResource, demolishFlag } from './road-teardown.js';
-import { constructionDemand } from './building-construction.js';
 import { clearFlagAcceptBytes } from './flag-accept.js';
 
 /**
@@ -70,35 +85,11 @@ const PHASE_B_DEMAND: ReadonlyMap<number, readonly DemandSlot[]> = new Map([
   [23, [{ slot: 0, slider: (p: Player) => p.coalDistribution[1] }, { slot: 1 }]], // gold smelter <- coal + gold(0xff)
 ]);
 
-/**
- * `LAB_000132e2` **construction branch** (build material demand) — the shared head handler
- * `FUN_000138ed` @0x138ed. The dispatch uses `(bld[4] & 0xfc) * 2`, and `bld[4]` bit 7 (`constructing`)
- * thereby sets the high index bit, so **every building under construction jumps to the shared head**
- * while finished ones go to their production handler.
- *
- * The formula differs from production phase B — hence a handler of its own:
- * ```
- * fill = avail + req
- * if (fill < 8 && fill != stockMaximum[slot]):
- *     prio = base >> fill          // base = (planks>>8)&0xff or 0xff
- *     if (!holder) prio >>= 2      // an unoccupied site is throttled further
- *     flag.stockPriority[slot] = prio & 0xfe
- * else: flag.stockPriority[slot] = 0
- * ```
- * The **`stockMaximum` gate** ties demand to the type's real material need (a coal mine `[5,0]` asks for
- * planks but NO stone; a hut `[1,1]` for both).
- *
- * **Runs only when `progress != 0`** — while still levelling, the original flow never reaches the tail:
- * the large body @0x138ed returns after requesting the digger.
- *
- * The **event** part of the same tail (the emergency demolition, which draws a random value) therefore
- * does NOT run here (`allowEmergency = false`) — it hangs on the rotation-gated
- * {@link buildingConstructionHead}.
- */
-function updateConstructionDemand(state: GameState, bld: Building, index: number): void {
-  if (bld.progress === 0) return; // still levelling => the head returns before the tail
-  constructionDemand(state, bld, index, false);
-}
+// The **construction branch** of `LAB_000132e2` is NOT here. Its handler `FUN_000138ed` @0x138ed is
+// one body: head (digger/builder request) then tail (`constructionDemand` @0x13bf5), and the head has
+// early exits on which the original never reaches the tail. It therefore lives entirely in
+// `serf-request.ts` -> {@link buildingConstructionHead}. The tail must not be called past the head:
+// a site whose builder request was rejected would keep advertising demand.
 
 /** Sets the material request priority on the building's flag (phase B, see above). */
 function updatePhaseBDemand(state: GameState, bld: Building): void {
@@ -124,30 +115,25 @@ function updatePhaseBDemand(state: GameState, bld: Building): void {
 
 /**
  * Building update driver (`FUN_000130f2`) — the one building routine of the frame loop, between the
- * flag scheduler and the serf driver.
+ * flag scheduler and the serf driver. **Called once per frame, not per tick** (see the module head).
  *
  * **The per-type dispatch itself lives in `serf-request.ts`** (`requestBuildingWorkers`): every ported
- * type handler (military, castle, warehouse) hangs on the request head.
+ * type handler (military, castle, warehouse, construction site) hangs on the request head, and phase A
+ * is its head. Both walk the SAME block `rotation * 32 .. +31`, which is what the original does with
+ * one loop over one block; splitting it into two loops over the same block is equivalent because the
+ * two phases are mutually exclusive per building (A gates on `!holder`, B on `holder`) and B reads
+ * nothing that A writes apart from `bld` itself.
  *
- * **Phase A (`request_serf`) is part of THIS routine** in the original (the head of each per-type
- * handler), not a frame-loop step of its own — hence grouped here and executed **only at the frame
- * boundary**, rotation gated. Calling the whole request block first and the phase B loop afterwards is
- * behaviourally identical to the original's per-building "A then B", because the two are mutually
- * exclusive per building (A gates on `!holder && !serfRequested && !serfRequestFailed`, B on `holder`)
- * and B reads nothing that A writes apart from `bld` itself.
+ * Rotations >= 32 belong to the economy/AI sweep and see no building at all (`jae` @0x130f5).
  */
-export function updateBuildings(state: GameState, frameBoundary = false): void {
-  // Phase A (request_serf) — head of the per-type handler, rotation gated => frame boundary only.
-  if (frameBoundary) requestBuildingWorkers(state);
+export function updateBuildings(state: GameState): void {
+  // Phase A (request_serf) — head of the per-type handler; walks the same block.
+  requestBuildingWorkers(state);
   const { buildings } = state;
-  for (let i = 0; i < buildings.length; i++) {
+  for (const i of buildingDriverBlock(state.rotation, buildings.length)) {
     const bld = buildings[i];
     if (bld === null) continue;
-    if (bld.burning) {
-      updateBurning(state, bld, i);
-      continue;
-    }
-    if (bld.constructing) updateConstructionDemand(state, bld, i);
+    if (bld.burning) updateBurning(state, bld, i);
     else updatePhaseBDemand(state, bld);
   }
 }

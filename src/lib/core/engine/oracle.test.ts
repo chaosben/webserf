@@ -243,7 +243,7 @@ describe('oracle diffStates', () => {
     expect(r.inventories.samples[0].diffs).toEqual([{ field: 'resources[4]', a: 0, b: 2 }]);
   });
 
-  it('formatReport erzeugt lesbare Zusammenfassung ohne zu werfen', () => {
+  it('formatReport produces a readable summary without throwing', () => {
     const a = emptyState({ serfRecords: [serf(1), serf(2, { counter: 100 })] });
     const b = emptyState({ serfRecords: [serf(1), serf(2, { counter: 55 })] });
     const text = formatReport(diffStates(a, b));

@@ -212,15 +212,16 @@ export interface GroundRowDiff {
  * ## Why rows, and why exact
  *
  * The world-anchored ground surface recomposes row **strips** (see `views/terrain-surface.ts`), so
- * the question it must answer is "which rows", not "did anything change". Hashes over bands of 32
- * rows used to stand here; on the largest map (512x256, world surface 84 MB) **one changed tile cost
- * 130 ms** because an eighth of the surface was redrawn. Via the word table it is the one row.
+ * the question it must answer is "which rows", not "did anything change". A hash over bands of 32
+ * rows would answer it too coarsely: on the largest map (512x256, world surface 84 MB) one changed
+ * tile then costs **130 ms**, because an eighth of the surface is redrawn. The word table names the
+ * one row.
  *
  * ## Why columns too
  *
- * The strip was then still **full width** — 32 ms, because all 512 columns were recomposed for one
- * changed tile. The column bounds turn that into a rectangle, and they cost nothing here: the loop
- * runs over every tile anyway.
+ * A **full width** strip still costs 32 ms on that map, because all 512 columns are recomposed for
+ * one changed tile. The column bounds turn the strip into a rectangle, and they cost nothing here:
+ * the loop runs over every tile anyway.
  *
  * The buffer holds `cols · rows` entries (512 KB on the largest map) and is compared and updated **in
  * the same loop**: one pass instead of hashing plus comparing, and no second buffer for the previous

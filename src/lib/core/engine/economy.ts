@@ -43,8 +43,8 @@ import { mapObjectGrowth } from './map-growth.js';
 import { viewportAmbientAudio } from './ambient-sound.js';
 import { campaignFollowUpPassword, SETUP_PASSWORD_BYTES } from '../player-setup.js';
 
-const SERF_GENERIC = 21; // Serf-Typ 0x15
-const SERF_KNIGHT0 = 22; // Serf-Typ 0x16
+const SERF_GENERIC = 21; // serf type 0x15
+const SERF_KNIGHT0 = 22; // serf type 0x16
 const STATE_IDLE_IN_STOCK = 1;
 const RES_SWORD = 24;
 const RES_SHIELD = 25;
@@ -365,7 +365,7 @@ function pickInventory(state: GameState, owner: number, wantKnight: boolean): In
   return best;
 }
 
-/** Den frisch allokierten Serf als Generic/IdleInStock im Inventar einrichten (`LAB_00029c03`). */
+/** Set up the freshly allocated serf as Generic/IdleInStock in the inventory (`LAB_00029c03`). */
 function setupGeneric(state: GameState, player: Player, serf: Serf, inv: Inventory): void {
   const bld = state.buildings[inv.building];
   inv.genericCount += 1; // inv+0x40++
@@ -381,12 +381,12 @@ function setupGeneric(state: GameState, player: Player, serf: Serf, inv: Invento
   serf.tick = state.gameTick;
   serf.state = STATE_IDLE_IN_STOCK;
   serf.stateName = SERF_STATE_NAMES[STATE_IDLE_IN_STOCK];
-  serf.stateData = [0, 0, 0, inv.index & 0xff, (inv.index >> 8) & 0xff]; // field_0xe = Inventar-Index
+  serf.stateData = [0, 0, 0, inv.index & 0xff, (inv.index >> 8) & 0xff]; // field_0xe = inventory index
 }
 
 /** Conversion generic -> Knight0: type bits, census, military score, weapons consumed. */
 function specializeKnight(player: Player, serf: Serf, inv: Inventory): void {
-  setSerfType(serf, SERF_KNIGHT0); // Typ-Bits &0x83|0x58 == Knight0
+  setSerfType(serf, SERF_KNIGHT0); // type bits &0x83|0x58 == Knight0
   player.serfCount[SERF_GENERIC] -= 1; // player-0x10--
   player.serfCount[SERF_KNIGHT0] += 1; // player-0xe++
   player.totalMilitaryScore += 1; // player+0x11a++
@@ -416,7 +416,7 @@ export function createSerf(state: GameState, start = 1): Serf | null {
   if (idx >= state.header.maxSerfIndex) {
     state.header.maxSerfIndex = idx + 1;
     state.blockMeta.serfs.maxIndex = idx + 1;
-    if (serfs.length <= idx + 1) serfs.push(null); // Top-Slot bleibt frei (Round-Trip-Konvention)
+    if (serfs.length <= idx + 1) serfs.push(null); // top slot stays free (round-trip convention)
   }
 
   const serf: Serf = {

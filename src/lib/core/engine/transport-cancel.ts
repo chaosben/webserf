@@ -4,9 +4,9 @@
  * The original has one contiguous code block `[0x176c0, 0x17f6c)` with **three** entry points and
  * **one shared tail**. The entries differ only in which serf classes they clear:
  *
- * | Einstieg | Serf-Klasse | Schwanz `@0x17a52` |
+ * | Entry | Serf class | Tail `@0x17a52` |
  * |---|---|---|
- * | `FUN_000176c0` | laufende Siedler | **nein** (`ret` @0x177e8) |
+ * | `FUN_000176c0` | walking serfs | **no** (`ret` @0x177e8) |
  * | `FUN_000177e9` | resource carriers | yes (`jmp 0x17a52` @0x178eb) |
  * | `FUN_000178f0` | **both** | yes (fall-through — the tail physically lives in this routine) |
  *
@@ -104,13 +104,13 @@ export function cancelTransportOnDelete(state: GameState, flagIndex: number): vo
       s.stateData[0] = 0xfe; // @0x179e0
       setDest(s, 0);
     } else if (matchesResState(s)) {
-      setDest(s, 0); // @0x17a21 — `serf[0xb]` bleibt stehen
+      setDest(s, 0); // @0x17a21 — `serf[0xb]` stays as it is
     }
   }
   clearDestinationFromNetwork(state, flagIndex);
 }
 
-// ── Der geteilte Schwanz (`@0x17a52`) ─────────────────────────────────────────────────────────────
+// ── The shared tail (`@0x17a52`) ─────────────────────────────────────────────────────────────────
 
 /**
  * **The shared tail `@0x17a52`** — remove the destination from the network's transport bookkeeping.
@@ -195,7 +195,7 @@ function slotByte(f: Flag, i: number): number {
   return ((f.resourceSlots[i]! + 1) & 0x1f) | (((f.slotDir[i]! + 1) & 7) << 5);
 }
 
-/** Ziel-Feld `serf[0xc]` (u16) = `stateData[1..2]`. */
+/** Destination field `serf[0xc]` (u16) = `stateData[1..2]`. */
 function dest(s: Serf): number {
   return (s.stateData[1] ?? 0) | ((s.stateData[2] ?? 0) << 8);
 }

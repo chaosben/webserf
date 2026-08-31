@@ -1215,5 +1215,5 @@ function engageDefendedBuilding(
   setUnionU16(serf, 0xe, cur);
   const def = state.serfs[cur]!;
   def.state = ST_KNIGHT_LEAVE_FOR_FIGHT; // 46
-  def.stateData[4] = ST_KNIGHT_PREPARE_DEFENDING; // serf[0xf] = 47 als Folgezustand
+  def.stateData[4] = ST_KNIGHT_PREPARE_DEFENDING; // serf[0xf] = 47 as the follow-up state
 }

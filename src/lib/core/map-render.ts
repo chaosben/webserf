@@ -377,7 +377,8 @@ export function waterWaveFrame(pos: number, tick: number): number {
 /**
  * First real map object in a tile's `object` field (values below are none/flag/building/castle =
  * 0..7). From here on trees (8..31), later stone piles (72..79) and so on - contiguous as an object
- * sprite index.
+ * sprite index. The original subtracts exactly this to get the bank offset (`subb $0x8,0x8(%edi)`
+ * @0x34094).
  */
 export const MAP_OBJECT_FIRST = 8;
 
@@ -415,10 +416,10 @@ const ANIMATED_OBJECT_SHORT_BANK = 0x10;
  * the animated range as static.
  */
 export function mapObjectSprite(object: number, tick: number): number | null {
-  if (object < MAP_OBJECT_FIRST) return null;
+  if (object < MAP_OBJECT_FIRST) return null; // `jb 0x34158` @0x34098
   let v = object - MAP_OBJECT_FIRST;
   if (v < ANIMATED_OBJECT_LIMIT) {
-    const phase = ((tick + v) & 0xffff) >>> 4; // @0x340dd/@0x340e5 - 16-bit
+    const phase = ((tick + v) & 0xffff) >>> 4; // @0x340dd/@0x340e1/@0x340e5 - 16-bit
     v =
       v < ANIMATED_OBJECT_SHORT_BANK
         ? (v & 0x78) + (phase & 7) // @0x340f1/@0x340f6

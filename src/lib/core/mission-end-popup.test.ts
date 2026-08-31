@@ -131,14 +131,14 @@ describe('mission end — step sequence', () => {
     ]);
   });
 
-  it('Stufe ohne Zusatz-Bild: Bild, Text', () => {
+  it('level without a bonus picture: picture, text', () => {
     expect(missionEndSteps(view({ levelSetupIndex: 2 }))).toEqual([
       { kind: 'picture', artBox: 0 },
       { kind: 'message' },
     ]);
   });
 
-  it('verlorene Kampagne: Trauer-Bild, Text', () => {
+  it('lost campaign: mourning picture, text', () => {
     expect(missionEndSteps(view({ winnerIndex: 1, levelSetupIndex: 1 }))).toEqual([
       { kind: 'picture', artBox: 2 },
       { kind: 'message' },

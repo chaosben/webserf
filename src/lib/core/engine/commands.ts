@@ -524,10 +524,10 @@ export function canApplyCommand(state: GameState, cmd: Command): boolean {
     case 'beginRoadBuilding': {
       const site = siteOf(state, cmd);
       if (site === null) return false;
-      // Ein laufender Bau muss erst abgebrochen werden — im Original entscheidet dasselbe Icon an
+      // A road build in progress has to be cancelled first — in the original the same icon at
       // `vp[1]` bit 6 decides which of the two branches runs (@0x27490).
       if (roadSession(state, state.players[cmd.player]!).active) return false;
-      // `@0x2864c`: Cursor-Art 1 oder 2, sonst nur Leisten-Icons.
+      // `@0x2864c`: cursor type 1 or 2, otherwise only control bar icons.
       return site.cursorType === CURSOR_FLAG || site.cursorType === CURSOR_REMOVABLE_FLAG;
     }
     case 'roadBuildClick': {
@@ -590,8 +590,7 @@ export function buildFlagRejection(
 
 /**
  * Applies `cmd` to `state` in place. Returns `true` when the command was executed, `false` when it was
- * inadmissible in the current state and was discarded. The caller must apply it at
- * einer Tick-Grenze aufgerufen werden.
+ * inadmissible in the current state and was discarded. The caller has to invoke it at a tick boundary.
  */
 export function applyCommand(state: GameState, cmd: Command): boolean {
   if (!canApplyCommand(state, cmd)) return false;
@@ -774,8 +773,7 @@ export function applyAttackLaunch(
 /**
  * Recruit and return the count — the same effect as `applyCommand({kind:'recruitKnights', …})`, only
  * without discarding the number. The original decides the sound from it (`or %ax,%ax ; je` @0x2df10:
- * 0 recruits means sound 4, otherwise sound 2), and the UI layer
- * braucht sie also.
+ * 0 recruits means sound 4, otherwise sound 2), so the UI layer needs it.
  *
  * `applied` is `recruited > 0`: recruiting nothing is the reject branch in the original.
  */

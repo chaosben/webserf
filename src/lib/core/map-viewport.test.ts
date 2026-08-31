@@ -17,8 +17,8 @@ describe('viewportSpan', () => {
   it('nUp == nDown (the odd tileWidth makes sure of it)', () => {
     for (const w of [320, 640, 1280, 1920]) {
       const span = viewportSpan(w, 480);
-      expect(upRowTileCount(span), `Breite ${w}`).toBe(downRowTileCount(span));
-      expect(span.tileWidth % 2, `Breite ${w}`).toBe(1);
+      expect(upRowTileCount(span), `width ${w}`).toBe(downRowTileCount(span));
+      expect(span.tileWidth % 2, `width ${w}`).toBe(1);
     }
   });
 
@@ -34,18 +34,18 @@ describe('viewportSpan', () => {
 
   it('the up row covers the width despite its -16 px offset', () => {
     // The reason for the odd `tileWidth`: otherwise 16 px are missing on the right. The reach must
-    // also cover the sub-tile remainder (up to TILE_W-1) — otherwise a
- // Streifen am rechten Rand ungedeckt (gemessen, s. `viewportSpan`-Doku).
+    // also cover the sub-tile remainder (up to TILE_W-1) — otherwise a strip at the right edge
+    // stays uncovered (measured, see the `viewportSpan` docs).
     for (const w of [320, 640, 1280, 1920]) {
       const span = viewportSpan(w, 480);
       const reach = upRowTileCount(span) * TILE_W - TILE_W / 2;
-      expect(reach, `Breite ${w}`).toBeGreaterThanOrEqual(w + TILE_W - 1);
+      expect(reach, `width ${w}`).toBeGreaterThanOrEqual(w + TILE_W - 1);
     }
   });
 
   it('the half-row count follows the height range, not a fixed value', () => {
-    // The range `maxHeight*4` must fit into half rows, otherwise the lower edge stays empty above
- // schwarz. Bei flacher Karte darf es entsprechend weniger sein.
+    // The range `maxHeight*4` must fit into half rows, otherwise the lower edge stays black. On a
+    // flat map correspondingly fewer are allowed.
     const flat = viewportSpan(640, 480, 0).halfRows;
     const hilly = viewportSpan(640, 480, 31).halfRows;
     expect(hilly - flat).toBe(Math.ceil((31 * 4) / TILE_H));
@@ -61,7 +61,7 @@ describe('viewportSpan', () => {
   });
 });
 
-describe('buildHalfRows — Struktur', () => {
+describe('buildHalfRows — structure', () => {
   const span = viewportSpan(640, 480);
   const rows = buildHalfRows({ col: 10, row: 20 }, geo, span);
 
@@ -70,7 +70,7 @@ describe('buildHalfRows — Struktur', () => {
     expect(rows[0]!.kind).toBe('up');
     expect(rows[1]!.kind).toBe('down');
     for (let i = 0; i < rows.length; i++) {
-      expect(rows[i]!.kind, `Halbzeile ${i}`).toBe(i % 2 === 0 ? 'up' : 'down');
+      expect(rows[i]!.kind, `half row ${i}`).toBe(i % 2 === 0 ? 'up' : 'down');
     }
   });
 
@@ -82,14 +82,14 @@ describe('buildHalfRows — Struktur', () => {
   });
 
   it('the xOffset of the original bookkeeping alternates 0 / -16 px (half a tile)', () => {
-    // Note: this is NOT the triangle position — `terrainTriangle` provides that from the
- // Quell-Kachel (s. Modul-Doku + einer Sonde).
+    // Note: this is NOT the triangle position — `terrainTriangle` provides that from the source
+    // tile (see the module docs; verified against the original data).
     expect(rows[0]!.xOffset).toBe(0);
     expect(rows[1]!.xOffset).toBe(DOWN_ROW_X_UNITS * 8);
     expect(rows[1]!.xOffset).toBe(-TILE_W / 2);
   });
 
-  it('Kachelzahl je Halbzeile folgt nUp/nDown', () => {
+  it('tile count per half row follows nUp/nDown', () => {
     expect(rows[0]!.tiles).toHaveLength(upRowTileCount(span));
     expect(rows[1]!.tiles).toHaveLength(downRowTileCount(span));
   });
@@ -101,7 +101,7 @@ describe('buildHalfRows — Struktur', () => {
   });
 });
 
-describe('buildHalfRows — Traversierung', () => {
+describe('buildHalfRows — traversal', () => {
   const span = viewportSpan(640, 480);
 
   it('the first tile is the scroll position', () => {
@@ -114,8 +114,8 @@ describe('buildHalfRows — Traversierung', () => {
     const rows = buildHalfRows({ col: 5, row: 5 }, geo, span);
     const t = rows[0]!.tiles;
     for (let k = 0; k < t.length; k++) {
-      expect(colOf(t[k]!, geo), `Kachel ${k}`).toBe((5 + k) & geo.colMask);
-      expect(rowOf(t[k]!, geo), `Kachel ${k}`).toBe(5);
+      expect(colOf(t[k]!, geo), `tile ${k}`).toBe((5 + k) & geo.colMask);
+      expect(rowOf(t[k]!, geo), `tile ${k}`).toBe(5);
     }
   });
 
@@ -126,9 +126,9 @@ describe('buildHalfRows — Traversierung', () => {
     for (let i = 0; i + 1 < rows.length; i++) {
       const dCol = (startCol(i + 1) - startCol(i)) & geo.colMask;
       const dRow = (startRow(i + 1) - startRow(i)) & geo.rowMask;
-      expect(dRow, `Halbzeile ${i}→${i + 1}`).toBe(1);
- // up→down = down (col gleich); down→up = down-right (col+1)
-      expect(dCol, `Halbzeile ${i}→${i + 1}`).toBe(rows[i]!.kind === 'up' ? 0 : 1);
+      expect(dRow, `half row ${i}→${i + 1}`).toBe(1);
+      // up→down = down (col unchanged); down→up = down-right (col+1)
+      expect(dCol, `half row ${i}→${i + 1}`).toBe(rows[i]!.kind === 'up' ? 0 : 1);
     }
     // Over two half rows: row+2, col+1 — that is the shear compensation
     // (2 rows x 16 px offset = 32 px = one tile width).
@@ -148,7 +148,7 @@ describe('buildHalfRows — one map row per half row (load-bearing assumption of
     const seen = new Set<number>();
     for (const r of rows) {
       for (const p of r.tiles) {
-        expect(seen.has(p), `Kachel ${p} doppelt`).toBe(false);
+        expect(seen.has(p), `tile ${p} twice`).toBe(false);
         seen.add(p);
       }
     }
@@ -213,7 +213,7 @@ describe('buildHalfRows — torus wrap (the "infinite scrolling")', () => {
     const a = buildHalfRows({ col: 9, row: 9 }, geo, span);
     const b = buildHalfRows({ col: 9 + geo.cols, row: 9 + geo.rows }, geo, span);
     for (let i = 0; i < a.length; i++) {
-      expect(Array.from(b[i]!.tiles), `Halbzeile ${i}`).toEqual(Array.from(a[i]!.tiles));
+      expect(Array.from(b[i]!.tiles), `half row ${i}`).toEqual(Array.from(a[i]!.tiles));
     }
   });
 
@@ -224,7 +224,7 @@ describe('buildHalfRows — torus wrap (the "infinite scrolling")', () => {
   });
 });
 
-describe('buildHalfRows — Zentrier-Offset (vp[0x4a]/0x4c, in KACHELN)', () => {
+describe('buildHalfRows — centring offset (vp[0x4a]/0x4c, in TILES)', () => {
   it('shifts the start tile by whole tiles', () => {
     const span = viewportSpan(640, 480);
     const rows = buildHalfRows(

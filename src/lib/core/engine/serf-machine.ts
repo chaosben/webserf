@@ -1875,6 +1875,15 @@ HANDLERS[12] = (state, serf) => {
 // the first `raw==0`; if 0..6 are taken -> i=7). Write the slot (the raw `field_0xb` as a whole byte ->
 // `resourceSlots[i]=(b&0x1f)-1`, `slotDir[i]=((b>>5)&7)-1`), `slotDest[i]=field_0xc`,
 // `hasResources=true`, `field_0xb=0`, `state=6`, then enter the building (== stepInToBuilding).
+//
+// The clamp at 7 is deliberate, not an oversight, and it must not be "fixed" into a loss path: the
+// caller guarantees a free slot. State 11 checks all eight slots before the serf steps out at all and
+// otherwise makes him wait at the door (`moveResourceOutStep` above) — and the original writes that
+// eighth test with a real branch to the waiting body, while here it emits a jump of displacement zero
+// (@0x22e2f), i.e. the shape a compiler produces for an unrolled clamp whose failure case cannot
+// occur. Where the failure case CAN occur the original does handle it: `dropResource` in the field
+// worker scans all eight and discards the load. Measured over four saves and 1.6 M ticks, including a
+// deliberately congested one: 4584 deliveries here, none onto an occupied slot.
 HANDLERS[13] = (state, serf) => {
   if (serf.col === null || serf.row === null) return;
   const flagTile = posOf(serf.col, serf.row, state.geo);

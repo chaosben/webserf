@@ -38,7 +38,7 @@ function recordingProvider(): { provider: (e: number) => DecodedSprite; entries:
   };
 }
 
-describe('Bewertungs-Skala (FUN_0003eb71)', () => {
+describe('rating scale (FUN_0003eb71)', () => {
   it('exactly one level more than thresholds', () => {
     expect(SOIL_LEVEL_LABELS).toHaveLength(SOIL_LEVEL_THRESHOLDS.length + 2);
   });
@@ -72,8 +72,8 @@ describe('Bewertungs-Skala (FUN_0003eb71)', () => {
   });
 });
 
-describe('Anzeige-Gewichtung (Renderer FUN_0003ea6e)', () => {
-  it('Gold ×2, Eisen ×1, Kohle ÷2, Granit ×2', () => {
+describe('display weighting (renderer FUN_0003ea6e)', () => {
+  it('gold ×2, iron ×1, coal ÷2, granite ×2', () => {
     const [gold, iron, coal, stone] = SOIL_POPUP_ROWS;
     expect(gold!.weigh(100)).toBe(200);
     expect(iron!.weigh(100)).toBe(100);
@@ -87,17 +87,17 @@ describe('Anzeige-Gewichtung (Renderer FUN_0003ea6e)', () => {
   });
 
   it('the same raw sum is rated differently per mineral', () => {
-    // 250 → Gold 500 „VIEL", Eisen 250 „UNTER MITTEL", Kohle 125 „SEHR WENIG".
+    // 250 → gold 500 'VIEL', iron 250 'UNTER MITTEL', coal 125 'SEHR WENIG'.
     expect(soilLevelLabel(SOIL_POPUP_ROWS[0]!.weigh(250))).toBe('VIEL');
     expect(soilLevelLabel(SOIL_POPUP_ROWS[1]!.weigh(250))).toBe('UNTER MITTEL');
     expect(soilLevelLabel(SOIL_POPUP_ROWS[2]!.weigh(250))).toBe('SEHR WENIG');
   });
 });
 
-describe('Layout + Klick', () => {
+describe('layout + click', () => {
   it('six icons: head, four minerals, exit', () => {
     expect(SOIL_POPUP_LAYOUT.map((i) => i.icon)).toEqual([28, 47, 44, 46, 43, 60]);
-    // Die vier Bodenschatz-Symbole stehen in derselben Spalte, je 20 px auseinander.
+    // The four mineral symbols sit in the same column, 20 px apart each.
     const rows = SOIL_POPUP_LAYOUT.slice(1, 5).map((i) => i.row);
     expect(rows).toEqual([50, 70, 90, 110]);
     expect(new Set(SOIL_POPUP_LAYOUT.slice(1, 5).map((i) => i.col)).size).toBe(1);

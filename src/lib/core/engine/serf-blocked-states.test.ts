@@ -300,7 +300,7 @@ describe('10 BuildingCastle', () => {
     expect(serf.state).toBe(10);
   });
 
-  it('ohne Zeitfortschritt passiert nichts', () => {
+  it('nothing happens without time passing', () => {
     const { state, serf, castle } = castleState(4096);
     state.gameTick = 900;
     dispatchSerf(state, serf);

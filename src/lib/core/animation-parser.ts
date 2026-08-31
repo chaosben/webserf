@@ -1,13 +1,13 @@
 /**
  * Parser for the in-archive animation table (`Animation` asset = entry index 1).
  *
- * Format (Big-Endian!), empirisch verifiziert:
+ * Format (big-endian!), empirically verified:
  *
  *   u32 BE  size                  // == own data size (sanity check)
  *   u32 BE  offsets[N]            // offsets of the N animations, relative to the start AFTER `size`
- *   AnimationFrame[ ]             // pro Frame 3 Bytes: u8 sprite, i8 x, i8 y
+ *   AnimationFrame[ ]             // 3 bytes per frame: u8 sprite, i8 x, i8 y
  *
- *   Frame-Anzahl einer Animation = (next_offset - own_offset) / 3
+ *   Frame count of an animation = (next_offset - own_offset) / 3
  *   For the last animation: difference to the end of the buffer.
  *
  * **Self-describing**: the count `N` need not be hard-coded — it follows from the first offset,
@@ -19,13 +19,13 @@
 
 import type { PaArchive } from './pa-parser.js';
 
-/** Eine einzelne Phase einer Animation. */
+/** A single phase of an animation. */
 export interface AnimationFrame {
   /** Sprite index (u8), relative into a serf sprite range (mapped by the renderer). */
   readonly sprite: number;
-  /** Horizontale Pivot-Verschiebung (signed). */
+  /** Horizontal pivot shift (signed). */
   readonly x: number;
-  /** Vertikale Pivot-Verschiebung (signed). */
+  /** Vertical pivot shift (signed). */
   readonly y: number;
 }
 
@@ -78,14 +78,14 @@ export function parseAnimationTable(raw: Uint8Array): AnimationTable {
     );
   }
 
-  // 3. Offset-Tabelle (BE) lesen.
+  // 3. Read the offset table (BE).
   const offsets: number[] = new Array(count);
   for (let i = 0; i < count; i++) {
     offsets[i] = dv.getUint32(tableStart + i * 4, false);
   }
 
   // 4. Per animation: derive the frame count from the difference to the next offset,
-  //    Frames als (sprite, x, y) lesen.
+  //    read the frames as (sprite, x, y).
   const tailLength = raw.byteLength - tailStart;
   const animations: AnimationFrame[][] = new Array(count);
 

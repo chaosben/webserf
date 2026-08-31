@@ -11,15 +11,15 @@ export type EntryKind = 'sprite' | 'palette' | 'animation' | 'sound' | 'music' |
  * Classifies a pack entry.
  *
  * Order of the checks:
- * 1. `offset === 0` → `empty` (undefinierter Slot).
+ * 1. `offset === 0` → `empty` (undefined slot).
  * 2. `size === 768` → `palette` (in-archive Palette, 256×3 raw RGB).
  *    In the original archive those are the indices 2, 3996, 3997.
  * 3. Look-up in the asset registry by asset name:
  *    - `Animation` → `animation`
  *    - `Sound` → `sound`
  *    - `Music` → `music`
- *    - Wenn `spriteType !== 'unknown'` → `sprite`
- * 4. Sonst → `unknown`.
+ *    - If `spriteType !== 'unknown'` → `sprite`
+ * 4. Otherwise → `unknown`.
  */
 export function classifyEntry(entry: PackEntry): EntryKind {
   if (entry.offset === 0) return 'empty';
@@ -45,8 +45,8 @@ export function entryKindLabel(kind: EntryKind): string {
     case 'palette':   return 'Palette';
     case 'animation': return 'Animation';
     case 'sound':     return 'Sound';
-    case 'music':     return 'Musik';
-    case 'empty':     return 'leer';
-    case 'unknown':   return 'unbek.';
+    case 'music':     return 'Music';
+    case 'empty':     return 'empty';
+    case 'unknown':   return 'unknown';
   }
 }

@@ -227,8 +227,8 @@
    * State of the options screen. In the original none of it is in the save game (all global, from
    * the configuration file) — which is why the menu can open it without a running game.
    *
-   * Our configuration file is the settings store the map view reads as well. This view used to keep
-   * its **own** set: what was set here was gone at game start because nobody read it.
+   * Our configuration file is the settings store the map view reads as well — this view must not
+   * keep its **own** set, or what is set here is gone at game start because nobody reads it.
    */
   const uiViewOptions = $derived(settings.value.viewOptions);
   const uiVolume = $derived(settings.value.volume);

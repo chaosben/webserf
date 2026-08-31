@@ -28,12 +28,12 @@ function recorder(): { asked: number[]; provider: (e: number) => DecodedSprite }
   return { asked, provider: (e: number) => (asked.push(e), sprite) };
 }
 
-describe('attack-popup — Screen 0x14/0x15 (Angriff)', () => {
+describe('attack-popup — screen 0x14/0x15 (attack)', () => {
   it('target building: its own sprite and row per type', () => {
     expect(attackPopupTargetSprite(0x2c)).toEqual({ sprite: 0xab, row: 0x32 }); // hut
-    expect(attackPopupTargetSprite(0x54)).toEqual({ sprite: 0x9e, row: 0x20 }); // Wachturm
-    expect(attackPopupTargetSprite(0x58)).toEqual({ sprite: 0x98, row: 0x11 }); // Festung
-    expect(attackPopupTargetSprite(0x60)).toEqual({ sprite: 0xb2, row: 0 }); //    Schloss
+    expect(attackPopupTargetSprite(0x54)).toEqual({ sprite: 0x9e, row: 0x20 }); // tower
+    expect(attackPopupTargetSprite(0x58)).toEqual({ sprite: 0x98, row: 0x11 }); // fortress
+    expect(attackPopupTargetSprite(0x60)).toEqual({ sprite: 0xb2, row: 0 }); //    castle
   });
 
   it('every button has exactly one click zone (and vice versa)', () => {
@@ -52,7 +52,7 @@ describe('attack-popup — Screen 0x14/0x15 (Angriff)', () => {
   });
 
   it('click mapping: minus, plus, attack, exit and the four presets', () => {
-    // Zeichen-Pixel = Klick-Raum + (8, 9).
+    // Drawing pixels = click space + (8, 9).
     expect(attackPopupAction(0x28, 0x79)).toEqual({ kind: 'decrement', action: 0x4a });
     expect(attackPopupAction(0x58, 0x79)).toEqual({ kind: 'increment', action: 0x4b });
     expect(attackPopupAction(0x08, 0x89)).toEqual({ kind: 'launch', action: 0x4c });
@@ -74,7 +74,7 @@ describe('attack-popup — Screen 0x14/0x15 (Angriff)', () => {
     expect(asked.filter((e) => e === UI_ICON_BASE + ATTACK_POPUP_BG_ICON).length).toBeGreaterThan(0);
     for (const it of ATTACK_POPUP_SCENERY) expect(asked).toContain(UI_OBJECT_BASE + it.icon);
     for (const it of ATTACK_POPUP_BUTTONS) expect(asked).toContain(UI_ICON_BASE + it.icon);
-    expect(asked).toContain(UI_OBJECT_BASE + 0x9e); // Wachturm als Ziel
+    expect(asked).toContain(UI_OBJECT_BASE + 0x9e); // tower as the target
     // Numbers as digit icons: 3, 0, 1|2, 7 and the choice 6.
     for (const d of [3, 0, 1, 2, 7, 6]) expect(asked).toContain(UI_ICON_BASE + UI_DIGIT_ICON_BASE + d);
   });

@@ -28,15 +28,14 @@ export interface DecodeOptions {
   readonly colorOffset?: number;
   /**
    * For `overlay`: the constant that determines ALL fill pixels — colour = `palette[overlayValue]`
-   * UND Alpha = `overlayValue`. Default `0x80` (Palette-Index 128 = Schwarz, Alpha 128 = 50 %
+   * AND alpha = `overlayValue`. Default `0x80` (palette index 128 = black, alpha 128 = 50 %
    * half shadow) — the original shadow recipe. Overlay payloads consist of pure
-   * `(drop, fill)`-Paaren ohne Per-Pixel-Bytes.
+   * `(drop, fill)` pairs without per-pixel bytes.
    */
   readonly overlayValue?: number;
   /**
    * For `auto`: the physical sprite index used to look the type up in the asset registry. Without
-   * it `auto` falls back to a heuristic (solid when `size-10 == w*h`,
-   * sonst Transparent).
+   * it `auto` falls back to a heuristic (solid when `size-10 == w*h`, otherwise transparent).
    */
   readonly physicalIndex?: number;
 }
@@ -78,7 +77,7 @@ export function resolveSpriteType(
     const res = lookupSpaResource(physicalIndex);
     if (res && res.spriteType !== 'unknown') return res.spriteType;
   }
-  // Fallback-Heuristik ohne Tabelle: Solid bei exaktem Payload-Match, sonst Transparent.
+  // Fallback heuristic without the table: solid on an exact payload match, otherwise transparent.
   return payloadLen === totalPixels ? 'solid' : 'transparent';
 }
 
@@ -86,9 +85,9 @@ export function resolveSpriteType(
  * Decodes a sprite entry into RGBA pixels.
  *
  * - `solid`: width * height palette index bytes (alpha 255 — index 0 renders as black).
- * - `transparent`: RLE `(drop u8, fill u8, [palIdx u8] × fill)`; `drop`-Pixel = voll transparent.
+ * - `transparent`: RLE `(drop u8, fill u8, [palIdx u8] × fill)`; `drop` pixels = fully transparent.
  *   An optional `colorOffset` is added to every index (for serf torsos).
- * - `overlay`: RLE `(drop u8, fill u8)` ohne Per-Pixel-Bytes; alle fill-Pixel nutzen
+ * - `overlay`: RLE `(drop u8, fill u8)` without per-pixel bytes; all fill pixels use
  *   `palette[overlayValue]` as colour and `overlayValue` as alpha (default `0x80`).
  * - `mask`: RLE `(drop u8, fill u8)` without per-pixel bytes; fill pixels are opaque white.
  */
@@ -100,7 +99,7 @@ export function decodeSprite(
   const header = readSpriteHeader(raw);
   if (!isPlausibleSpriteHeader(header)) {
     throw new Error(
-      `decodeSprite: unplausibler Header w=${header.width} h=${header.height}.`,
+      `decodeSprite: implausible header w=${header.width} h=${header.height}.`,
     );
   }
 
@@ -221,7 +220,7 @@ function decodeOverlayRLE(
   const src = payload;
   const srcLen = src.byteLength;
 
-  // Reine (drop, fill)-Paare — KEINE Per-Pixel-Bytes. Alle fill-Pixel bekommen dieselbe Farbe
+  // Pure (drop, fill) pairs — NO per-pixel bytes. All fill pixels get the same colour
   // palette[value] and alpha = value (the original shadow recipe, value 0x80).
   let sp = 0;
   let pp = 0;

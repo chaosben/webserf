@@ -24,7 +24,7 @@ function makeState(
     cooldown?: number;
   /** Serf index registered on the flag tile. */
     tileSerf?: number;
- /** Steht dieser Serf auch wirklich dort? */
+ /** Does that serf really stand there? */
     tileSerfHere?: boolean;
     inventoryIndex?: number | null;
   } = {},
@@ -118,7 +118,7 @@ function makeState(
   return { state, bld, inv, player };
 }
 
-describe('warehouse_building_handler — Aktivierung', () => {
+describe('warehouse_building_handler — activation', () => {
   it('creates an inventory on the first pass, links it and sends message type 7', () => {
     const { state, bld, player } = makeState({ active: false, inventoryIndex: null });
     warehouseBuildingHandler(state, bld);
@@ -129,7 +129,7 @@ describe('warehouse_building_handler — Aktivierung', () => {
     expect(inv.building).toBe(3);
     expect(inv.flag).toBe(2);
     expect(bld.hasInventory).toBe(true);
- // `mov $0xffff,%ax ; mov %ax,0x8(%ebx)` @0x15310 — beide Slots werden zum Inventar-Marker.
+ // `mov $0xffff,%ax ; mov %ax,0x8(%ebx)` @0x15310 — both slots become the inventory marker.
     expect(bld.stock[0]).toEqual({ available: 0xf, requested: 0xf });
     expect(bld.stock[1]).toEqual({ available: 0xf, requested: 0xf });
     expect(player.messageTypes).toEqual([7]);
@@ -174,7 +174,7 @@ describe('warehouse_building_handler: transporter request', () => {
   });
 });
 
-describe('Stock-Schwanz — Generic-Nachschub', () => {
+describe('stock tail — generic resupply', () => {
   it('counts down and only fires on underflow', () => {
     const { state, bld, player } = makeState({ genericCount: 0, cooldown: 2 });
     stockBuildingTail(state, bld);
@@ -214,7 +214,7 @@ describe('Stock-Schwanz — Generic-Nachschub', () => {
   });
 });
 
-describe('Stock-Schwanz — Gold-Akkumulation', () => {
+describe('stock tail — gold accumulation', () => {
   it('adds the gold bar stock on EVERY pass (an accumulator, not a level)', () => {
     const { state, bld, player } = makeState({ goldBars: 7 });
     stockBuildingTail(state, bld);

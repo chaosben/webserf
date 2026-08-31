@@ -5,8 +5,8 @@ import { readOriginal } from '../testing/originals.js';
 
 const loadOrigFile = (name: string): Buffer | null => readOriginal(name);
 
-describe('parsePalette (externe .PAL-Datei, VGA 6-bit)', () => {
-  it('wirft bei zu kleinem Buffer', () => {
+describe('parsePalette (external .PAL file, VGA 6-bit)', () => {
+  it('throws on a buffer that is too small', () => {
     expect(() => parsePalette(new Uint8Array(10))).toThrow(/too small/);
   });
 
@@ -16,7 +16,7 @@ describe('parsePalette (externe .PAL-Datei, VGA 6-bit)', () => {
     expect(() => parsePalette(buf)).toThrow(/> 63/);
   });
 
-  it('konvertiert 6-bit zu 8-bit korrekt', () => {
+  it('converts 6-bit to 8-bit correctly', () => {
     const buf = new Uint8Array(4 + 256 * 3);
     buf[4] = 0;
     buf[5] = 63;
@@ -28,14 +28,14 @@ describe('parsePalette (externe .PAL-Datei, VGA 6-bit)', () => {
     expect(pal.rgba[3]).toBe(255);
   });
 
-  it('liefert exakt 256*4 Bytes RGBA', () => {
+  it('yields exactly 256*4 bytes of RGBA', () => {
     const buf = new Uint8Array(4 + 256 * 3);
     const pal = parsePalette(buf);
     expect(pal.rgba.byteLength).toBe(256 * 4);
   });
 
   describe.runIf(loadOrigFile('0.PAL') !== null)('with the original 0.PAL', () => {
-    it('parst 0.PAL ohne Fehler', () => {
+    it('parses 0.PAL without error', () => {
       const buf = loadOrigFile('0.PAL')!;
       const pal = parsePalette(buf);
       expect(pal.rgba.byteLength).toBe(1024);
@@ -46,13 +46,13 @@ describe('parsePalette (externe .PAL-Datei, VGA 6-bit)', () => {
   });
 });
 
-describe('parseInArchivePalette (in-archive Palette, raw 8-bit RGB)', () => {
+describe('parseInArchivePalette (in-archive palette, raw 8-bit RGB)', () => {
   it('throws on a wrong size', () => {
     expect(() => parseInArchivePalette(new Uint8Array(100))).toThrow(/768/);
     expect(() => parseInArchivePalette(new Uint8Array(1000))).toThrow(/768/);
   });
 
-  it('parst exakt 768 Bytes als 256×4 RGBA', () => {
+  it('parses exactly 768 bytes as 256×4 RGBA', () => {
     const buf = new Uint8Array(768);
     buf[3] = 0xff; buf[4] = 0xa0; buf[5] = 0x10;
     const pal = parseInArchivePalette(buf);
@@ -80,7 +80,7 @@ describe('parseInArchivePalette (in-archive Palette, raw 8-bit RGB)', () => {
       expect(raw.byteLength).toBe(768);
       const pal = parseInArchivePalette(raw);
       expect(pal.rgba.byteLength).toBe(1024);
-      // Kein Alpha-Slack
+      // No alpha slack
       for (let i = 3; i < pal.rgba.byteLength; i += 4) {
         expect(pal.rgba[i]).toBe(0xff);
       }

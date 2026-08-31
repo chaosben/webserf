@@ -3,12 +3,11 @@
  * attaches to a GitHub issue themselves: save game as JSON, action log, a markdown note and a PNG
  * of the map.
  *
- * **There is no endpoint.** A server route used to accept the report and store it as a folder. That
- * route is gone, and not merely out of convenience: GitHub has **no API for attachments** — an
- * issue created server-side cannot carry `state.json` and `screen.png`. Only the reporter can drag
- * the file in. Along the way the rate limiter, the folder boundary and the question what of all
- * this belongs in a public repository fall away; without the endpoint the application is fully
- * static. See `shell/project.ts`.
+ * **There is deliberately no endpoint**, and not merely out of convenience: GitHub has **no API for
+ * attachments** — an issue created server-side cannot carry `state.json` and `screen.png`. Only the
+ * reporter can drag the file in. A server route would therefore buy nothing and cost a rate limiter,
+ * a folder boundary and the question what of all this belongs in a public repository; without one
+ * the application is fully static. See `shell/project.ts`.
  *
  * **The save game comes along shrunk** (`core/report-state.ts`): the map as a seed reference plus
  * deviations instead of a tile table. Without that the package would be around 18 MB at 512x256 —
@@ -192,9 +191,9 @@ function renderCostLines(r: RenderMetricsReport): string[] {
   if (r.phases.length === 0) {
     out.push('- (no measurement — no drawing pass ran)');
   } else {
-    // List ALL phases, including those without a measurement. A missing phase used to be dropped
-    // silently — in the report a missing line is then indistinguishable from "costs nothing", and
-    // that is the most expensive kind of gap because it looks like a result.
+    // List ALL phases, including those without a measurement. A phase dropped for want of one is
+    // indistinguishable in the report from "costs nothing", and that is the most expensive kind of
+    // gap because it looks like a result.
     const measured = new Map(r.phases.map((p) => [p.phase, p]));
     for (const phase of REPORT_PHASES) {
       const p = measured.get(phase);
@@ -370,8 +369,8 @@ export async function buildDebugReport(
 /**
  * Body of the prefilled issue: what the reporter WROTE, the attachment box, and a short fingerprint.
  *
- * It used to be the whole of `report.md`, clipped to a few kilobytes — duplication, since the same
- * prose lies in the package, and it buried the one sentence a human had typed.
+ * Deliberately NOT the whole of `report.md`: the same prose lies in the package, and it would bury
+ * the one sentence a human typed.
  *
  * TWO PARTS ARE THERE ON PURPOSE, both because of the same fault: the file never gets attached, and
  * that only becomes apparent after the issue has been submitted, when no hint in this application

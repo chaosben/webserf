@@ -73,13 +73,13 @@ function mkKnight(over: Partial<{ type: number; owner: number; counter: number; 
   } as unknown as Serf;
 }
 
-describe('serf-military — Verteidigungs-Garnison (FUN_0001fc40)', () => {
+describe('serf-military — defending garrison (FUN_0001fc40)', () => {
   it('rank 4 (Knight4) is a no-op: counter/tick/type unchanged', () => {
     const { state, rngCalls } = mkState({ gameTick: 500 });
-    const s = mkKnight({ type: 26, counter: 6000, tick: 16048 }); // wie Fixture #232
+    const s = mkKnight({ type: 26, counter: 6000, tick: 16048 }); // like fixture #232
     defendingHut(state, s);
     expect(s.counter).toBe(6000);
-    expect(s.tick).toBe(16048); // NICHT aktualisiert (bare ret)
+    expect(s.tick).toBe(16048); // NOT updated (bare ret)
     expect(s.type).toBe(26);
     expect(rngCalls()).toBe(0);
   });
@@ -95,9 +95,9 @@ describe('serf-military — Verteidigungs-Garnison (FUN_0001fc40)', () => {
 
   it('underflow without promotion: one +6000 re-arm (-> 5808)', () => {
     const { state, rngCalls } = mkState({ gameTick: 324, rngValues: [0xffff] }); // delta 224
-    const s = mkKnight({ type: 24, counter: 32, tick: 100 }); // Knight2, wie #165
+    const s = mkKnight({ type: 24, counter: 32, tick: 100 }); // Knight2, like #165
     defendingHut(state, s);
- // 32 - 224 = 65344 (u16), + 6000 = 5808 (wrap), before 65344 ≥ 0xe890 → fertig
+ // 32 - 224 = 65344 (u16), + 6000 = 5808 (wrap), before 65344 ≥ 0xe890 → done
     expect(s.counter).toBe(5808);
     expect(s.tick).toBe(324);
     expect(s.type).toBe(24); // no promotion
@@ -107,31 +107,31 @@ describe('serf-military — Verteidigungs-Garnison (FUN_0001fc40)', () => {
   it('underflow with promotion (RNG < threshold): rank R -> R+1 plus bookkeeping', () => {
     const player = mkPlayer({ serfCount: (() => { const a = new Array(27).fill(0); a[22] = 3; a[23] = 1; return a; })(), militaryScore: 5 });
     const { state } = mkState({ gameTick: 101, rngValues: [0], players: [player, null, null, null] }); // delta 1, rng 0 < 250
-    const s = mkKnight({ type: 22, counter: 0, tick: 100 }); // Knight0 → Underflow (0 < 1)
+    const s = mkKnight({ type: 22, counter: 0, tick: 100 }); // Knight0 → underflow (0 < 1)
     defendingHut(state, s);
     expect(s.type).toBe(23); // Knight1
     expect(s.counter).toBe(6000);
     expect(player.serfCount[22]).toBe(2); // −1
     expect(player.serfCount[23]).toBe(2); // +1
-    expect(player.totalMilitaryScore).toBe(6); // +1 (Rang 0 → 1<<0)
+    expect(player.totalMilitaryScore).toBe(6); // +1 (rank 0 → 1<<0)
   });
 
   it('promotion rank 2 -> 3: militaryScore += 1<<2 = 4, not a flat +1', () => {
     const player = mkPlayer({ serfCount: (() => { const a = new Array(27).fill(0); a[24] = 2; a[25] = 1; return a; })(), militaryScore: 50 });
-    const { state } = mkState({ gameTick: 101, rngValues: [0], players: [player, null, null, null] }); // rng 0 < Castle-Rang2-Schwelle 250
-    const s = mkKnight({ type: 24, counter: 0, tick: 100 }); // Knight2 → Underflow
+    const { state } = mkState({ gameTick: 101, rngValues: [0], players: [player, null, null, null] }); // rng 0 < castle rank-2 threshold 250
+    const s = mkKnight({ type: 24, counter: 0, tick: 100 }); // Knight2 → underflow
     defendingCastle(state, s);
     expect(s.type).toBe(25); // Knight3
     expect(player.serfCount[24]).toBe(1); // −1
     expect(player.serfCount[25]).toBe(2); // +1
-    expect(player.totalMilitaryScore).toBe(54); // +4 = 1<<2, NICHT +1
+    expect(player.totalMilitaryScore).toBe(54); // +4 = 1<<2, NOT a flat +1
   });
 
   it('re-arm loops on a large underflow until the u16 wrap (several RNG rolls)', () => {
     const { state, rngCalls } = mkState({ gameTick: 60000 }); // delta 60000, rng default 0xffff (never promote)
     const s = mkKnight({ type: 22, counter: 5, tick: 0 });
     defendingHut(state, s);
- // 5 - 60000 = 5541 (u16); +6000 je Runde bis 'before' ≥ 0xe890 (59536): 5541,11541,…,59541 → 10 Runden
+ // 5 - 60000 = 5541 (u16); +6000 per round until 'before' ≥ 0xe890 (59536): 5541,11541,…,59541 → 10 rounds
     expect(rngCalls()).toBe(10);
     expect(s.counter).toBe(5); // 59541 + 6000 = 65541 & 0xffff
   });
@@ -148,31 +148,31 @@ describe('serf-military — Verteidigungs-Garnison (FUN_0001fc40)', () => {
   });
 });
 
-describe('serf-military — Kampf-Entscheidungskern (State 45, Spec 6.2/6.4)', () => {
+describe('serf-military — fight resolution core (state 45)', () => {
  // Type byte of a knight with rank r and owner o: (22+r)<<2 | o (serf[0] = owner/type/sound byte).
   const typeByte = (rank: number, owner = 0) => (((22 + rank) << 2) | owner) & 0xff;
 
-  it('knightRank: Typ-Byte → Rang 0..4', () => {
+  it('knightRank: type byte → rank 0..4', () => {
     expect(knightRank(typeByte(0))).toBe(0);
     expect(knightRank(typeByte(4))).toBe(4);
     expect(knightRank(typeByte(2, 1))).toBe(2); // owner bits do not interfere (mask 0x7c)
   });
 
   it('knightStrength: base 0x400<<rank, home morale 0x1000 -> base (>>16 with 4096)', () => {
- // Heim: (0x400<<rang · 0x1000) >> 16 = (0x400<<rang)/16 = 0x40<<rang.
+ // At home: (0x400<<rank · 0x1000) >> 16 = (0x400<<rank)/16 = 0x40<<rank.
     expect(knightStrength(0, true, 9999)).toBe(0x40); // 1024·4096>>16 = 64
-    expect(knightStrength(1, true, 9999)).toBe(0x80); // verdoppelt je Rang
+    expect(knightStrength(1, true, 9999)).toBe(0x80); // doubles per rank
     expect(knightStrength(4, true, 9999)).toBe(0x400);
   });
 
-  it('knightStrength: Feindland nutzt Gold-Moral (Basis 1024) statt 4096', () => {
+  it('knightStrength: enemy land uses gold morale (base 1024) instead of 4096', () => {
  // (0x400 · 1042) >> 16 = 1067008 >> 16 = 16.
     expect(knightStrength(0, false, 1042)).toBe(16);
- // Rang 2: (0x1000 · 1042) >> 16 = 4268032>>16 = 65.
+ // Rank 2: (0x1000 · 1042) >> 16 = 4268032>>16 = 65.
     expect(knightStrength(2, false, 1042)).toBe(65);
   });
 
-  it('attackerWinsDuel: roll < strA → Sieg; Grenzen exakt', () => {
+  it('attackerWinsDuel: roll < strA → attacker wins; exact boundaries', () => {
  // strA=64, strB=64 → total=128. roll=(128·rng)>>16.
  // rng chosen so that roll=63 (<64) -> win: 63 = (128*rng)>>16 -> rng approx 63*65536/128 = 32256.
     expect(attackerWinsDuel(64, 64, 32256)).toBe(true); // roll=63 < 64
@@ -182,14 +182,14 @@ describe('serf-military — Kampf-Entscheidungskern (State 45, Spec 6.2/6.4)', (
   });
 
   it('attackerWinsDuel: the stronger knight wins more often (distribution sanity)', () => {
- // strA=256 (Rang2 heim), strB=64 (Rang0 heim), total=320. Median-rng (0x8000) → roll=160 ≥256? nein → Sieg.
+ // strA=256 (rank 2 at home), strB=64 (rank 0 at home), total=320. Median rng (0x8000) → roll=160 ≥ 256? no → attacker wins.
     expect(attackerWinsDuel(256, 64, 0x8000)).toBe(true);
     let wins = 0;
     for (let r = 0; r < 65536; r += 256) if (attackerWinsDuel(256, 64, r)) wins++;
     expect(wins / 256).toBeGreaterThan(0.75); // ~ strA/total = 256/320 = 0.8
   });
 
-  it('applyDuelLoss: militaryScore −= 1<<loserRang, serfCount[loserRang+22] −= 1', () => {
+  it('applyDuelLoss: militaryScore −= 1<<loserRank, serfCount[loserRank+22] −= 1', () => {
     const sc = new Array(27).fill(0);
     sc[22] = 5; // Knight0
     sc[24] = 3; // Knight2
@@ -202,7 +202,7 @@ describe('serf-military — Kampf-Entscheidungskern (State 45, Spec 6.2/6.4)', (
     expect(p.serfCount[24]).toBe(2);
   });
 
-  it('applyDuelLoss: null-Player + serfCount==0 sind robust', () => {
+  it('applyDuelLoss: is robust for a null player and serfCount==0', () => {
     expect(() => applyDuelLoss(null, 3)).not.toThrow();
     const p = { totalMilitaryScore: 5, serfCount: new Array(27).fill(0) } as unknown as Player;
     applyDuelLoss(p, 0);
@@ -211,7 +211,7 @@ describe('serf-military — Kampf-Entscheidungskern (State 45, Spec 6.2/6.4)', (
   });
 });
 
-describe('serf-military — Duell-Pfad-Handler (47/48/49)', () => {
+describe('serf-military — duel path handlers (47/48/49)', () => {
   const mkK = (over: Partial<{ type: number; state: number; counter: number; tick: number; data: number[] }> = {}): Serf =>
     ({
       index: 1,
@@ -247,7 +247,7 @@ describe('serf-military — Duell-Pfad-Handler (47/48/49)', () => {
     const state = { gameTick: 150, serfs: [null, null, null, null, null, defender], rng: { next: () => 0 } } as unknown as GameState;
     knightAttacking(state, att);
     expect(att.counter).toBe(50); // 100 - 50
-    expect(defender.counter).toBe(50); // synchronisiert
+    expect(defender.counter).toBe(50); // kept in sync
     expect(att.state).toBe(48); // no resolution
   });
 
@@ -306,7 +306,7 @@ describe('serf-military — Duell-Pfad-Handler (47/48/49)', () => {
   it('48 resolution, attacker loses: attacker -> Dead(27)+51, defender walks back into the building', () => {
     const { state, flagPos, bldPos } = duelAtBuilding();
     const defender = mkK({ type: 24, state: 49, counter: 0 });
- // stateData[0]=15 → STRIKE_SEQ[15]=0xFF (sofort Sequenz-Ende); serf[0xc]=0; serf[0xe]=5.
+ // stateData[0]=15 → STRIKE_SEQ[15]=0xFF (sequence ends at once); serf[0xc]=0; serf[0xe]=5.
     const att = mkK({ type: 22, state: 48, counter: 0, tick: 100, data: [15, 0, 0, 5, 0] });
     att.index = 6;
     state.serfs[5] = defender;
@@ -359,10 +359,10 @@ describe('serf-military — Duell-Pfad-Handler (47/48/49)', () => {
 });
 
 /**
- * Besetzungs-Slice (Spec 6.6) — `knightEngagingBuilding` (44) + `knightOccupyEnemyBuilding` (52).
- * Kern byte-verifiziert gegen SAVE8→SAVE9 (bld#23 @(27,54): owner 1→0, Garnison 3→1, P0 building_score +3).
+ * Occupation — `knightEngagingBuilding` (44) + `knightOccupyEnemyBuilding` (52). The core
+ * is byte-verified against SAVE8→SAVE9 (bld#23 @(27,54): owner 1→0, garrison 3→1, P0 building_score +3).
  */
-describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)', () => {
+describe('occupation 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)', () => {
   const geo = mapGeometry(3);
 
   function mkOccupyState(bldFirstKnight: number) {
@@ -398,7 +398,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
       ],
     } as unknown as Building;
  // Full flag fields: occupation calls `cancelTransportOnDelete` (@0x16bac), which walks the
- // Waren-Slots aller Flaggen absucht.
+ // resource slots of every flag.
     const flag = {
       index: 3,
       owner: 1,
@@ -467,7 +467,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     expect(knight.counter).toBe(0x7f);
   });
 
- // --- 44: Verteidiger-Zweig (@0x17fd4) ---
+ // --- 44: defender branch (@0x17fd4) ---
 
  /** Build a garrison of `n` knights as a singly linked list starting at serf index 20. */
   function withGarrison(st: GameState, bld: Building, n: number): number[] {
@@ -506,11 +506,11 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
 
     const def = state.serfs[g[0]!]!;
     expect(def.state).toBe(0x2e); // 46 KnightLeaveForFight
-    expect(def.stateData[4]).toBe(0x2f); // Folgezustand 47
+    expect(def.stateData[4]).toBe(0x2f); // follow-up state 47
     expect(bld.firstKnight).toBe(0);
   });
 
-  it('44: `bld[8] -= 0xf` — available runter UND requested rauf (Ersatz angefordert)', () => {
+  it('44: `bld[8] -= 0xf` — available down AND requested up (a replacement is requested)', () => {
     const { state, knight, bld } = mkOccupyState(0);
     bld.stock[0] = { available: 1, requested: 0 }; // Byte 0x10
     withGarrison(state, bld, 1);
@@ -537,17 +537,17 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     defender.flags = 0;
     (defender as { messageTypes: number[] }).messageTypes = [];
     (defender as { messagePositions: number[] }).messagePositions = [];
-    bld.progress = 1; // Losschick-Signal steht
+    bld.progress = 1; // dispatch signal is set
     bld.stock[0] = { available: 2, requested: 0 };
     withGarrison(state, bld, 2);
 
     knightEngagingBuilding(state, knight);
-    expect(bld.progress & 1).toBe(0); // verbraucht
+    expect(bld.progress & 1).toBe(0); // consumed
     expect(defender.messageTypes).toEqual([1]); // ((owner 0 & 3) << 5) + 1
     expect(defender.messagePositions).toEqual([bldPos]);
-    expect(defender.flags & 8).toBe(8); // Wecker Bit 3
+    expect(defender.flags & 8).toBe(8); // wake-up flag, bit 3
 
- // Ein zweiter Angreifer erzeugt KEINE weitere Meldung.
+ // A second attacker produces NO further message.
     const knight2 = { ...knight, index: 8, state: 0x2c, counter: 0, tick: 0 } as unknown as Serf;
     state.serfs[8] = knight2;
     knightEngagingBuilding(state, knight2);
@@ -573,14 +573,14 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     const def = state.serfs[g[0]!]!;
 
     knightLeaveForFight(state, def);
-    expect(def.state).toBe(5); // LeavingBuilding, Folgezustand 47 wartet in 0xf
+    expect(def.state).toBe(5); // LeavingBuilding, follow-up state 47 waits in 0xf
     expect(def.stateData[4]).toBe(0x2f);
     expect(state.mapTiles[bldPos].serfIndex).toBe(0); // own tile cleared
-    expect(state.mapTiles[flagPos].serfIndex).toBe(7); // Angreifer bleibt eingetragen
+    expect(state.mapTiles[flagPos].serfIndex).toBe(7); // attacker stays registered
     expect([def.col, def.row]).toEqual([colOf(flagPos, geo), rowOf(flagPos, geo)]);
   });
 
-  it('46: blockiertes eigenes Feld → wirkungslos (KEINE Warte-Animation 0x52)', () => {
+  it('46: own tile blocked → no effect (NO waiting animation 0x52)', () => {
     const { state, knight, bld, bldPos } = mkOccupyState(0);
     bld.stock[0] = { available: 1, requested: 0 };
     const g = withGarrison(state, bld, 1);
@@ -589,7 +589,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     state.mapTiles[bldPos].serfIndex = 999; // foreign serf on the building tile
     def.animation = 37;
     knightLeaveForFight(state, def);
-    expect(def.state).toBe(0x2e); // bleibt 46
+    expect(def.state).toBe(0x2e); // stays 46
     expect(def.animation).toBe(37); // unchanged — no 0x52
   });
 
@@ -598,9 +598,9 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     knightOccupyEnemyBuilding(state, knight);
 
  // score transfer (BUILDING_SCORE[11]=3)
-    expect(players[1]!.totalBuildingScore).toBe(197); // Alt-Owner −3
-    expect(players[0]!.totalBuildingScore).toBe(103); // Neu-Owner +3
-    expect(players[1]!.completedBuildingCount[10]).toBe(4); // Typ 11 → Index 10, −1
+    expect(players[1]!.totalBuildingScore).toBe(197); // old owner −3
+    expect(players[0]!.totalBuildingScore).toBe(103); // new owner +3
+    expect(players[1]!.completedBuildingCount[10]).toBe(4); // type 11 → index 10, −1
     expect(players[0]!.completedBuildingCount[10]).toBe(6); // +1
 
  // owner flip on building and flag, type unchanged, garrison marker building+8 = 1
@@ -641,7 +641,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
     knightOccupyEnemyBuilding(state, knight);
 
     expect(state.mapTiles[bldPos].owner).toBe(1); // building tile -> winner P0 (centre)
-    expect(state.mapTiles[nearPos].owner).toBe(1); // naher Ring → P0
+    expect(state.mapTiles[nearPos].owner).toBe(1); // near ring → P0
     expect(state.mapTiles[farPos].owner).toBe(2); // outside the radius -> unchanged, no recolour
   });
 
@@ -652,7 +652,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
    * building survives on ground that now belongs to the winner — the tile never changes owner, so
    * nothing else would ever remove it.
    */
-  describe('52: der Footprint-Abriss (@0x16d28..@0x16e46)', () => {
+  describe('52: the footprint teardown (@0x16d28..@0x16e46)', () => {
     /** Plant a free-standing flag of the OLD owner on `pos` and return its slot. */
     function plantFlag(state: GameState, pos: number, index: number): void {
       state.flags[index] = {
@@ -730,13 +730,13 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
   * `-1` for the loser in the castle branch of `demolishBuilding`. Both belong to ONE event and
   * affect two different players, which is why they are tested together.
   */
-  describe('52: erobertes SCHLOSS (Bilanz-Paar Block 478)', () => {
+  describe('52: a captured CASTLE (balance pair, block 478)', () => {
     function mkCastleOccupy() {
       const r = mkOccupyState(0);
       r.bld.type = 24; // Castle
       const loser = r.players[1] as unknown as Player;
       const winner = r.players[0] as unknown as Player;
-      loser.build = 0xc; // Bits 2|3 — „Anfangs-Serfs erzeugt" + „hat Schloss"
+      loser.build = 0xc; // bits 2|3 — "initial serfs created" + "has castle"
       loser.castleBuilderSerf = 0;
       return { ...r, loser, winner };
     }
@@ -747,11 +747,11 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
       expect(winner.castleCaptureBalance).toBe(1);
       expect(loser.castleCaptureBalance).toBe(-1);
       expect(bld.burning).toBe(true);
-      expect(loser.build & 8).toBe(0); // „hat Schloss" weg
-      expect(loser.build & 4).toBe(4); // Bit 2 unangetastet
+      expect(loser.build & 8).toBe(0); // "has castle" cleared
+      expect(loser.build & 4).toBe(4); // bit 2 untouched
     });
 
-    it('brennt 0x1fff statt 0x7ff Ticks', () => {
+    it('burns for 0x1fff instead of 0x7ff ticks', () => {
       const { state, knight, bld } = mkCastleOccupy();
       knightOccupyEnemyBuilding(state, knight);
       expect(bld.firstKnight).toBe(0x1fff);
@@ -807,7 +807,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
   * The second branch of state 52 (`je 0x16852` @0x1680d): the target **already** belongs to the
   * knight — the situation of every attack wave after the first. He moves up to the **absolute**
   * capacity (hut 3 / tower 6 / fortress 12, @0x16876/@0x16882/@0x1688e), otherwise he becomes lost.
-  * Byte-Belege + Rundlauf: einer Sonde.
+  * Bytes and round trip: verified against the original data.
   */
   describe('52: attacker moving up into an own building', () => {
     it('moves up: tile free, bld[8] += 1, state 4, field_0xb = 0xff', () => {
@@ -842,7 +842,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
       expect(knight.state).toBe(25);
     });
 
-    it('brennendes Ziel → Lost (25) statt stillem Stehenbleiben', () => {
+    it('a burning target → lost (25) instead of standing still', () => {
       const { state, knight, bld } = mkOccupyState(0);
       bld.burning = true;
       knightOccupyEnemyBuilding(state, knight);
@@ -855,7 +855,7 @@ describe('Besetzung 44/52 (KnightEngagingBuilding / KnightOccupyEnemyBuilding)',
 /**
  * Open-field fight resolution — the `isFree` branch of `knightAttacking` (state 60) plus
  * `knightAttackingVictoryFree` (62) / `knightDefendingVictoryFree` (63) / `knightAttackingFreeWait` (64).
- * Byte-gelesen aus @0x18802 (Freifeld-Zweige) + @0x1ceee/0x1cff0/0x1d0cd.
+ * Read from the bytes at @0x18802 (open-field branches) + @0x1ceee/0x1cff0/0x1d0cd.
  */
 describe('open-field fight resolution 60/62/63/64', () => {
   const geo = mapGeometry(3);
@@ -886,18 +886,18 @@ describe('open-field fight resolution 60/62/63/64', () => {
       stateData: over.data ?? [0, 0, 0, 0, 0],
     }) as unknown as Serf;
 
-  it('60 gewonnen (isFree): Angreifer→62, kopiert Gegner-Kampfwerte, Verteidiger→Dead', () => {
+  it('60 won (isFree): attacker→62, copies the opponent fight values, defender→Dead', () => {
     const defender = mkK({ index: 5, type: 24, state: 61, data: [0, 0, 7, 8, 9] });
     const att = mkK({ index: 1, type: 26, state: 0x3c, tick: 100, data: [15, 1, 0, 5, 0] }); // seq[15]=0xFF, win=1, opp=5
     const state = mkFreeState([null, att, null, null, null, defender]);
     knightAttacking(state, att);
     expect(att.state).toBe(0x3e); // 62
     expect(att.animation).toBe(0xa8);
-    expect([att.stateData[0], att.stateData[1], att.stateData[2]]).toEqual([7, 8, 9]); // opp[0xd..0xf] kopiert
+    expect([att.stateData[0], att.stateData[1], att.stateData[2]]).toEqual([7, 8, 9]); // opp[0xd..0xf] copied
     expect(defender.type).toBe(27); // Dead
   });
 
-  it('60 verloren (isFree): Angreifer→51+Dead, Verteidiger→63 (serf[0xe]=Angreifer), Kachel→Verteidiger', () => {
+  it('60 lost (isFree): attacker→51+Dead, defender→63 (serf[0xe]=attacker), tile→defender', () => {
     const defender = mkK({ index: 5, type: 24, state: 61 });
     const att = mkK({ index: 1, type: 26, state: 0x3c, tick: 100, col: 10, row: 10, data: [15, 0, 0, 5, 0] }); // win=0, opp=5
     const state = mkFreeState([null, att, null, null, null, defender]);
@@ -907,11 +907,11 @@ describe('open-field fight resolution 60/62/63/64', () => {
     expect(att.type).toBe(27); // Dead
     expect(defender.state).toBe(0x3f); // 63
     expect(defender.animation).toBe(0xb4);
-    expect(defender.stateData[3] | (defender.stateData[4] << 8)).toBe(1); // defender[0xe] = Angreifer-Idx
-    expect(state.mapTiles[attPos].serfIndex).toBe(5); // Kachel → Verteidiger
+    expect(defender.stateData[3] | (defender.stateData[4] << 8)).toBe(1); // defender[0xe] = attacker index
+    expect(state.mapTiles[attPos].serfIndex).toBe(5); // tile → defender
   });
 
-  it('62 AttackingVictoryFree: Verlierer freigegeben, →64 (ohne Warteschlange serf[0xf]=0)', () => {
+  it('62 AttackingVictoryFree: loser freed, →64 (with no queue serf[0xf]=0)', () => {
     const loser = mkK({ index: 5, type: 24, state: 61, counter: 0, tick: 100 });
     const victor = mkK({ index: 1, state: 0x3e, tick: 100, data: [0, 0, 0, 5, 0] }); // serf[0xb]=0, serf[0xe]=5
     const state = mkFreeState([null, victor, null, null, null, loser]);
@@ -929,12 +929,12 @@ describe('open-field fight resolution 60/62/63/64', () => {
     const state = mkFreeState([null, victor, null, null, null, loser]);
     knightAttackingVictoryFree(state, victor);
     expect(victor.stateData[0]).toBe(7); // serf[0xb] := old serf[0xc] (moved up)
-    expect(victor.stateData[1]).toBe(0); // serf[0xc] := alt serf[0xd]
-    expect(victor.stateData[4]).toBe(1); // serf[0xf]=1 → weiterer Gegner
+    expect(victor.stateData[1]).toBe(0); // serf[0xc] := old serf[0xd]
+    expect(victor.stateData[4]).toBe(1); // serf[0xf]=1 → another opponent
     expect(victor.state).toBe(0x40);
   });
 
-  it('63 DefendingVictoryFree: Verlierer freigegeben, →53', () => {
+  it('63 DefendingVictoryFree: loser freed, →53', () => {
     const loser = mkK({ index: 5, type: 26, state: 0x33, counter: 0, tick: 100 });
     const victor = mkK({ index: 1, type: 24, state: 0x3f, tick: 100, data: [0, 0, 9, 5, 0] }); // serf[0xe]=5
     const state = mkFreeState([null, victor, null, null, null, loser]);
@@ -946,7 +946,7 @@ describe('open-field fight resolution 60/62/63/64', () => {
 
   it('63 is robust: loser already gone (deleted by state 51) -> still -> 53, no double free', () => {
     const victor = mkK({ index: 1, type: 24, state: 0x3f, tick: 100, data: [0, 0, 0, 5, 0] });
-    const state = mkFreeState([null, victor, null, null, null, null]); // idx 5 bereits null
+    const state = mkFreeState([null, victor, null, null, null, null]); // idx 5 already null
     knightDefendingVictoryFree(state, victor);
     expect(victor.state).toBe(0x35); // 53
     expect(state.serfBudget).toBe(100); // no extra free
@@ -965,10 +965,10 @@ describe('open-field fight resolution 60/62/63/64', () => {
 });
 
 /**
- * Freifeld-Engage-Kette (Spec 6.9, Teil 2a) — State 53 Scan/Engage + Handshake 54/55/56/57/58/59.
- * Byte-belegt gegen `freefield-engage-*` (#101 `53→54` anim 99 data[2]=0; #245 `2→55` data[2]=dir data[3]=101).
+ * Open-field engage chain — state 53 scan/engage + handshake 54/55/56/57/58/59.
+ * Byte-verified against the original data (#101 `53→54` anim 99 data[2]=0; #245 `2→55` data[2]=dir data[3]=101).
  */
-describe('Freifeld-Engage-Kette 53–59', () => {
+describe('open-field engage chain 53–59', () => {
   const geo = mapGeometry(3);
   function mkEngageState(serfsList: (Serf | null)[], players?: (Player | null)[]) {
     const mapTiles = Array.from({ length: geo.cols * geo.rows }, () => ({ serfIndex: 0, owner: 0, object: 0, objIndex: 0, height: 0 }));
@@ -1001,7 +1001,7 @@ describe('Freifeld-Engage-Kette 53–59', () => {
       stateData: over.data ?? [0, 0, 0, 0, 0],
     }) as unknown as Serf;
 
-  it('53 Scan engagt laufenden Ritter (State 2): Scanner→54 (anim 99, data[2]=0), Nachbar→55 (data[2]=dir, data[3]=Scanner)', () => {
+  it('53 scan engages a walking knight (state 2): scanner→54 (anim 99, data[2]=0), neighbour→55 (data[2]=dir, data[3]=scanner)', () => {
     const scanner = mkK({ index: 1, owner: 0, state: 0x35, col: 10, row: 10 });
     const enemy = mkK({ index: 5, owner: 1, type: 26, state: 2, col: 10, row: 11, data: [7, 8, 0, 0, 0] }); // Down (dir 2)
     const state = mkEngageState([null, scanner, null, null, null, enemy]);
@@ -1009,20 +1009,20 @@ describe('Freifeld-Engage-Kette 53–59', () => {
     knightFreeWalking(state, scanner);
     expect(scanner.state).toBe(0x36); // 54
     expect(scanner.animation).toBe(99);
-    expect(scanner.stateData[2]).toBe(0); // Walking-Knight-Variante
+    expect(scanner.stateData[2]).toBe(0); // walking-knight variant
     expect(enemy.state).toBe(0x37); // 55
-    expect(enemy.stateData[2]).toBe(2); // Richtung Down
-    expect(enemy.stateData[3] | (enemy.stateData[4] << 8)).toBe(1); // nb[0xe] = Scanner-Index
+    expect(enemy.stateData[2]).toBe(2); // direction Down
+    expect(enemy.stateData[3] | (enemy.stateData[4] << 8)).toBe(1); // nb[0xe] = scanner index
   });
 
-  it('53 Scan engagt Freifeld-Ritter (State 53): Scanner data[2]=1, self[0xe:0xf]=nb[0xb:0xc]', () => {
+  it('53 scan engages an open-field knight (state 53): scanner data[2]=1, self[0xe:0xf]=nb[0xb:0xc]', () => {
     const scanner = mkK({ index: 1, owner: 0, state: 0x35 });
     const enemy = mkK({ index: 5, owner: 1, state: 0x35, col: 11, row: 10, data: [3, 4, 0, 0, 0] }); // Right (dir 0)
     const state = mkEngageState([null, scanner, null, null, null, enemy]);
     state.mapTiles[posOf(11, 10, geo)].serfIndex = 5;
     knightFreeWalking(state, scanner);
     expect(scanner.state).toBe(0x36); // 54
-    expect(scanner.stateData[2]).toBe(1); // Freifeld-Variante
+    expect(scanner.stateData[2]).toBe(1); // open-field variant
     expect(scanner.stateData[3]).toBe(3); // self[0xe] = nb[0xb]
     expect(scanner.stateData[4]).toBe(4); // self[0xf] = nb[0xc]
     expect(enemy.state).toBe(0x37); // 55
@@ -1031,26 +1031,26 @@ describe('Freifeld-Engage-Kette 53–59', () => {
   it('53 neighbour with the same owner -> no engage (friend untouched, scanner keeps moving)', () => {
  // flags=8 (destination-reached bit) -> the locomotion (reusing freeWalkingCommon) falls into destReached (knight -> 52).
     const scanner = mkK({ index: 1, owner: 0, type: 26, state: 0x35, counter: 0, tick: 100, data: [0, 0, 0, 0, 8] });
-    const friend = mkK({ index: 5, owner: 0, state: 2, col: 11, row: 10 }); // gleicher Owner
+    const friend = mkK({ index: 5, owner: 0, state: 2, col: 11, row: 10 }); // same owner
     const state = mkEngageState([null, scanner, null, null, null, friend]);
     state.mapTiles[posOf(11, 10, geo)].serfIndex = 5;
-    state.gameTick = 300; // Counter abgelaufen → Scan + Lokomotion laufen
+    state.gameTick = 300; // counter expired → scan and locomotion both run
     knightFreeWalking(state, scanner);
     expect(friend.state).toBe(2); // not engaged (same owner is skipped)
-    expect(scanner.state).toBe(52); // lokomotet → destReached (Ritter-Zweig KnightOccupyEnemy)
+    expect(scanner.state).toBe(52); // moves on → destReached (knight branch KnightOccupyEnemy)
   });
 
-  it('53 ohne Gegner: Lokomotion via freeWalkingCommon (Ziel erreicht → KnightOccupyEnemy 52)', () => {
+  it('53 with no opponent: locomotion via freeWalkingCommon (destination reached → KnightOccupyEnemy 52)', () => {
     const knight = mkK({ index: 1, owner: 0, type: 26, state: 0x35, counter: 0, tick: 100, data: [0, 0, 0, 0, 8] });
     const state = mkEngageState([null, knight]);
     state.gameTick = 300;
     knightFreeWalking(state, knight);
-    expect(knight.state).toBe(52); // destReached (Ritter-Zweig)
+    expect(knight.state).toBe(52); // destReached (knight branch)
   });
 
   it('53 engages a walking knight -> his target garrison is booked out (building+8 -= 1)', () => {
     const scanner = mkK({ index: 1, owner: 0, state: 0x35, col: 10, row: 10 });
- // Walking-Knight (State 2), Ziel-Flagge #3 in serf[0xc] (stateData[1]=3, stateData[2]=0).
+ // Walking knight (state 2), target flag #3 in serf[0xc] (stateData[1]=3, stateData[2]=0).
     const enemy = mkK({ index: 5, owner: 1, type: 26, state: 2, col: 10, row: 11, data: [0, 3, 0, 0, 0] });
     const state = mkEngageState([null, scanner, null, null, null, enemy]);
     state.mapTiles[posOf(10, 11, geo)].serfIndex = 5;
@@ -1060,29 +1060,29 @@ describe('Freifeld-Engage-Kette 53–59', () => {
  // Flag #3 with building #2 in direction UpLeft (connections[4]).
     mut.flags = [null, null, null, { index: 3, connections: [null, null, null, null, { kind: 'building', index: 2 }, null] } as unknown as Flag];
     knightFreeWalking(state, scanner);
-    expect(enemy.state).toBe(0x37); // 55 (engagt)
-    expect(bld.stock[0]).toEqual({ available: 0, requested: 2 }); // Garnison 3 → 2
+    expect(enemy.state).toBe(0x37); // 55 (engaged)
+    expect(bld.stock[0]).toEqual({ available: 0, requested: 2 }); // garrison 3 → 2
   });
 
   it('53 engage blocked: the battle site (Left of the opponent) is blocked -> no engage, knight keeps moving', () => {
  // flags=8 -> the locomotion falls straight into destReached (knight -> 52), which exposes the "no engage" case.
     const scanner = mkK({ index: 1, owner: 0, type: 26, state: 0x35, counter: 0, tick: 100, col: 10, row: 10, data: [0, 0, 0, 0, 8] });
-    const enemy = mkK({ index: 5, owner: 1, state: 0x35, col: 10, row: 11 }); // Freifeld-Ritter, Down (dir 2)
+    const enemy = mkK({ index: 5, owner: 1, state: 0x35, col: 10, row: 11 }); // open-field knight, Down (dir 2)
     const state = mkEngageState([null, scanner, null, null, null, enemy]);
     state.mapTiles[posOf(10, 11, geo)].serfIndex = 5;
  // Battle site = Left neighbour of the opponent (10,11) -> (9,11): block it.
     state.mapTiles[neighbor(posOf(10, 11, geo), Direction.Left, geo)].blocked = true;
     state.gameTick = 300;
     knightFreeWalking(state, scanner);
-    expect(enemy.state).toBe(0x35); // NICHT engagt (bleibt Freifeld-Ritter)
+    expect(enemy.state).toBe(0x35); // NOT engaged (stays an open-field knight)
     expect(scanner.state).not.toBe(0x36); // the scanner is not the defender (54)
-    expect(scanner.state).toBe(52); // stattdessen lokomotet → destReached
+    expect(scanner.state).toBe(52); // moves on instead → destReached
   });
 
   it('55 -> 56 (anim 0xa7, counter reset on overshoot > 0xbf)', () => {
     const s = mkK({ index: 1, state: 0x37, counter: 0, tick: 100 });
     const state = mkEngageState([null, s]);
-    state.gameTick = 400; // delta 300 > 0xbf → Underflow tief genug → counter = 0
+    state.gameTick = 400; // delta 300 > 0xbf → underflow deep enough → counter = 0
     knightEngageAttackingFree(state, s);
     expect(s.state).toBe(0x38); // 56
     expect(s.animation).toBe(0xa7);
@@ -1091,11 +1091,11 @@ describe('Freifeld-Engage-Kette 53–59', () => {
 
   it('56 -> 57 and puts the defender (serf[0xe]) -> 58 with a slope move in the engage direction', () => {
     const defender = mkK({ index: 5, state: 0x36, col: 10, row: 10, data: [0, 0, 0, 0, 0] });
- // serf[0xe]=5 (Verteidiger), serf[0xd]=0 (Engage-Richtung Right).
+ // serf[0xe]=5 (defender), serf[0xd]=0 (engage direction Right).
     const att = mkK({ index: 1, state: 0x38, counter: 0, tick: 100, data: [0, 0, 0, 5, 0] });
     const state = mkEngageState([null, att, null, null, null, defender]);
     state.mapTiles[posOf(10, 10, geo)].serfIndex = 5;
-    state.gameTick = 300; // Counter abgelaufen
+    state.gameTick = 300; // counter expired
     knightEngageAttackingFreeJoin(state, att);
     expect(att.state).toBe(0x39); // 57
     expect(att.animation).toBe(0xa8);
@@ -1105,7 +1105,7 @@ describe('Freifeld-Engage-Kette 53–59', () => {
     expect(defender.row).toBe(10);
     expect(defender.animation).toBe(4);
     expect(defender.stateData[0]).toBe(0xff); // serf[0xb] -= Δcol(1) → -1 & 0xff
-    expect(state.mapTiles[posOf(10, 10, geo)].serfIndex).toBe(0); // alter Slot geleert
+    expect(state.mapTiles[posOf(10, 10, geo)].serfIndex).toBe(0); // old slot cleared
   });
 
   it('58 -> 59 (counter 0)', () => {
@@ -1115,7 +1115,7 @@ describe('Freifeld-Engage-Kette 53–59', () => {
     expect(s.counter).toBe(0);
   });
 
-  it('57 wartet, bis Verteidiger in 59; dann Angreifer→60, Verteidiger→61, decideDuel (Sieg + Buchung)', () => {
+  it('57 waits until the defender is in 59; then attacker→60, defender→61, decideDuel (win + bookkeeping)', () => {
     const p1 = { serfCount: (() => { const a = new Array(27).fill(0); a[22] = 5; return a; })(), totalMilitaryScore: 100, goldMorale: 1024 } as unknown as Player;
     const p0 = { serfCount: new Array(27).fill(0), totalMilitaryScore: 50, goldMorale: 4096 } as unknown as Player;
     const defender = mkK({ index: 5, type: 22, owner: 1, state: 0x3b, col: 10, row: 11 }); // K0, in 59
@@ -1124,15 +1124,15 @@ describe('Freifeld-Engage-Kette 53–59', () => {
     knightPrepareAttackingFree(state, att);
     expect(att.state).toBe(0x3c); // 60
     expect(defender.state).toBe(0x3d); // 61
-    expect(att.stateData[1]).toBe(1); // Ausgang: Angreifer siegt (K4 4096 vs K0 1024)
-    expect(p1.serfCount[22]).toBe(4); // Verlierer-Buchung: −1
+    expect(att.stateData[1]).toBe(1); // outcome: the attacker wins (K4 4096 vs K0 1024)
+    expect(p1.serfCount[22]).toBe(4); // loser bookkeeping: −1
     expect(p1.totalMilitaryScore).toBe(99); // −(1<<0)
   });
 });
 
-// --- Zustand 65 KnightLeaveForWalkToFight (@0x24528) --------------------------------------------
+// --- State 65 KnightLeaveForWalkToFight (@0x24528) --------------------------------------------
 
-describe('serf-military — 65 KnightLeaveForWalkToFight (Austritt zum Angriff)', () => {
+describe('serf-military — 65 KnightLeaveForWalkToFight (exit to attack)', () => {
   const g = mapGeometry(3);
   const t = (over: Record<string, number> = {}): Tile =>
     ({
@@ -1197,15 +1197,15 @@ describe('serf-military — 65 KnightLeaveForWalkToFight (Austritt zum Angriff)'
     return { state, serf, bld, here, flag };
   }
 
-  it('freies Flaggen-Feld: tritt aus wie Zustand 07, Zustand → 5, Folgezustand 53 bleibt stehen', () => {
+  it('free flag tile: exits like state 07, state → 5, follow-up state 53 stays', () => {
     const { state, serf, here, flag } = s65();
     knightLeaveForWalkToFight(state, serf);
-    expect(serf.state).toBe(5); // LeavingBuilding — holt danach 53 aus serf[0xf]
+    expect(serf.state).toBe(5); // LeavingBuilding — picks 53 out of serf[0xf] afterwards
     expect(serf.stateData[4]).toBe(0x35);
     expect([serf.col, serf.row]).toEqual([11, 21]);
     expect(state.mapTiles[here].serfIndex).toBe(0);
     expect(state.mapTiles[flag].serfIndex).toBe(5);
-    expect(serf.animation).toBe(14); // Δh(+1) + 0xd — derselbe geteilte Block @0x2473b
+    expect(serf.animation).toBe(14); // Δh(+1) + 0xd — the same shared block @0x2473b
   });
 
   it('own serf on the flag: wait (anim 0x52), state stays 65', () => {
@@ -1222,7 +1222,7 @@ describe('serf-military — 65 KnightLeaveForWalkToFight (Austritt zum Angriff)'
     expect(serf.state).toBe(70); // DefendingHut (@0x2462a: `mov $0x46`)
     expect(bld.firstKnight).toBe(5); // put at the head of the list
     expect(bld.stock[0].available).toBe(1); // bld[8] += 0x10
-    expect(serf.animation).toBe(0); // dieser Zweig setzt weder Anim noch Counter
+    expect(serf.animation).toBe(0); // this branch sets neither animation nor counter
   });
 
   it('tower/fortress lead back into 71/72', () => {

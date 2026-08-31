@@ -3,7 +3,7 @@ import { castleBuildingHandler } from './castle-garrison.js';
 import type { Building, GameState, Inventory, Player, Serf } from './state.js';
 
 /**
- * `castle_building_handler` (@0x14da5) — the mechanics: which serf is chosen, what is booked, and
+ * `castle_building_handler` (@0x14da5) - the mechanics: which serf is chosen, what is booked, and
  * when nothing happens at all.
  */
 
@@ -110,7 +110,7 @@ function chain(state: GameState, castle: Building): number[] {
   return out;
 }
 
-describe('castle_building_handler — too many in the castle (target < actual)', () => {
+describe('castle_building_handler: too many in the castle (target < actual)', () => {
   it('puts the HEAD of the chain into its own stock and books actual-1', () => {
     const { state, castle, player } = makeCastle({ garrison: [24, 22, 26], want: 2, have: 3 });
     castleBuildingHandler(state, castle);
@@ -119,11 +119,11 @@ describe('castle_building_handler — too many in the castle (target < actual)',
     const gone = state.serfs[100]!;
     expect(gone.state).toBe(1); // IdleInStock
     expect(gone.stateData[1]).toBe(0); // field_0xc = 0
-    expect(gone.stateData[3] | (gone.stateData[4] << 8)).toBe(0); // Inventar-Index
+    expect(gone.stateData[3] | (gone.stateData[4] << 8)).toBe(0); // inventory index
   });
 });
 
-describe('castle_building_handler — too few in the castle (target > actual)', () => {
+describe('castle_building_handler: too few in the castle (target > actual)', () => {
   it('takes the HIGHEST rank out of its own stock', () => {
     const { state, castle, inv, player } = makeCastle({
       garrison: [22],
@@ -136,11 +136,11 @@ describe('castle_building_handler — too few in the castle (target > actual)', 
     expect(state.serfs[8]!.state).toBe(75); // DefendingCastle
     expect(state.serfs[8]!.counter).toBe(6000);
     expect(inv.serfIndices[25]).toBe(0);
-    expect(inv.serfIndices[22]).toBe(7); // K0 bleibt liegen
+    expect(inv.serfIndices[22]).toBe(7); // K0 stays put
     expect(player.knightMenuCounter).toBe(2);
   });
 
-  it('macht aus einem Generic + Schwert + Schild einen Knight0', () => {
+  it('turns a generic plus sword plus shield into a Knight0', () => {
     const { state, castle, inv, player } = makeCastle({
       garrison: [22],
       stock: { 21: 9 },
@@ -181,20 +181,20 @@ describe('castle_building_handler — too few in the castle (target > actual)', 
     const { state, castle, player } = makeCastle({ garrison: [22], want: 2, have: 1, cooldown: 2 });
     castleBuildingHandler(state, castle); // 2 -> 1, no request
     expect(player.castleRequestCooldown).toBe(1);
-    castleBuildingHandler(state, castle); // 1 → 0
+    castleBuildingHandler(state, castle); // 1 -> 0
     expect(player.castleRequestCooldown).toBe(0);
     castleBuildingHandler(state, castle); // 0 => request, reset to 5
     expect(player.castleRequestCooldown).toBe(5);
-    // `bld[8] = 0xffff` @0x15062 — the inventory marker as the real byte pair.
+    // `bld[8] = 0xffff` @0x15062 - the inventory marker as the real byte pair.
     expect(castle.stock[0]).toEqual({ available: 0xf, requested: 0xf });
     expect(castle.stock[1]).toEqual({ available: 0xf, requested: 0xf });
   });
 });
 
-describe('castle_building_handler — rank rotation (target == actual)', () => {
+describe('castle_building_handler: rank rotation (target == actual)', () => {
   it('swaps the strongest of the garrison for a weaker one from the stock', () => {
     const { state, castle, inv } = makeCastle({
-      garrison: [23, 26, 24], // K1, K4, K2 — the strongest sits in the middle
+      garrison: [23, 26, 24], // K1, K4, K2 - the strongest sits in the middle
       stock: { 22: 7 }, // one K0 in the stock
       want: 3,
       have: 3,
@@ -215,7 +215,7 @@ describe('castle_building_handler — rank rotation (target == actual)', () => {
     });
     castleBuildingHandler(state, castle);
     expect(state.serfs[7]!.type).toBe(22);
-    expect(inv.serfIndices[22]).toBe(7); // Cache unangetastet
+    expect(inv.serfIndices[22]).toBe(7); // cache untouched
   });
 
   it('stops as soon as the next stock rank would no longer be weaker', () => {
@@ -247,7 +247,7 @@ describe('castle_building_handler — rank rotation (target == actual)', () => {
     expect(inv.serfIndices[24]).toBe(8); // K2 stays untouched
   });
 
-  it('tut nichts bei leerer Garnison', () => {
+  it('does nothing with an empty garrison', () => {
     const { state, castle, inv } = makeCastle({ garrison: [], stock: { 22: 7 }, want: 0, have: 0 });
     castleBuildingHandler(state, castle);
     expect(castle.firstKnight).toBe(0);

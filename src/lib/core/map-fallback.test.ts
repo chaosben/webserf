@@ -22,7 +22,7 @@ function cam(col: number, row: number, width = 320, height = 240): Camera {
 }
 
 describe('buildColorTriangles', () => {
-  it('liefert zwei Dreiecke je sichtbarer Kachel', () => {
+  it('yields two triangles per visible tile', () => {
     const c = cam(10, 8);
     const frame = buildWindowFrame(c, geo, 0);
     const visible = frame.halfRows.reduce((n, r) => n + r.tiles.length, 0);

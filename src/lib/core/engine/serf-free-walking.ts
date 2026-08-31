@@ -790,7 +790,7 @@ export function freeWalkingCommon(state: GameState, serf: Serf, water = false): 
   const dirIndex = forwardDirIndex(d1, d2);
   const row = DIR_FORWARD[dirIndex];
 
-  // Bevorzugte Richtung direkt versuchen.
+  // Try the preferred direction directly.
   const dir0 = row[0];
   const np0 = neighbor(pos, dir0, geo);
   if (passableTerrain(state, np0, water) && !hasSerf(state, np0)) {

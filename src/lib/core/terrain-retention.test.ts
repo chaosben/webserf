@@ -175,8 +175,8 @@ describe('diffGroundRows', () => {
     expect(diffGroundRows(tiles, 64, 64, words).rows).toEqual([]);
   });
 
-  // Regression test of the previous version: it blocked TWO-DIMENSIONALLY, so changes in the right
-  // half of the map pointed at an empty row range and were never redrawn. A row MUST span all columns.
+  // A row MUST span all columns. Blocking two-dimensionally would let a change in the right half of
+  // the map point at an empty row range, and it would never be redrawn.
   it('covers ALL columns of a row — the last one too, and reports the column', () => {
     for (const col of [0, 31, 32, 63]) {
       const tiles = make(64, 64);

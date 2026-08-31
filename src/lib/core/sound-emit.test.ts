@@ -80,7 +80,7 @@ describe('map object pass — only the five sounding types', () => {
     const q2 = createSoundQueue();
     emitBuildingSound(bCtx(8, l, q2), bld({ type: 15 }), 100);
     expect(first(q2)).toBe(SOUND_NONE); // latch still set
-    // Phase != 0 entriegelt, danach klingt es wieder.
+    // Phase != 0 unlatches, after which it sounds again.
     const q3 = createSoundQueue();
     emitBuildingSound(bCtx(16, l, q3), bld({ type: 15 }), 100);
     expect(first(q3)).toBe(SOUND_NONE);
@@ -184,7 +184,7 @@ describe('map object pass — only the five sounding types', () => {
     // Type 12 (farm) has no sound of its own — so the test measures only the fire branch.
     const l = createSoundLatches();
     const q = createSoundQueue();
-    // (firstKnight >> 3) & 3 == 3  ⇒  z. B. 0x18..0x1f
+    // (firstKnight >> 3) & 3 == 3  ⇒  e.g. 0x18..0x1f
     emitBuildingSound(bCtx(0, l, q), bld({ type: 12, burning: true, firstKnight: 0x18 }), 100);
     expect(first(q)).toBe(0x54);
     const q2 = createSoundQueue();
@@ -297,7 +297,7 @@ describe('serf pass — one-shot latches and the per-type sign gates', () => {
       emit(sCtx(l, q), srf({ type: 11 }), 0x85);
       expect(first(q)).toBe(0x36);
     }
-    // Die vier ausgenommenen Frame-Bytes bleiben still.
+    // The four exempted frame bytes stay silent.
     for (const sprite of [0x80, 0x87, 0x88, 0x8f]) {
       const q = createSoundQueue();
       emit(sCtx(l, q), srf({ type: 11 }), sprite);
@@ -347,7 +347,7 @@ describe('serf pass — one-shot latches and the per-type sign gates', () => {
     }
   });
 
-  it('Typen ohne Klang-Routine bleiben still (Transporter, Ritter, Generic)', () => {
+  it('types without a sound routine stay silent (transporter, knight, generic)', () => {
     for (const type of [0, 4, 21, 22, 23, 24, 25, 26]) {
       const q = createSoundQueue();
       for (let sprite = 0; sprite < 256; sprite++) {

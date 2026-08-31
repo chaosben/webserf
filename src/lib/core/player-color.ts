@@ -12,8 +12,8 @@
  *   `flag-sprites.flagSpriteOffset`.
  *
  * The RGBA functions below (`recolorMaskImage`, `stickSprite`) are a **second-hand reconstruction**
- * and are no longer used by the map renderer; they only serve the asset viewer, which shows sprites
- * without a game context. Their approach (difference of two colour variants -> region -> luminance
+ * and serve the asset viewer alone, which shows sprites without a game context — the map renderer
+ * does not use them. Their approach (difference of two colour variants -> region -> luminance
  * shading) does **not** model what the original does.
  */
 

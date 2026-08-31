@@ -104,10 +104,9 @@ export const maskToggled = (mask: number, index: number): number => mask ^ (1 <<
  * NOTHING is selected to begin with, and since the selection is the switch, that is the readout
  * switched off.
  *
- * An earlier version started with a handful of useful goods on the grounds that the first switch-on
- * must not show an empty box. That was the wrong trade: an addition of ours has no business
- * appearing over the game screen before anyone asked for it. It holds for every enhancement, not
- * just this one — see `registry.ts`.
+ * Do not preselect a handful of useful goods so the first switch-on is not an empty box: an addition
+ * of ours has no business appearing over the game screen before anyone asked for it. That holds for
+ * every enhancement, not just this one — see `registry.ts`.
  */
 export const STOCK_GOODS_DEFAULT = 0;
 export const STOCK_SERFS_DEFAULT = 0;

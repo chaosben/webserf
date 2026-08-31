@@ -53,7 +53,7 @@ function makeState(
   return { state, player, other };
 }
 
-describe('update_knight_morale — goldDeposited', () => {
+describe('update_knight_morale: goldDeposited', () => {
   it('sums warehouse and military gold', () => {
     const { state, player } = makeState({ stockGold: 250, militaryGold: 19 });
     updateKnightMorale(state, player);
@@ -67,7 +67,7 @@ describe('update_knight_morale — goldDeposited', () => {
   });
 });
 
-describe('update_knight_morale — goldMorale', () => {
+describe('update_knight_morale: goldMorale', () => {
   it('is a fixed 0x1000 when the map has no gold', () => {
     const { state, player } = makeState({ mapGoldTotal: 0, stockGold: 5 });
     updateKnightMorale(state, player);
@@ -119,7 +119,7 @@ describe('update_knight_morale: castle balance (0 in every real save)', () => {
     expect(player.goldMorale).toBe(0xffff);
   });
 
-  it('zieht bei verlorenem Schloss 0x3ff ab', () => {
+  it('deducts 0x3ff for a lost castle', () => {
     const a = makeState({ castleBalance: 0, stockGold: 900, mapGoldTotal: 1000 });
     updateKnightMorale(a.state, a.player);
     const b = makeState({ castleBalance: -1, stockGold: 900, mapGoldTotal: 1000 });
@@ -130,7 +130,7 @@ describe('update_knight_morale: castle balance (0 in every real save)', () => {
   it('does not drop below 1 on deduction (not to 0)', () => {
     const { state, player } = makeState({ castleBalance: -1, stockGold: 0, mapGoldTotal: 1000 });
     updateKnightMorale(state, player);
-    expect(player.goldMorale).toBe(1); // 0x400 − 0x3ff = 1, aber auch bei Unterlauf bleibt es 1
+    expect(player.goldMorale).toBe(1); // 0x400 - 0x3ff = 1, and it stays 1 even on underflow
   });
 });
 
@@ -162,8 +162,8 @@ describe('update_knight_morale: strength ratio', () => {
   });
 });
 
-describe('update_knight_morale — Reset', () => {
-  it('nullt alle drei Akkumulatoren', () => {
+describe('update_knight_morale: reset', () => {
+  it('clears all three accumulators', () => {
     const { state, player } = makeState({ stockGold: 42, militaryGold: 7 });
     updateKnightMorale(state, player);
     expect(player.goldAccumulator).toBe(0);

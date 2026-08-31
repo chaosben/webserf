@@ -180,12 +180,12 @@ describe('mining (29) — digging, search and yield', () => {
     expect(serf.animation).toBe(0x7e);
   });
 
-  it('Suche (Substate 5): passendes Vorkommen → dekrementieren, Ausbeute (res+1), Substate 8', () => {
-    // Ganze Karte = Kohle (Typ 3, Menge 5) ⇒ jede Spiral-Position matcht.
+  it('search (substate 5): a matching deposit → decrement, yield (res+1), substate 8', () => {
+    // The whole map is coal (type 3, amount 5) ⇒ every spiral position matches.
     const state = makeState((t) => ({ ...t, mineral: 3, resourceAmount: 5 }) as Tile);
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1, mineral: 3, resourceAmount: 5 });
-    const serf = mkSerf({ index: 1, state: 29, stateData: [5, 0, 0, 3, 0] }); // deposit=3 (Kohle)
+    const serf = mkSerf({ index: 1, state: 29, stateData: [5, 0, 0, 3, 0] }); // deposit=3 (coal)
     state.serfs[1] = serf;
 
     // Predict the tile the search will hit (same RNG sequence).
@@ -248,12 +248,12 @@ describe('mining (29) — handover and completion', () => {
     expect(serf.counter).toBe(0x12f);
   });
 
-  it('Substate 9: increase_mining (progress<<1 |res-gefunden), active an, Anim 0x80, Substate 10', () => {
+  it('substate 9: increase_mining (progress<<1 | res found), active on, anim 0x80, substate 10', () => {
     const state = makeState();
     const pos = posOf(20, 20, geo);
     state.mapTiles[pos] = tile({ objIndex: 1 });
     state.buildings[1] = bld({ progress: 0x0005 });
-    const serf = mkSerf({ index: 1, state: 29, stateData: [9, 0, 13, 0, 0] }); // res gefunden (13)
+    const serf = mkSerf({ index: 1, state: 29, stateData: [9, 0, 13, 0, 0] }); // res found (13)
     state.serfs[1] = serf;
 
     dispatchSerf(state, serf);

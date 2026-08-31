@@ -20,7 +20,7 @@ export function debugSlug(raw: string | undefined): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
-  return s.length > 0 ? s : 'bericht';
+  return s.length > 0 ? s : 'report';
 }
 
 /**

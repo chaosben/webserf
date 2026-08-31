@@ -12,7 +12,7 @@ function loadOrigFile(name: string): Uint8Array | null {
 // ---------------------------------------------------------------------------
 
 function makeChunk(id: string, payload: Uint8Array): Uint8Array {
-  if (id.length !== 4) throw new Error('chunk id muss 4 Zeichen lang sein');
+  if (id.length !== 4) throw new Error('chunk id must be 4 characters long');
   const padded = payload.byteLength + (payload.byteLength & 1);
   const out = new Uint8Array(8 + padded);
   for (let i = 0; i < 4; i++) out[i] = id.charCodeAt(i);
@@ -25,7 +25,7 @@ function makeChunk(id: string, payload: Uint8Array): Uint8Array {
 }
 
 function makeContainer(id: 'FORM' | 'CAT ', subType: string, children: Uint8Array[]): Uint8Array {
-  if (subType.length !== 4) throw new Error('subType muss 4 Zeichen lang sein');
+  if (subType.length !== 4) throw new Error('subType must be 4 characters long');
   let total = 4;
   for (const c of children) total += c.byteLength;
   const payload = new Uint8Array(total);
@@ -194,7 +194,7 @@ describe('parseXmi — Event-Stream', () => {
     expect(noteOff[0]!.time).toBe(128);
   });
 
-  it('extrahiert Tempo-Meta (FF 51 03) als µs/Beat', () => {
+  it('extracts the tempo meta event (FF 51 03) as µs/beat', () => {
  // 500000 µs = 0x07A120 → 07 A1 20
     const xmi = makeSettlersStyleXmi([0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20]);
     const parsed = parseXmi(xmi);
@@ -215,9 +215,9 @@ describe('parseXmi — Event-Stream', () => {
     expect(pc!.data2).toBe(0);
   });
 
-  it('wirft bei Sysex/Escape (F0/F7)', () => {
+  it('throws on sysex/escape (F0/F7)', () => {
     const xmi = makeSettlersStyleXmi([0x00, 0xf0]);
-    expect(() => parseXmi(xmi)).toThrow(/Sysex|Escape/);
+    expect(() => parseXmi(xmi)).toThrow(/sysex|escape/i);
   });
 
   it('sorts events by time, then by insertion order', () => {
@@ -228,12 +228,12 @@ describe('parseXmi — Event-Stream', () => {
       0x91,
       60,
       100,
-      ...vlq(100), // Note-Off bei 100
+      ...vlq(100), // note-off at 100
       0x00,
       0x91,
       64,
       100,
-      ...vlq(50), // Note-Off bei 50
+      ...vlq(50), // note-off at 50
     ]);
     const parsed = parseXmi(xmi);
     const times = parsed.events.map((e) => e.time);
@@ -275,10 +275,10 @@ describe('xmiToSmf / buildSmf', () => {
     expect(division).toBeGreaterThan(0);
   });
 
-  it('schreibt MTrk-Header direkt nach MThd', () => {
+  it('writes the MTrk header directly after MThd', () => {
     const smf = xmiToSmf(makeSettlersStyleXmi([0x00, 0x91, 60, 100, ...vlq(48)]));
     expect(String.fromCharCode(...smf.slice(14, 18))).toBe('MTrk');
- // MTrk-Size kommt als BE-u32
+    // The MTrk size comes as a BE u32
     const trkSize =
       ((smf[18]! << 24) | (smf[19]! << 16) | (smf[20]! << 8) | smf[21]!) >>> 0;
     expect(trkSize).toBeGreaterThan(0);

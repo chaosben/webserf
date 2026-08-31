@@ -4,7 +4,7 @@
 
 /** VGA palette with 256 RGBA entries (4 bytes per entry). */
 export interface Palette {
-  /** 256 * 4 = 1024 Bytes, [R,G,B,A] pro Eintrag. */
+  /** 256 * 4 = 1024 bytes, [R,G,B,A] per entry. */
   readonly rgba: Uint8Array;
 }
 
@@ -44,13 +44,13 @@ export interface SaveSlot {
  * and the click zones A25/A26/A27 lie exactly on those three bars.
  */
 export interface MenuPlayerSetup {
-  /** Gesicht je Slot (`gs+0x36a`, `.DS`@144). `0` = Slot unbesetzt. */
+  /** Face per slot (`gs+0x36a`, `.DS`@144). `0` = slot unoccupied. */
   readonly face: readonly [number, number, number, number];
   /** Intelligence per slot (`gs+0x36e`, `.DS`@148) — source of the `aiRate` (`value · 1300 + 13535`). */
   readonly intelligence: readonly [number, number, number, number];
   /** Supply per slot (`gs+0x372`, `.DS`@152) — becomes the player's `difficulty` field 1:1. */
   readonly supply: readonly [number, number, number, number];
-  /** Fortpflanzung je Slot (`gs+0x376`, `.DS`@156) — ergibt `reproductionReset = (60 − wert) · 50`. */
+  /** Reproduction per slot (`gs+0x376`, `.DS`@156) — yields `reproductionReset = (60 − value) · 50`. */
   readonly reproduction: readonly [number, number, number, number];
   /** Supply of the two HUMAN players (`gs+0x37a`/`0x37b`, `.DS`@160/161). */
   readonly humanSupply: readonly [number, number];
@@ -250,7 +250,7 @@ export interface SaveGameHeader {
  * record size. The record fields themselves are not decoded here.
  */
 export interface EntityBlock {
-  /** Bytes pro Record (Serf 16, Flag 70, Building 18, Inventory 120). */
+  /** Bytes per record (serf 16, flag 70, building 18, inventory 120). */
   readonly recordSize: number;
   /** Highest index held (from the header). */
   readonly maxIndex: number;
@@ -276,7 +276,7 @@ export interface BuildingRecord {
   /** Building type 0..24 (0 = none/reserved slot, 24 = castle). */
   readonly type: number;
   readonly typeName: string;
-  /** Besitzer-Spieler 0..3. */
+  /** Owning player 0..3. */
   readonly owner: number;
   /** Under construction (not finished yet). */
   readonly constructing: boolean;
@@ -427,12 +427,12 @@ export type SerfStateFields =
  */
 export interface SerfRecord {
   readonly index: number;
-  /** Besitzer-Spieler 0..3 (Byte 0, Bits 0–1). */
+  /** Owning player 0..3 (byte 0, bits 0-1). */
   readonly owner: number;
-  /** Serf-Typ 0..27 (Byte 0, Bits 2–6). */
+  /** Serf type 0..27 (byte 0, bits 2-6). */
   readonly type: number;
   readonly typeName: string;
-  /** Sound-Flag (Byte 0, Bit 7). */
+  /** Sound flag (byte 0, bit 7). */
   readonly sound: boolean;
   /** Animation index (byte 1). */
   readonly animation: number;
@@ -441,9 +441,9 @@ export interface SerfRecord {
   /** Map position (bytes 4–7); `null` if the original holds 0xFFFFFFFF (no tile). */
   readonly col: number | null;
   readonly row: number | null;
-  /** Tick-Stempel (Byte 8–9, u16). */
+  /** Tick stamp (bytes 8-9, u16). */
   readonly tick: number;
-  /** Zustand 0..76 (Byte 10). */
+  /** State 0..76 (byte 10). */
   readonly state: number;
   readonly stateName: string;
   /** The 5 state-dependent union bytes (11..15) — the only storage; reading via `serfStateFields`. */
@@ -492,7 +492,7 @@ export interface FlagRecord {
   readonly resourceSlots: readonly number[];
   /** Transient search state field (bytes 0..1); its meaning for the state model is open. */
   readonly searchNum: number;
-  /** Such-Richtung (Byte 2); transient. */
+  /** Search direction (byte 2); transient. */
   readonly searchDir: number;
   /** Per direction 0..5: does this road have a carrier? (byte 5, bit mask). */
   readonly transporters: readonly boolean[];
@@ -502,9 +502,9 @@ export interface FlagRecord {
   readonly length: readonly number[];
   /** Per ware slot 0..7: pickup direction (-1 = not scheduled, otherwise 0..5). */
   readonly slotDir: readonly number[];
-  /** Pro Waren-Slot 0..7: Ziel-Index (u16, Byte 20..35). */
+  /** Per resource slot 0..7: destination index (u16, bytes 20..35). */
   readonly slotDest: readonly number[];
-  /** Pro Richtung 0..5: Gegenrichtung am verbundenen Endpunkt (Byte 60..65, Bits 3–5). */
+  /** Per direction 0..5: opposite direction at the connected endpoint (bytes 60..65, bits 3-5). */
   readonly otherEndDir: readonly number[];
   /**
    * Per direction 0..5: a ware waits for pickup in this direction (bytes 60..65, bit 7). Transport
@@ -526,7 +526,7 @@ export interface FlagRecord {
    * ware demand mapping). Read by the ware scheduler, set when the worker enters.
    */
   readonly bldFlags: number;
-  /** Rohes Flag-Byte 68 (`bld2_flags`): Bit 7 = `acceptsResources`, Bits 0–5 = Anforderungsmaske Slot 1. */
+  /** Raw flag byte 68 (`bld2_flags`): bit 7 = `acceptsResources`, bits 0-5 = demand mask of slot 1. */
   readonly bld2Flags: number;
   /** Two stock priorities (byte 67/69); relevant only with an attached building. */
   readonly stockPriority: readonly [number, number];
@@ -550,11 +550,11 @@ export interface InventoryRecord {
   readonly index: number;
   /** Owning player (byte 0); verified ∈ {0,1} in a one-on-one. */
   readonly owner: number;
-  /** Roh-Byte 1 (Ressourcen-/Serf-Modus, gepackt). */
+  /** Raw byte 1 (resource/serf mode, packed). */
   readonly resDir: number;
-  /** Ressourcen-Annahmemodus (Byte 1, Bits 0–1): 0=in, 1=stop, 2=out. */
+  /** Resource acceptance mode (byte 1, bits 0-1): 0=in, 1=stop, 2=out. */
   readonly resMode: number;
-  /** Serf-Annahmemodus (Byte 1, Bits 2–3). */
+  /** Serf acceptance mode (byte 1, bits 2-3). */
   readonly serfMode: number;
   /** Index of the associated flag (byte 2); verified < maxFlagIndex. */
   readonly flag: number;
@@ -584,9 +584,9 @@ export interface InventoryRecord {
  * building type j+1). `index` == slot position, verified as well.
  */
 export interface PlayerRecord {
-  /** Spieler-Slot 0..3. */
+  /** Player slot 0..3. */
   readonly slot: number;
-  /** `index`-Feld (Offset 128); verifiziert == `slot` bei aktiven Spielern. */
+  /** `index` field (offset 128); verified == `slot` for active players. */
   readonly index: number;
   /** „Aktiv"-Bit (flags Byte 130, Bit 6). */
   readonly active: boolean;
@@ -906,8 +906,8 @@ export interface PlayerRecord {
   /** Knights to be spawned (u16, offset 396). Verified (∈ [0,2], 6/6 — matches the original clamp). */
   readonly knightsToSpawn: number;
   /**
-   * Geologen-Analyse-Ergebnisse [GoldOre, IronOre, Coal, Stone] (4× u16, Offset 440). **Verifiziert**
-   * (= 0 bei allen Beobachtungen — Default).
+   * Geologist analysis results [GoldOre, IronOre, Coal, Stone] (4x u16, offset 440). **Verified**
+   * (= 0 in every observation — the default).
    */
   readonly analysis: readonly number[];
   /**
@@ -917,7 +917,7 @@ export interface PlayerRecord {
   readonly foodDistribution: readonly number[];
   /** Plank distribution [construction, boatbuilder, toolmaker] (3x u16, offset 456). Verified. */
   readonly planksDistribution: readonly number[];
-  /** Stahl-Verteilung [Werkzeugmacher, Waffenschmied] (2× u16, Offset 462). **Verifiziert** (Default-Match). */
+  /** Steel distribution [toolmaker, weaponsmith] (2x u16, offset 462). **Verified** (exact default match). */
   readonly steelDistribution: readonly number[];
   /** Coal distribution [steel smelter, gold smelter, weaponsmith] (3x u16, offset 466). Verified. */
   readonly coalDistribution: readonly number[];
@@ -1191,7 +1191,7 @@ export interface MapTile {
   readonly object: number;
   /** Owning player 1..4, or 0 = no owner (land unclaimed). */
   readonly owner: number;
-  /** Weg-Bits je Richtung (Bits 0..5: Right, DownRight, Down, Left, UpLeft, Up). */
+  /** Road bits per direction (bits 0..5: Right, DownRight, Down, Left, UpLeft, Up). */
   readonly paths: number;
   /**
    * Block marker (landscape byte 0 bit 6, `0x40`). Empirically set on building tiles (object 2..4),

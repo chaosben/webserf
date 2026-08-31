@@ -144,9 +144,8 @@ describe('popMessage (tail of FUN_00027c9a)', () => {
   });
 
   it('leaves a fully read list REALLY empty — otherwise the next message is invisible', () => {
-    // Regression: a 0 used to stay in the array. `addPlayerMessage` appends, so the next message
-    // landed as `[0, type]` behind a zero, which every reader takes as end of list — after clicking
-    // through once no message arrived any more.
+    // `addPlayerMessage` APPENDS, and every reader takes a 0 as end of list. A 0 left in the array
+    // therefore makes the next message land as `[0, type]` behind it, where nobody sees it.
     const types = [6];
     const pos = [100];
     popMessage(types, pos);
@@ -414,10 +413,10 @@ describe('note strip — the screen cascade (@0x27852..0x2787b)', () => {
 });
 
 describe('text colour of the message texts', () => {
-  // The message window used to draw its texts in BLACK because it did not pass a colour, and
-  // `drawPanelText` then blits the raw pixels of the glyph mask. In the original all 19 handlers call
-  // the same panel wrapper `0x37c78`, which sets its foreground to 0x1f (@0x37cc6) — the colour is
-  // therefore the same for every type and does not come from the caller.
+  // In the original all 19 handlers call the same panel wrapper `0x37c78`, which sets its foreground
+  // to 0x1f (@0x37cc6) — the colour is the same for every type and does not come from the caller.
+  // The colour must be passed: without it `drawPanelText` blits the raw pixels of the glyph mask,
+  // and the font bank carries palette index 0, i.e. black on black.
   //
   // Checked via a **sentinel pass**: the pixels that differ between two colour choices are exactly
   // the text pixels. That needs no layout knowledge and rules out a hard-wired colour passing the

@@ -58,16 +58,16 @@ describe('stats — warehouse totals (screen 0x09)', () => {
         null,
         inventory(0, { 7: 10, 9: 5 }),
         inventory(0, { 7: 3 }),
-        inventory(1, { 7: 100 }), // fremd
+        inventory(1, { 7: 100 }), // foreign
       ],
     );
     const totals = stockTotals(state, player({ heldPlanks: 7, heldStone: 2 }));
-    expect(totals[7]).toBe(10 + 3 + 7); // Bretter + Reserve
-    expect(totals[9]).toBe(5 + 2); // Stein + Reserve
+    expect(totals[7]).toBe(10 + 3 + 7); // planks + reserve
+    expect(totals[9]).toBe(5 + 2); // stone + reserve
     expect(totals[12]).toBe(0);
   });
 
-  it('klemmt bei 65535 statt umzulaufen', () => {
+  it('clamps at 65535 instead of wrapping', () => {
     const state = gameState(
       [],
       [inventory(0, { 0: 60000 }), inventory(0, { 0: 60000 })],
@@ -93,10 +93,10 @@ describe('stats — fill levels (screens 0x10/0x11)', () => {
     const state = gameState(
       [
         mill({}), //                        counts
-        mill({ owner: 1 }), //              fremd
-        mill({ burning: true }), //         brennt
-        mill({ constructing: true }), //    Baustelle
-        mill({ holder: false }), //         ohne Arbeiter
+        mill({ owner: 1 }), //              foreign
+        mill({ burning: true }), //         burning
+        mill({ constructing: true }), //    construction site
+        mill({ holder: false }), //         without a worker
       ],
       [],
     );
@@ -177,8 +177,8 @@ describe('stats — profession availability (screen 0x13)', () => {
       null,
       serf({ type: 6, state: PROFESSION_IDLE_STATE }), //          counts
       serf({ type: 6, state: PROFESSION_IDLE_STATE }), //          counts
-      serf({ type: 6, state: 2 }), //                              unterwegs
-      serf({ type: 6, state: PROFESSION_IDLE_STATE, owner: 1 }), // fremd
+      serf({ type: 6, state: 2 }), //                              under way
+      serf({ type: 6, state: PROFESSION_IDLE_STATE, owner: 1 }), // foreign
     ]);
     expect(professionAvailability(state, player())[6]).toBe(2);
   });
@@ -188,7 +188,7 @@ describe('stats — profession availability (screen 0x13)', () => {
     (state.inventories[0] as unknown as { genericCount: number }).genericCount = 5;
     const avail = professionAvailability(state, player());
     for (const type of [0, 8, 10, 12, 15, 16]) expect(avail[type]).toBe(5);
-    expect(avail[2]).toBe(0); // Planierer ohne Schaufel: nichts
+    expect(avail[2]).toBe(0); // digger without a shovel: nothing
   });
 
   it('clamps every profession to its tool, and two-tool professions to both', () => {
@@ -196,10 +196,10 @@ describe('stats — profession availability (screen 0x13)', () => {
     const inv = inventory(0, { 16: 2, 23: 1, 21: 3 });
     (inv as unknown as { genericCount: number }).genericCount = 5;
     const avail = professionAvailability(withSerfs([], [inv]), player());
-    expect(avail[3]).toBe(2); //  Bauarbeiter: Hammer
-    expect(avail[17]).toBe(2); // Bootsbauer:  Hammer
-    expect(avail[20]).toBe(2); // Geologe:     Hammer
-    expect(avail[19]).toBe(1); // Schmied:     Hammer UND Zange
+    expect(avail[3]).toBe(2); //  builder:      hammer
+    expect(avail[17]).toBe(2); // boat builder: hammer
+    expect(avail[20]).toBe(2); // geologist:    hammer
+    expect(avail[19]).toBe(1); // smith:        hammer AND pincer
     expect(avail[6]).toBe(3); //  sawmiller: saw
     expect(avail[18]).toBe(2); // toolmaker: saw AND hammer
   });
@@ -215,7 +215,7 @@ describe('stats — profession availability (screen 0x13)', () => {
     const inv = inventory(0, { 19: 7 });
     (inv as unknown as { genericCount: number }).genericCount = 7;
     const avail = professionAvailability(withSerfs([], [inv]), player());
-    expect(avail[3]).toBe(0); //  Bauarbeiter ohne Hammer
+    expect(avail[3]).toBe(0); //  builder without a hammer
     expect(avail[14]).toBe(7); // farmer with a scythe is full all the same
   });
 

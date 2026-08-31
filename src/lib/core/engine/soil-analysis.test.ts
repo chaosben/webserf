@@ -63,7 +63,7 @@ function walkWeights(col: number, row: number): Map<number, number> {
   return weights;
 }
 
-describe('Spiral-Geometrie (FUN_0003f42c)', () => {
+describe('spiral geometry (FUN_0003f42c)', () => {
   it('covers 1800 distinct tiles - each exactly once, ring r holding 6*(r+1) tiles', () => {
     const weights = walkWeights(32, 32);
     let total = 0;
@@ -75,7 +75,7 @@ describe('Spiral-Geometrie (FUN_0003f42c)', () => {
     for (let ring = 0; ring < SOIL_ANALYSIS_RINGS; ring++) {
       const w = SOIL_ANALYSIS_RINGS - ring;
       const count = [...weights.values()].filter((v) => v === w).length;
-      expect(count, `Ring ${ring}`).toBe(6 * (ring + 1));
+      expect(count, `ring ${ring}`).toBe(6 * (ring + 1));
     }
   });
 
@@ -98,7 +98,7 @@ describe('analyzeSoil', () => {
     expect(p.analysis).toEqual([0, 0, 0, 0]);
   });
 
-  it('einzelnes Vorkommen: Summe == (Menge · Gesamtgewicht) >> 4 im richtigen Slot', () => {
+  it('a single deposit: sum == (amount · total weight) >> 4 in the right slot', () => {
     for (const mineral of [1, 2, 3, 4]) {
       const st = state();
       const p = st.players[0]!;
@@ -108,7 +108,7 @@ describe('analyzeSoil', () => {
       const expected = (9 * walkWeights(32, 32).get(posOf(33, 32, geo))!) >>> 4;
       const got = analyzeSoil(st, p, 32, 32);
       expect(got[mineral - 1]).toBe(expected);
-      expect(got.reduce((a, b) => a + b, 0)).toBe(expected); // nur dieser Slot
+      expect(got.reduce((a, b) => a + b, 0)).toBe(expected); // only this slot
     }
   });
 

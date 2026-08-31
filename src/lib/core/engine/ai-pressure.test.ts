@@ -11,7 +11,7 @@ import type { GameState, Player } from './state.js';
 
 function player(over: Partial<Player> = {}): Player {
   return {
-    flags: 0xc0, // KI + aktiv
+    flags: 0xc0, // AI + active
     totalLandScore: 0,
     totalBuildingScore: 0,
     aiPressure: new Array<number>(AI_PRESSURE_COUNT).fill(0),
@@ -53,7 +53,7 @@ describe('build pressure counters', () => {
 
   it('the halving cascade truncates step by step, not in one go', () => {
     const p = player();
-    // 31 >> 1 == 15, >> 1 == 7, >> 1 == 3, >> 1 == 1 — dieselbe Folge wie im Original.
+    // 31 >> 1 == 15, >> 1 == 7, >> 1 == 3, >> 1 == 1 - the same sequence as in the original.
     aiPressurePlayer(p, 31);
     expect(p.aiPressure[4]).toBe(15); // ×1/2
     expect(p.aiPressure[1]).toBe(7); // ×1/4
@@ -67,7 +67,7 @@ describe('build pressure counters', () => {
   });
 });
 
-describe('Das Tor: nur KI-Spieler, nur aktive Slots', () => {
+describe('the gate: AI players only, active slots only', () => {
   it('leaves a human player untouched', () => {
     const p = player({ flags: 0x40 }); // active but not AI
     aiPressurePlayer(p, 400);
@@ -81,7 +81,7 @@ describe('Das Tor: nur KI-Spieler, nur aktive Slots', () => {
   });
 });
 
-describe('Nachhol-Druck', () => {
+describe('catch-up pressure', () => {
   it('decays by the interval length and clamps at 0 on underflow', () => {
     const p = player({ aiPressureCatchUp: 1000 });
     aiPressurePlayer(p, 400);
@@ -98,13 +98,12 @@ describe('Nachhol-Druck', () => {
 
   it('rises on DENSELY built land (little land per building score), not the other way round', () => {
     // The direction is the opposite of the intuitive one: `q = land*128/buildings` is large with a
-    // lot of land, and `q ^ 0x3ff` turns that into a small value. This test caught the wrong
-    // Deutung im ersten Modul-Kopf aufgedeckt.
-    const dicht = player({ totalLandScore: 1000, totalBuildingScore: 900 });
-    const weitlaeufig = player({ totalLandScore: 1000, totalBuildingScore: 200 });
-    aiPressurePlayer(dicht, 10);
-    aiPressurePlayer(weitlaeufig, 10);
-    expect(dicht.aiPressureCatchUp).toBeGreaterThan(weitlaeufig.aiPressureCatchUp);
+    // lot of land, and `q ^ 0x3ff` turns that into a small value.
+    const dense = player({ totalLandScore: 1000, totalBuildingScore: 900 });
+    const spacious = player({ totalLandScore: 1000, totalBuildingScore: 200 });
+    aiPressurePlayer(dense, 10);
+    aiPressurePlayer(spacious, 10);
+    expect(dense.aiPressureCatchUp).toBeGreaterThan(spacious.aiPressureCatchUp);
   });
 
   it('stops applying once the quotient reaches the limit', () => {

@@ -51,13 +51,13 @@ describe('classifyEntry', () => {
 });
 
 describe('entryKindLabel', () => {
-  it('liefert deutsche Kurz-Tags', () => {
+  it('returns short tags', () => {
     expect(entryKindLabel('sprite')).toBe('Sprite');
     expect(entryKindLabel('palette')).toBe('Palette');
     expect(entryKindLabel('animation')).toBe('Animation');
     expect(entryKindLabel('sound')).toBe('Sound');
-    expect(entryKindLabel('music')).toBe('Musik');
-    expect(entryKindLabel('empty')).toBe('leer');
-    expect(entryKindLabel('unknown')).toBe('unbek.');
+    expect(entryKindLabel('music')).toBe('Music');
+    expect(entryKindLabel('empty')).toBe('empty');
+    expect(entryKindLabel('unknown')).toBe('unknown');
   });
 });

@@ -131,7 +131,7 @@ describe('main menu — click', () => {
     const iA29 = zones.findIndex((z) => z.action === 29);
     const iA30 = zones.findIndex((z) => z.action === 30);
     expect(iA29).toBeLessThan(iA30);
-    expect(hitTestMainMenu(free, 16 + 210, 24 + 120)).toBe(30); // A30 liegt NICHT in A29 (x 208>199)
+    expect(hitTestMainMenu(free, 16 + 210, 24 + 120)).toBe(30); // A30 is NOT inside A29 (x 208>199)
     expect(hitTestMainMenu(free, 16 + 180, 24 + 120)).toBe(29);
   });
 
@@ -158,9 +158,9 @@ describe('main menu — click', () => {
 
   it('the two buttons of the loaded state lie on the places of START and LADEN', () => {
     const pending = { ...s, loadedGamePending: true };
-    expect(hitTestMainMenu(pending, 16 + 10, 24 + 60)).toBe(40); // START-Platz
-    expect(hitTestMainMenu(pending, 16 + 300, 24 + 60)).toBe(41); // LADEN-Platz
-    expect(hitTestMainMenu(pending, 16 + 4, 24 + 4)).toBe(11); // Beenden-Ecke bleibt
+    expect(hitTestMainMenu(pending, 16 + 10, 24 + 60)).toBe(40); // the START place
+    expect(hitTestMainMenu(pending, 16 + 300, 24 + 60)).toBe(41); // the LADEN place
+    expect(hitTestMainMenu(pending, 16 + 4, 24 + 4)).toBe(11); // the quit corner stays
     // The EXTRA-OPTION place (248..279) is dead in the bit-6 state.
     expect(hitTestMainMenu(pending, 16 + 260, 24 + 60)).toBeNull();
     expect(hitTestMainMenu(s, 16 + 260, 24 + 60)).toBe(13);
@@ -254,17 +254,17 @@ describe('main menu — actions', () => {
     expect(applyMainMenuAction(s, 38).sound).toBe(2);
     expect(applyMainMenuAction(s, 39).sound).toBe(2);
     expect(applyMainMenuAction(s, 13).sound).toBe(8);
-    expect(applyMainMenuAction(s, 40).sound).toBe(2); // A40 „weiterspielen" @0x4fc4d
+    expect(applyMainMenuAction(s, 40).sound).toBe(2); // A40 "resume" @0x4fc4d
     expect(applyMainMenuAction(s, 41).sound).toBe(2); // A41 back to the menu @0x4fcb4
-    expect(applyMainMenuAction(s, 12).sound).toBe(2); // A12 „Karte erzeugen" @0x50a41
+    expect(applyMainMenuAction(s, 12).sound).toBe(2); // A12 "generate map" @0x50a41
     expect(applyMainMenuAction(s, 0).sound).toBe(8);
   });
 
   // A2/A3 @0x50d3b/@0x50d8a and A5/A6 @0x50dc4/@0x50dfe enqueue sound 4 at the limit
   // (@0x50d84/@0x50dbe/@0x50df8/@0x50e32) and change nothing.
   it('rejects at the limit — level and mission with sound 4', () => {
-    // Ausgangslage: Stufe 1 == freigeschaltete Grenze 1, Auftrag 1.
-    expect(applyMainMenuAction(s, 2).sound).toBe(4); // Stufe hoch, Grenze erreicht
+    // Starting point: level 1 == unlocked bound 1, mission 1.
+    expect(applyMainMenuAction(s, 2).sound).toBe(4); // level up, bound reached
     expect(applyMainMenuAction(s, 2).state.level).toBe(1);
     expect(applyMainMenuAction(s, 3).sound).toBe(4); // level down, already at 1
     expect(applyMainMenuAction(s, 6).sound).toBe(4); // mission down, already at 1
@@ -400,9 +400,8 @@ describe('main menu — drawing', () => {
 describe('map code', () => {
   // The two original captures: seed from the save, digits read off the screen.
   const CAPTURES: ReadonlyArray<readonly [string, [number, number, number], string]> = [
-    // The seed was originally noted as coming from one capture slot; that slot has since been
-    // overwritten. The same bytes are carried by two other captures — there the world size 8 of the
-    // capture also stands in the header.
+    // Cross-check for both entries: the header of the save carries the world size 8 of its capture,
+    // so seed and screen digits belong to the same run.
     ['sied_029 / SAVE4+5.DS', [0x4b6b, 0x29d7, 0x21c3], '3377462471731814'],
     ['sied_032 / SAVE6.DS', [0x2d19, 0x9f5b, 0x3ee1], '2432656681428452'],
   ];
@@ -438,9 +437,9 @@ describe('map code', () => {
   });
 
   it('rejects invalid codes instead of storing half a seed', () => {
-    expect(parseMapSeedCode('123456781234567')).toBeNull(); // zu kurz
+    expect(parseMapSeedCode('123456781234567')).toBeNull(); // too short
     expect(parseMapSeedCode('1234567812345679')).toBeNull(); // '9' is out of range
-    expect(parseMapSeedCode('123456781234567 ')).toBeNull(); // Leerzeichen liegt darunter
+    expect(parseMapSeedCode('123456781234567 ')).toBeNull(); // a space is below the range
   });
 
   it('A10 opens the input with an empty buffer and a digit filter', () => {
@@ -521,8 +520,7 @@ describe('map code', () => {
   it('mapSeedInputCode leads back to the seed — where the DISPLAY does not', () => {
     // This is the extension that makes a bug report reproducible on the DOS original: the display of
     // the original loses 16 bits, the input does not. The first seed is that of the two original
-    // captures — 512×256, and exactly the map with the stones in the water.
-    // Wasser (Fehlerbericht qzbhr6q2).
+    // captures — 512x256, and exactly the map with the stones in the water.
     for (const seed of [
       [0x4b6b, 0x29d7, 0x21c3],
       [0x2d19, 0x9f5b, 0x3ee1],
@@ -700,7 +698,7 @@ describe('loaded save — the bit-6 branch', () => {
 
   it('the three clocks of A40 are those of a NEW game', () => {
     // Byte proof: the bit-1 branch of the frame loop writes the same three values to the same three
-    // Stellen (@0xbc13/@0xbc21/@0xbc2f gegen @0x4fc72/@0x4fc80/@0x4fc8e).
+    // places (@0xbc13/@0xbc21/@0xbc2f against @0x4fc72/@0x4fc80/@0x4fc8e).
     expect(MENU_RESUME_CLOCKS.quitGrace).toBe(6000);
     expect(MENU_RESUME_CLOCKS.saveReminder30).toBe(180000);
     expect(MENU_RESUME_CLOCKS.saveReminder60).toBe(360000);
@@ -798,8 +796,8 @@ describe('A18 — take settings over to the left', () => {
   });
 
   it('takes the SECOND HUMAN in "2 SPIELER" — and before slot 1', () => {
-    // @0x4fb1d `cmpw $0x3,gs+0x352` stands in the cascade BEFORE the test on face 1. Exactly that
-    // branch was missing, which is why the arrow did nothing in "2 SPIELER".
+    // @0x4fb1d `cmpw $0x3,gs+0x352` stands in the cascade BEFORE the test on face 1 — without that
+    // branch the arrow does nothing in "2 SPIELER".
     const two = {
       ...full,
       gameType: GAME_TYPE_TWO_PLAYERS,
@@ -1050,7 +1048,7 @@ describe('main menu — a loaded save writes the menu cells (`savegame_load_head
   });
 });
 
-describe('main menu — map preview (`gs+0x37e` Bit 1, Leisten-Slot 2)', () => {
+describe('main menu — map preview (`gs+0x37e` bit 1, control bar slot 2)', () => {
   const ready = (): MainMenuState => ({
     ...initialMainMenuState(),
     gameType: 2,
@@ -1067,11 +1065,11 @@ describe('main menu — map preview (`gs+0x37e` Bit 1, Leisten-Slot 2)', () => {
 
   it.each([
     [9, 'roll the seed'],
-    [10, 'Karten-Code'],
+    [10, 'map code'],
     [18, 'transfer values'],
-    [14, 'Regler'],
+    [14, 'slider'],
     [23, 'face on/off'],
-    [19, 'Gesicht weiter'],
+    [19, 'next face'],
   ])('A%i (%s) discards it with sound 0x30 (shared helper 0x50376)', (action, _who) => {
     const r = applyMainMenuAction(ready(), action as number, 20, () => 0x1234);
     expect(r.state.previewGenerated).toBe(false);
