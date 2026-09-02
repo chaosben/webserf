@@ -202,18 +202,86 @@ class Writer {
 }
 
 /**
+ * The 22 map-geometry fields of the header, `gs+0x00..0x42` plus `gs+0x60` and `gs+0x10`.
+ *
+ * **They must be written, and they cannot be left out.** `savegame_load_header` @0x47ba8 copies
+ * `buf[0x00]..buf[0x43]` and `buf[0xce]` into `gs` unfiltered, and nothing recomputes them
+ * afterwards: `init_neighbor_deltas` @0x7ae7 has exactly ONE caller in the whole binary, the NEW
+ * GAME branch of `new_game_init` @0x4df5 (the one that also runs the map generator, `init_players`
+ * and `place_player_castles`); the load branch goes straight into `frame_loop`. For a loaded save
+ * the header is the only source of column count, row count, both masks, the column shift, the row
+ * stride and all six neighbour deltas — with zeroes there every position calculation runs on mask 0
+ * and stride 0, and the original dies on the first frame with an invalid opcode.
+ *
+ * The values are a pure function of `mapCols`/`mapRows`, taken from `init_neighbor_deltas`. Two
+ * details of that routine do not follow from the field names:
+ *
+ * - `colShift` counts the shifts of `cols` until it reaches 0 (`do { n++; c >>= 1 } while (c)`), so
+ *   it is `log2(cols) + 1`, not `log2(cols)`.
+ * - The original builds the four diagonals and `gs+0x00` with a HALF-WORD or
+ *   (`*(ushort *)&vreg0 |= (ushort)vreg2`), and a plain 32-bit `|` is equivalent only because the
+ *   right operand is always `gs+0x3a` — a 16-bit field — so it can never carry high bits. The
+ *   truncation that matters therefore sits in `colStep`, not in the or.
+ */
+function writeMapGeometry(w: Writer, h: SaveGameState['header']): void {
+  const cols = h.mapCols;
+  const rows = h.mapRows;
+  const colMask = (cols - 1) & 0xffff;
+  const rowMask = (rows - 1) & 0xffff;
+  let colShift = 0;
+  for (let c = cols & 0xffff; ; ) {
+    colShift += 1;
+    c >>= 1;
+    if (c === 0) break;
+  }
+  const rowStride = (cols << 3) >>> 0; // gs+0x28 — bytes per map row (two tuples of 4 per tile)
+  const colStep = (colMask << 2) & 0xffff; // gs+0x3a
+  const rowStep = (rowMask << (colShift + 2)) >>> 0; // gs+0x3c
+  const right = (4 & colStep) >>> 0;
+  const left = (-4 & colStep) >>> 0;
+  const down = (rowStride & rowStep) >>> 0;
+  const up = (-rowStride & rowStep) >>> 0;
+
+  w.seek(0);
+  w.u32((rowStep | colStep) >>> 0); // 0   (gs+0x00) — wrap mask of a packed position
+  w.u32(4); // 4   (gs+0x04) — Right
+  w.u32((down | right) >>> 0); // 8   (gs+0x08) — DownRight
+  w.u32(down); // 12  (gs+0x0c) — Down
+  w.u16(left & 0xffff); // 16  (gs+0x60) — Left, 16 bit
+  w.u32((up | left) >>> 0); // 18  (gs+0x14) — UpLeft
+  w.u32(up); // 22  (gs+0x18) — Up
+  w.u32((up | right) >>> 0); // 26  (gs+0x1c) — UpRight
+  w.u32((down | left) >>> 0); // 30  (gs+0x20) — DownLeft
+  w.u32(rowStride); // 34  (gs+0x28)
+  w.u32((cols * rows) >>> 0); // 38  (gs+0x2c) — tile count
+  w.u16(colShift); // 42  (gs+0x30)
+  w.u16(colMask); // 44  (gs+0x32)
+  w.u16(rowMask); // 46  (gs+0x34)
+  w.u32(rowStride >>> 1); // 48  (gs+0x36)
+  w.u16(colStep); // 52  (gs+0x3a)
+  w.u32(rowStep); // 54  (gs+0x3c)
+  w.u16(cols >> 1); // 58  (gs+0x40)
+  w.u16(rows >> 1); // 60  (gs+0x42)
+  w.u16(cols); // 62  (gs+0x1c2)
+  w.u16(rows); // 64  (gs+0x1c4)
+  w.seek(206);
+  w.u32(left); // 206 (gs+0x10) — Left again, 32 bit
+}
+
+/**
  * Writes the 250-byte header. Order and offsets follow @0x470ce.
  *
  * Not written (stay from the base or 0), with their `gs` offsets from the routine:
- * 0..66    22 fields `gs+0x00..0x42` plus `gs+0x60`, `gs+0x1c2`, `gs+0x1c4`, `gs+0x37e`
- * 67       computed: one flag per viewport (`+1` / `+2`, each `vp[0x87] & 1`)
  * 76       `gs+0x202` — lower half of the u32 whose upper half is `tick` @78
  * 164..173 `gs+0x172/0x176/0x17a` — parked cursor of the second splitscreen player
- * 206..209 `gs+0x10`
  */
 function writeHeader(w: Writer, state: SaveGameState): void {
   const h = state.header;
 
+  writeMapGeometry(w, h);
+  w.seek(66);
+  w.u8(h.sessionFlags); // 66  (gs+0x37e)
+  w.u8(h.messageMarks); // 67  (gs+0x37f)
   w.seek(68);
   w.u32(h.mapCursorRaw); // 68  (gs+0x280) — buf[0x44]
   w.u8(h.viewOptions[0]); // 72  (gs+0x3d8)
@@ -304,7 +372,7 @@ function writeHeader(w: Writer, state: SaveGameState): void {
   w.i16(h.winnerIndex); // 202 (gs+0x5e)
   w.u8(h.victoryMask); // 204 (gs+0x380)
   w.u8(h.missionEndPending); // 205 (gs+0x381)
-  // 206..209 (gs+0x10) — not modelled. 210..249 are guaranteed zero in the original.
+  // 206..209 (gs+0x10) — written by `writeMapGeometry`. 210..249 are guaranteed zero in the original.
 }
 
 /**

@@ -48,6 +48,8 @@ function makeSave(overrides?: {
     winnerIndex: -1,
     victoryMask: 0,
     missionEndPending: 0,
+    sessionFlags: 0x08,
+    messageMarks: 0,
     mapSize: 3,
     mapCols: 64,
     mapRows: 64,

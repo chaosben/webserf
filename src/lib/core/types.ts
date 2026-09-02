@@ -232,6 +232,21 @@ export interface SaveGameHeader {
   readonly victoryMask: number;
   /** `0xff` ⇒ the mission-end screen is due (offset 205, gs+0x381). 0 in all saves. */
   readonly missionEndPending: number;
+  /**
+   * Session flags (offset 66, gs+0x37e). Known bits, each with the site that decides it:
+   * bit 0 split-screen wish (A1 @0x50d12) · bit 1 "a map preview stands" (`bts` @0x50c6a) ·
+   * bit 2 a second human player (@0x4fde6) · bit 3 `cols >= 64 && rows >= 64`
+   * (`init_neighbor_deltas`) · bit 5 game type 4 (@0x4fe8a) · bit 6 split screen active.
+   *
+   * Carried rather than derived because bits 0 and 1 are pure MENU state: whether a preview was
+   * generated cannot be read off the world. Observed values 0x08, 0x0a, 0x28.
+   */
+  readonly sessionFlags: number;
+  /**
+   * Message marks (offset 67, gs+0x37f): `+1` if viewport 0 has messages, `+2` for viewport 1 — the
+   * writer builds it from `vp[0x87] & 1` of both viewports (@0x47110). Observed 0 and 1.
+   */
+  readonly messageMarks: number;
   /** Map size class (3..10). */
   readonly mapSize: number;
   readonly mapCols: number;

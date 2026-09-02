@@ -199,6 +199,8 @@ function buildSave(fx: Fixture): Uint8Array {
   const dv = new DataView(buf.buffer);
 
   dv.setUint16(74, fx.gameType, true);
+  buf[66] = 0x0a; // gs+0x37e — as in every 64x64 save the original wrote
+  buf[67] = 0x01; // gs+0x37f — viewport 0 has messages
   if (fx.menuBytes) buf.set(fx.menuBytes, 144);
   if (fx.password !== undefined) {
     for (let i = 0; i < 8; i++) buf[128 + i] = fx.password.charCodeAt(i);
@@ -465,6 +467,10 @@ describe('parseSaveGame — menu player settings (.DS@144..163)', () => {
     const state = parseSaveGame(buildSave({ ...baseFixture, gameType: 2, menuBytes: MENU }));
     expect(state.header.maxInventoryIndex).toBe(1);
     expect(state.header.mapSize).toBe(3);
+    // 66/67 — the two bytes that sit BEFORE the position cursor and were skipped along with the
+    // derivable geometry; if the cursor is off by one, `mapCursorRaw` moves with it.
+    expect(state.header.sessionFlags).toBe(0x0a);
+    expect(state.header.messageMarks).toBe(0x01);
   });
 });
 

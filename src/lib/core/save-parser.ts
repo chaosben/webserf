@@ -394,7 +394,12 @@ export function parseSaveGame(buffer: ArrayBuffer | ArrayBufferView): SaveGameSt
   const cur = new Cursor(dv, data.byteLength);
 
  // --- header primitives ---
-  cur.skip(68); // 0..67 open
+ // 0..65 — the map geometry, a pure function of the column and row count at 62/64. The engine reads
+ // it from here and nowhere else on the load path, so the ENCODER has to write it (see
+ // `writeMapGeometry`); for our model it is redundant and stays unread.
+  cur.skip(66); // 0..65 derivable
+  const sessionFlags = cur.u8(); // 66 (gs+0x37e)
+  const messageMarks = cur.u8(); // 67 (gs+0x37f)
  // 68 — position cursor of the map growth pass (gs+0x280). A packed u32 position as in the
  // serf/building record; kept raw, because the map geometry is only known from offset 190 on.
   const mapCursorRaw = cur.u32(); // 68 (gs+0x280)
@@ -512,6 +517,8 @@ export function parseSaveGame(buffer: ArrayBuffer | ArrayBufferView): SaveGameSt
   const { cols, rows, tileCount } = mapGeometry(mapSize);
 
   const header: SaveGameHeader = {
+    sessionFlags,
+    messageMarks,
     viewOptions,
     gameType,
     tick,

@@ -962,6 +962,15 @@ function newGameHeader(
     winnerIndex: -1, // `mov $0xffff,%ax` @0x66e9
     victoryMask: 0,
     missionEndPending: 0, // `mov %al,0x381(%ebx)` @0x66f9
+    // `gs+0x37e` — bit 3 comes from `init_neighbor_deltas` (the routine sets it and clears it again
+    // below 64x64), bits 2 and 5 from the game type (@0x4fde6 / @0x4fe8a). Bits 0, 1 and 6 are menu
+    // state the port does not carry into a game: there is no split screen, and bit 1 ("a map preview
+    // stands") has a single reader, the viewport scroll correction `FUN_00031e70`.
+    sessionFlags:
+      (geo.cols >= 0x40 && geo.rows >= 0x40 ? 0x08 : 0) |
+      (setup.gameType === GAME_TYPE.FreeTwoPlayers ? 0x04 : 0) |
+      (setup.gameType === GAME_TYPE.Demo ? 0x20 : 0),
+    messageMarks: 0, // no viewport has messages before the first frame
     mapSize: geo.mapSize,
     // The four menu columns (`gs+0x36a..0x37d` -> `.DS`@144..163), which the loader reads for
     // `gameType > 1`. They are the ONLY source of the faces of a free game: `gs+0x1d6` is not in the

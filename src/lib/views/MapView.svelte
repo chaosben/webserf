@@ -312,9 +312,10 @@
     /** File name of the loaded save — goes into the bug report only. */
     sourceFile?: string;
     /**
-     * Raw bytes of the source file, if there is one. On SAVING they fill the ranges our model does not
-     * hold yet (`encodeSaveGame({ base })`). Without them there are zeroes — a freshly created game
-     * has no source file, and that is the situation, not an error.
+     * Raw bytes of the source file, if there is one. On SAVING they fill the two header ranges our
+     * model does not hold (`encodeSaveGame({ base })`): the lower half of `gs+0x202` and the parked
+     * cursor of the second split-screen player. Both are zero in every save the original wrote, so a
+     * game started here — which has no source file — still produces a file the original can load.
      */
     sourceBytes?: Uint8Array | null;
     /** The save storage (`core/save-store.ts`); `null` = not opened yet. */

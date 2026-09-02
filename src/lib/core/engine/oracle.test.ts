@@ -83,6 +83,8 @@ function emptyState(over: Partial<SaveGameState> = {}): SaveGameState {
       serviceBudget: 55,
       buildingServiceCursor: 0,
       flagServiceCursor: 0,
+      sessionFlags: 0x08,
+      messageMarks: 0,
       mapSize: 3,
       mapCols: 64,
       mapRows: 64,
