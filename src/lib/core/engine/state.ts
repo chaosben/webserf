@@ -256,6 +256,10 @@ export function loadState(save: SaveGameState): GameState {
     rng: new Rng(h.random),
     rotation: h.rotation,
     rotationWrap: h.rotationWrap, // the 0 -> 49 fallback happens at the use site, to keep the round trip exact
+ // A parsed save carries no sub-frame phase - the field is not an original cell, and the original's
+ // own tick IS a frame number (`gs+0x206` is written only by the frame timer @0xd33a). A loaded game
+ // therefore starts frame ALIGNED: the drivers next run a full frame later. That is also what makes a
+ // differential comparison meaningful, see `alignFrameBoundaryAt`.
     frameAccum: h.frameAccum ?? 0,
     territoryVersion: 0,
     roadBuildAborted: false,

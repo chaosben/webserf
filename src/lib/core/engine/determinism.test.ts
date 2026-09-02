@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { SaveGameState, SaveGameHeader } from '../types.js';
 import { loadState, snapshot } from './state.js';
-import { runTicks } from './tick.js';
+import { FRAME_TICKS, runTicks } from './tick.js';
 
 /**
  * Determinism contract of the tick engine (the basis for replay, multiplayer lockstep and AI
@@ -135,8 +135,9 @@ describe('Determinismus — Reproduzierbarkeit', () => {
       makeSave({ serfs: [{ index: 1, type: 20, state: 42, counter: 0, col: 20, row: 20 }] });
     const a = loadState(mk());
     const b = loadState(mk());
-    runTicks(a, 5);
-    runTicks(b, 5);
+    // A whole frame: the serf driver runs on the frame boundary, so fewer ticks draw nothing at all.
+    runTicks(a, FRAME_TICKS);
+    runTicks(b, FRAME_TICKS);
     expect(a.rng.getState()).toEqual(b.rng.getState()); // deterministisch
     expect(a.rng.getState()).not.toEqual([1, 2, 3]); // randomness really was drawn
     expect(snapshot(a)).toEqual(snapshot(b));

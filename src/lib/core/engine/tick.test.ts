@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { SaveGameState, SaveGameHeader } from '../types.js';
 import { loadState, snapshot } from './state.js';
 import type { GameState } from './state.js';
-import { tick, runTicks, updateSerfs, advanceFrameClock } from './tick.js';
+import { FRAME_TICKS, tick, runTicks, updateSerfs, advanceFrameClock } from './tick.js';
 
 function makeSave(overrides?: {
   tick?: number;
@@ -105,9 +105,11 @@ describe('tick — logic tick', () => {
 
   it('applies the tick prologue to active serfs (counter -= delta)', () => {
     const state = loadState(makeSave({ tick: 1000 }));
-    tick(state); // gameTick 1001, delta 1
-    expect(state.serfs[1]!.counter).toBe(99);
-    expect(state.serfs[1]!.tick).toBe(1001);
+    // A loaded save is frame aligned, so the driver runs on the FRAME_TICKS-th tick and subtracts the
+    // whole delta at once - the original's `gameTick` moves in exactly these steps too (@0xd33a).
+    runTicks(state, FRAME_TICKS);
+    expect(state.serfs[1]!.counter).toBe(100 - FRAME_TICKS);
+    expect(state.serfs[1]!.tick).toBe(1000 + FRAME_TICKS);
   });
 
   it('leaves serfs in state 0 untouched', () => {
@@ -122,15 +124,24 @@ describe('tick — logic tick', () => {
     // reached by a state byte OUTSIDE the table. It must not stumble there, it just carries the
     // counter on (underflow -> u16 wrap).
     const state = loadState(makeSave({ tick: 1000, serfs: [{ index: 1, state: 90, counter: 0, tick: 1000 }] }));
-    tick(state);
-    expect(state.serfs[1]!.counter).toBe(0xffff);
+    runTicks(state, FRAME_TICKS);
+    expect(state.serfs[1]!.counter).toBe(0x10000 - FRAME_TICKS);
   });
 
-  it('updateSerfs consumes the accumulated delta across several ticks', () => {
+  it('consumes the accumulated delta in frame-sized chunks (exact at every boundary)', () => {
+    // The serf driver runs once per frame, so the prologue subtracts the whole delta at once. At a
+    // frame boundary the counter is therefore exact; in between it lags by up to FRAME_TICKS-1.
     const state = loadState(makeSave({ tick: 1000 }));
-    runTicks(state, 10);
-    expect(state.gameTick).toBe(1010);
-    expect(state.serfs[1]!.counter).toBe(90); // 100 - 10
+    runTicks(state, 2 * FRAME_TICKS);
+    expect(state.gameTick).toBe(1000 + 2 * FRAME_TICKS);
+    expect(state.serfs[1]!.counter).toBe(100 - 2 * FRAME_TICKS); // nothing lost across two frames
+  });
+
+  it('lags at most one frame in between - the door thresholds must not be crossed per tick', () => {
+    const state = loadState(makeSave({ tick: 1000 }));
+    runTicks(state, FRAME_TICKS - 1); // no boundary yet
+    expect(state.serfs[1]!.counter).toBe(100);
+    expect(state.serfs[1]!.tick).toBe(1000);
   });
 
   it('is deterministic: same start and tick count -> identical snapshot', () => {

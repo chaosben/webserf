@@ -452,6 +452,58 @@ export function serfDrawInfo(
 /** Constant vertical subtraction of the original serf drawing (`sub serf_y, 2` after `- 4*height`). */
 export const SERF_Y_CORRECTION = 2;
 
+/**
+ * Row bias per animation: which half row a serf is **enqueued** into, relative to the half row of
+ * its own tile (`0` or `-1`).
+ *
+ * The original does not blit an active serf immediately. `draw_serf_sprite` @0x25bea computes the
+ * screen position, then picks the row list to append to:
+ *
+ * ```
+ * 25d40  mov 0x1(%ebx),%al        ; serf->animation
+ * 25d48  lea 0x25ab5,%esi         ; this table
+ * 25d58  mov (%ebx,%esi,1),%al
+ * 25d5b  add %al,0x1c(%edi)       ; row index += table[animation]      (8-bit add: 0xff == -1)
+ * ```
+ *
+ * and the shared tail appends into that list — or drops the serf when the index leaves the window
+ * (`cmp %ax,0x1c(%edi)` against the half-row count, `jae` @0x27012/@0x27016). The map pass then
+ * draws, per half row, the objects first and that row's serf list right after — so a bias of `-1`
+ * puts a serf **behind** the objects of its own row.
+ *
+ * Why the bias is needed at all: a walking serf is registered on its **target** tile already, while
+ * the animation still carries it from the source tile. The two directions that step one map row
+ * downwards (DownRight, Down) are therefore drawn a row too late without it — they would sit on top
+ * of the buildings of the row they are walking into. `walkingAnim(dH, dir, switch) =
+ * 4 + dH + 9*(dir + (switch && dir < 3 ? 6 : 0))` maps exactly those two directions onto
+ * `9..26` (dH spans -4..+4) and `63..80` (the switch variants) — the two `-1` runs below. The
+ * northward directions need no bias: they are registered a row up and belong in front of it.
+ *
+ * The other two runs are the same mechanism for standing serfs: `121..122` planting/sowing, and
+ * `125..128` the four shaft phases of the miner — the latter is why a miner appears to stand inside
+ * his mine.
+ *
+ * The table ends where the carried-resource table begins (`lea 0x25b6a` @0x25fb7), i.e. after 181
+ * entries; no animation the engine assigns reaches that far.
+ */
+const SERF_ROW_BIAS_RUNS: readonly (readonly [number, number])[] = [
+  [9, 26],
+  [63, 80],
+  [121, 122],
+  [125, 128],
+];
+
+/** Number of entries of the original table — `0x25b6a - 0x25ab5`. */
+export const SERF_ROW_BIAS_LENGTH = 181;
+
+/** See {@link SERF_ROW_BIAS_RUNS}: `-1` for the runs above, `0` everywhere else. */
+export function serfRowBias(animation: number): number {
+  for (const [from, to] of SERF_ROW_BIAS_RUNS) {
+    if (animation >= from && animation <= to) return -1;
+  }
+  return 0;
+}
+
 // --- idle carriers on paths — own wobble animation instead of serf_get_body ---
 // (Original `draw_serf_row`, the `map->get_idle_serf(pos)` branch.) The save does NOT store the
 // idle_serf bit; the resting carriers are the IdleOnPath serf records (states 66..69) carrying their

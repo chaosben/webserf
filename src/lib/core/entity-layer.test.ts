@@ -123,13 +123,18 @@ function building(index: number, pos: number): Record<string, unknown> {
 }
 
 /** Walking carrier (state 1) — found through the tile's `serfIndex`. */
-function serf(index: number, state = 1, stateData = [0, 0, 0, 0, 0]): Record<string, unknown> {
+function serf(
+  index: number,
+  state = 1,
+  stateData = [0, 0, 0, 0, 0],
+  animation = 0,
+): Record<string, unknown> {
   return {
     index,
     owner: 0,
     type: 0,
     state,
-    animation: 0,
+    animation,
     counter: 0,
     col: 0,
     row: 0,
@@ -149,6 +154,9 @@ function frameAround(col: number, row: number, width = 320, height = 240) {
   return { cam, frame: buildWindowFrame(cam, GEO, 0) };
 }
 
+/** One frame per animation index, wide enough for the walking animations (`4 + 9*dir + dH`). */
+const RUN_ANIMS = Array.from({ length: 0xa0 }, () => [{ sprite: 0, x: 0, y: 0 }]);
+
 function run(state: SaveGameState, frame: ReturnType<typeof frameAround>['frame']): Draw[] {
   const rec = new Recorder();
   drawEntityLayer(rec, frame, {
@@ -156,7 +164,7 @@ function run(state: SaveGameState, frame: ReturnType<typeof frameAround>['frame'
     geo: GEO,
     heightUnit: 0,
     kit: KIT,
-    animations: { animations: [[{ sprite: 0, x: 0, y: 0 }]] },
+    animations: { animations: RUN_ANIMS },
     index: buildEntityIndex(state),
   });
   return rec.draws;
@@ -202,11 +210,11 @@ describe('drawEntityLayer — order', () => {
     );
   });
 
-  it('draws the shaft miner (mining, substate 3) BEHIND his building', () => {
+  it('draws the shaft miner (mining, substate 3, animation 0x7d) BEHIND his building', () => {
     const pos = posOf(10, 8, GEO);
     const state = makeState(new Map([[pos, { object: 2, objIndex: 1, serfIndex: 5 }]]), {
       buildings: [building(1, pos)],
-      serfs: [serf(5, 29, [3, 0, 0, 0, 0])],
+      serfs: [serf(5, 29, [3, 0, 0, 0, 0], 0x7d)],
     });
     const draws = run(state, frameAround(10, 8).frame);
     expect(draws.findIndex((d) => d.tag === 'serf')).toBeLessThan(
@@ -214,17 +222,48 @@ describe('drawEntityLayer — order', () => {
     );
   });
 
-  it('draws a non-shaft miner (mining, substate 1) on top of his building', () => {
+  it('draws a non-shaft miner (mining, substate 1, animation 0x62) on top of his building', () => {
     const pos = posOf(10, 8, GEO);
     const state = makeState(new Map([[pos, { object: 2, objIndex: 1, serfIndex: 5 }]]), {
       buildings: [building(1, pos)],
-      serfs: [serf(5, 29, [1, 0, 0, 0, 0])],
+      serfs: [serf(5, 29, [1, 0, 0, 0, 0], 0x62)],
     });
     const draws = run(state, frameAround(10, 8).frame);
     expect(draws.findIndex((d) => d.tag === 'serf')).toBeGreaterThan(
       draws.findIndex((d) => d.tag.startsWith('obj')),
     );
   });
+
+  // The row bias, per direction. `walkingAnim(dH, dir, switch) = 4 + dH + 9*(dir + ...)`: the two
+  // directions stepping one row down are registered on the target tile already, so without the bias
+  // they would cover the buildings of the row they walk into.
+  for (const [name, dir, behind] of [
+    ['Right', 0, false],
+    ['DownRight', 1, true],
+    ['Down', 2, true],
+    ['Left', 3, false],
+    ['UpLeft', 4, false],
+    ['Up', 5, false],
+  ] as const) {
+    it(`a serf walking ${name} is ${behind ? 'behind' : 'in front of'} the building of its row`, () => {
+      const pos = posOf(10, 8, GEO);
+      const bldPos = posOf(11, 8, GEO); // same row, one column to the east
+      const state = makeState(
+        new Map([
+          [bldPos, { object: 2, objIndex: 1 }],
+          [pos, { serfIndex: 5 }],
+        ]),
+        { buildings: [building(1, bldPos)], serfs: [serf(5, 1, [0, 0, 0, 0, 0], 4 + 9 * dir)] },
+      );
+      const draws = run(state, frameAround(10, 8).frame);
+      const srf = draws.findIndex((d) => d.tag === 'serf');
+      const bld = draws.findIndex((d) => d.tag.startsWith('obj'));
+      expect(srf).toBeGreaterThanOrEqual(0);
+      expect(bld).toBeGreaterThanOrEqual(0);
+      if (behind) expect(srf).toBeLessThan(bld);
+      else expect(srf).toBeGreaterThan(bld);
+    });
+  }
 });
 
 // --- positions from the traversal ----------------------------------------------------------------

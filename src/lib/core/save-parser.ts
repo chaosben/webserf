@@ -555,7 +555,6 @@ export function parseSaveGame(buffer: ArrayBuffer | ArrayBufferView): SaveGameSt
     mapCols: cols,
     mapRows: rows,
     tileCount,
-    frameAccum: 0, // engine-internal (not a .DS field): a freshly loaded game is frame-aligned
   };
 
  // The map geometry is already needed here because the message positions in the player block carry

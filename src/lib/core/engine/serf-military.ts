@@ -204,10 +204,18 @@ const STRIKE_SEQ: readonly number[] = [
   2, 1, 2, 4, 2, 3, 0, 2, 4, 3, 2, 0, 0, 255, 0, 0,
   1, 4, 3, 2, 2, 1, 2, 0, 0, 4, 3, 0, 255, 0, 0, 0,
 ];
-// Group sizes per `dir` @0x18d48 and animation pair bytes @0x18d4d — index `(GRP[dir] * rng) >> 16`.
-// High nibble is the attacker frame, low nibble the defender frame.
-const GRP: readonly number[] = [10, 11, 14, 11, 10];
-const ANIM_PAIR: readonly (readonly number[])[] = [
+/**
+ * Group sizes per `dir` @0x18d48 and animation pair bytes @0x18d4d — index
+ * `(STRIKE_GROUP_SIZE[dir] * rng) >> 16`.
+ * High nibble is the attacker frame, low nibble the defender frame; the attacker's animation is
+ * `0x92 + high`, the defender's `0x9c + low`.
+ *
+ * Exported because pose and animation pair come from the SAME group, which is what makes the zero
+ * slots of the hit marker table unreachable (`core/fight-overlay.HIT_MARKER_REACHABLE`) - a property
+ * that must be derived from these tables rather than written down twice.
+ */
+export const STRIKE_GROUP_SIZE: readonly number[] = [10, 11, 14, 11, 10];
+export const STRIKE_ANIM_PAIR: readonly (readonly number[])[] = [
   [0x18, 0x23, 0x29, 0x38, 0x43, 0x48, 0x53, 0x59, 0x64, 0x79],
   [0x1a, 0x28, 0x2a, 0x39, 0x49, 0x4a, 0x58, 0x68, 0x6a, 0x78, 0x7a],
   [0x11, 0x12, 0x17, 0x21, 0x22, 0x26, 0x27, 0x62, 0x66, 0x67, 0x71, 0x72, 0x76, 0x77],
@@ -306,8 +314,8 @@ export const knightAttacking = (state: GameState, serf: Serf): void => {
     serf.stateData[0] = (serf.stateData[0] + 1) & 0xff;
     const dir = serf.stateData[1] === 0 ? 4 - seq : seq; // a winning defender mirrors the pose
     serf.stateData[2] = dir; // serf[0xd]
-    const idx = Math.trunc((GRP[dir] * state.rng.next()) / 0x10000);
-    const animByte = ANIM_PAIR[dir][idx];
+    const idx = Math.trunc((STRIKE_GROUP_SIZE[dir]! * state.rng.next()) / 0x10000);
+    const animByte = STRIKE_ANIM_PAIR[dir]![idx]!;
  // @0x18cf8/@0x18d07 add 0x92 and 0x9c as bytes. Writing this as `- 0x6e` / `- 0x64` is identical
  // mod 256 but no longer matches the instructions, which is what the constants audit checks against.
     serf.animation = ((animByte >> 4) + 0x92) & 0xff;

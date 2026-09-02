@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   HIT_MARKER_CAPACITY,
+  HIT_MARKER_REACHABLE,
   fightPartnerIndex,
   fightPartnerVisible,
   hitMarkerOffset,
+  hitMarkerTableIndex,
   isFightPose,
 } from './fight-overlay.js';
 import type { SerfRecord } from './types.js';
@@ -13,6 +15,10 @@ import type { SerfRecord } from './types.js';
  * @0x26ef0). A pure table port is largely blind to unit tests, so these pin exactly the places where
  * a misreading would show: band bounds, the two strike poses, where the table index comes from, and
  * the counter ramp.
+ *
+ * The table values themselves are verified against the original data; a unit test can only pin the
+ * indices they are read at. The cases below therefore use the two ENDS of each half - a table shifted
+ * by one slot changes those first.
  */
 
 function knight(): SerfRecord {
@@ -64,9 +70,38 @@ describe('hitMarkerOffset', () => {
   });
 
   it('returns the entry of the OPPONENT animation for direction 4', () => {
-    // Its own animation would stay 0x93 -> (9,5); the opponent's 0xa0 is entry 13 -> (3,8).
+    // Its own animation would stay 0x93 -> (9,5); the opponent's 0xa0 is entry 13 -> (7,5).
     const m = hitMarkerOffset(withOver({ animation: 0x93, stateData: [0, 0, 4, 0, 0] }), partner);
-    expect(m).toMatchObject({ dx: 3 - 16, dy: -8 });
+    expect(m).toMatchObject({ dx: 7 - 16, dy: -5 });
+  });
+
+  it('reads both ends of the pose-4 half of the table', () => {
+    const at = (anim: number) =>
+      hitMarkerOffset(withOver({ animation: 0x93, stateData: [0, 0, 4, 0, 0] }), withOver({ animation: anim }));
+    // 0x9d is the first reachable opponent animation, 0xa3 the last.
+    expect(at(0x9d)).toMatchObject({ dx: 5 - 16, dy: -5 });
+    expect(at(0xa3)).toMatchObject({ dx: 5 - 16, dy: -8 });
+  });
+
+  it('draws nothing on the unreachable zero slots', () => {
+    // Pose 4 with opponent animations 0xa4..0xa6: those pairs exist only for other poses, so the
+    // original never indexes there. The zero offset would put the marker on the fighter's ankles.
+    for (const anim of [0xa4, 0xa5, 0xa6]) {
+      const serf = withOver({ animation: 0x93, stateData: [0, 0, 4, 0, 0] });
+      const opp = withOver({ animation: anim });
+      expect(hitMarkerTableIndex(serf, opp)).toBe(anim - 0x93);
+      expect(HIT_MARKER_REACHABLE.has(anim - 0x93)).toBe(false);
+      expect(hitMarkerOffset(serf, opp)).toBeNull();
+    }
+  });
+
+  it('separates the reachable index from the drawing decision', () => {
+    // Outside the gates there is no index at all; inside, the index is the raw table position.
+    expect(hitMarkerTableIndex(withOver({ counter: 0x20 }), partner)).toBeNull();
+    expect(hitMarkerTableIndex(withOver({ animation: 0x99 }), partner)).toBe(6);
+    expect([...HIT_MARKER_REACHABLE].sort((a, b) => a - b)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15, 16,
+    ]);
   });
 
   it('stays silent in the in-between poses and outside the animation range', () => {

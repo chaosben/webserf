@@ -239,8 +239,8 @@ export interface SaveGameHeader {
   readonly tileCount: number;
   /**
    * Engine-internal sub-frame counter (0..7) — NOT a `.DS` field. Set only by `snapshot()` so a
-   * snapshot taken mid-run continues the frame phase losslessly (multiplayer/replay). Undefined for a
-   * freshly parsed `.DS` → treated as 0 (frame-aligned).
+   * snapshot taken mid-run continues the frame phase losslessly (multiplayer/replay). A freshly parsed
+   * `.DS` leaves it undefined, and `loadState` then starts frame aligned.
    */
   readonly frameAccum?: number;
 }

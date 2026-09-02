@@ -21,6 +21,28 @@
  * animation counts, at direction 4 that of the OPPONENT. The sprite follows the counter through the
  * four red stages of the marker bank.
  *
+ * ## Where the marker sits, and why the table's zeros must never be used
+ *
+ * A serf sprite spans `[base - 6, base + 1]` vertically (torso, arms and head all share that band in
+ * the archive) and the fight animations carry `anim.y = +1`, so the body of a fighter covers
+ * `[base - 5, base + 2]`. The table's `dy` of 5..8 therefore puts the marker at head height or above
+ * it, `dy = 2` into leg height - and `dy = 0` onto the fighter's ankles. The original never draws it
+ * there: {@link HIT_MARKER_OFFSET} has six `(0, 0)` slots and all six are unreachable, because the
+ * strike pose `serf[0xd]` and the animation come from the SAME group of the sequence table (pose 0
+ * yields attacker animations `0x93..0x99`, pose 4 defender animations `0x9d..0xa3`). A marker on a
+ * zero slot is thus not a drawing question but the symptom of a serf whose pose byte and animation
+ * have drifted apart - a state the original cannot form. {@link hitMarkerTableIndex} reports the raw
+ * index so that can be measured instead of drawn.
+ *
+ * ## The window origin is NOT applied here
+ *
+ * `blit_map_marker_sprite` @0x349c5 adds `+0x10` to x, `+8` to y and `+0x140` to the sprite before it
+ * blits. The first two are the window origin of the screen group, which this port leaves out
+ * everywhere (see `map-render.ENTITY_ROW_BIAS`), so they are left out here too. The `subw $0x10` of
+ * the record (@0x26ece) is kept: its base is a SERF coordinate, which already carries the origin, and
+ * the subtraction is what places the marker between the two fighters rather than half a tile to their
+ * right.
+ *
  * The original appends the markers to a list which is worked off AFTER the map selector; the port keeps
  * that split - collect here, draw as the last layer.
  */
@@ -46,14 +68,27 @@ const HIT_MARKER_SPRITE = 0xc6;
 
 /**
  * Offset table of the hit marker (@0x25a65), entry `n` = animation `0x93 + n`, two i16 each
- * `(dx, dy)`. Reachable are `n = 0..6` (own animation at direction 0) and `n = 10..16` (opponent's
- * animation at direction 4) — the rest is zero padding of the original table.
+ * `(dx, dy)`. Its length is not a guess: the serf row-bias table begins at `0x25ab5` (`lea` @0x25d48),
+ * so the table holds `0x50 / 4 = 20` entries.
+ *
+ * Reachable are `n = 0..6` (own animation at pose 0) and `n = 10..16` (opponent's animation at pose
+ * 4); the six `(0, 0)` slots cannot be reached - see the module head and
+ * {@link HIT_MARKER_REACHABLE}.
  */
 // prettier-ignore
 const HIT_MARKER_OFFSET: readonly (readonly [number, number])[] = [
-  [9, 5], [10, 7], [10, 2], [8, 6], [11, 8], [9, 6], [9, 8], [0, 0], [0, 0], [5, 5],
-  [4, 7], [4, 2], [7, 5], [3, 8], [5, 6], [5, 8], [0, 0], [0, 0], [0, 0],
+  [9, 5], [10, 7], [10, 2], [8, 6], [11, 8], [9, 6], [9, 8], [0, 0], [0, 0], [0, 0],
+  [5, 5], [4, 7], [4, 2], [7, 5], [3, 8], [5, 6], [5, 8], [0, 0], [0, 0], [0, 0],
 ];
+
+/**
+ * The table indices the strike sequence can actually produce. Derived from the pose/animation
+ * coupling, not from the zero pattern: pose 0 indexes with the attacker's animation, pose 4 with the
+ * defender's, and both come from the same group of the sequence table.
+ */
+export const HIT_MARKER_REACHABLE: ReadonlySet<number> = new Set([
+  0, 1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15, 16,
+]);
 
 /** The `x` subtraction the original applies before storing (@0x26ece `subw $0x10`). */
 const HIT_MARKER_X_BIAS = 0x10;
@@ -89,6 +124,24 @@ export function fightPartnerVisible(partner: SerfRecord): boolean {
 }
 
 /**
+ * Table index the original would use for the fighter currently drawn, or `null` when no hit falls in
+ * this frame. Separate from {@link hitMarkerOffset} because the index is the measurable quantity: it
+ * must always land in {@link HIT_MARKER_REACHABLE}, and anything else means the serf's pose byte and
+ * animation have drifted apart.
+ */
+export function hitMarkerTableIndex(serf: SerfRecord, partner: SerfRecord): number | null {
+  // Gate order as in the original: animation range of the DRAWN serf (@0x26de7/0x26df4), then the
+  // strike pose, then the last quarter of the round.
+  if (serf.animation < 0x92 || serf.animation >= 0x9c) return null;
+  const dir = serf.stateData[2] ?? 0;
+  if (dir !== 0 && dir !== 4) return null;
+  if (serf.counter >= 0x20) return null;
+  // At pose 4 the table index comes from the opponent (@0x26e5b loads his record).
+  const anim = dir === 0 ? serf.animation : partner.animation;
+  return (anim - 0x93) & 0xff;
+}
+
+/**
  * Hit marker for the fighter currently drawn, **relative to his base point** (where the drawing
  * routine stands before the animation offset is added — i.e. including the constant `-2` of the serf
  * drawing). `null` = no hit in this frame.
@@ -97,16 +150,14 @@ export function hitMarkerOffset(
   serf: SerfRecord,
   partner: SerfRecord,
 ): { dx: number; dy: number; sprite: number } | null {
-  // Gate order as in the original: animation range of the DRAWN serf (@0x26de7/0x26df4), then the
-  // strike pose, then the last quarter of the round.
-  if (serf.animation < 0x92 || serf.animation >= 0x9c) return null;
-  const dir = serf.stateData[2] ?? 0;
-  if (dir !== 0 && dir !== 4) return null;
-  if (serf.counter >= 0x20) return null;
-  // At direction 4 the table index comes from the opponent (@0x26e5b loads his record).
-  const anim = dir === 0 ? serf.animation : partner.animation;
-  const entry = HIT_MARKER_OFFSET[(anim - 0x93) & 0xff];
-  if (entry === undefined) return null; // outside the original table: do not guess
+  const n = hitMarkerTableIndex(serf, partner);
+  if (n === null) return null;
+  // An index outside the reachable set is not a marker the original would place somewhere else - it
+  // is a pose byte that no longer belongs to the animation. Drawing the zero slot would put the
+  // marker on the fighter's ankles, so nothing is drawn; `hitMarkerTableIndex` makes the case
+  // measurable.
+  if (!HIT_MARKER_REACHABLE.has(n)) return null;
+  const entry = HIT_MARKER_OFFSET[n]!;
   return {
     dx: entry[0] - HIT_MARKER_X_BIAS,
     dy: -entry[1],

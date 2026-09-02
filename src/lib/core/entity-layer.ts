@@ -1,22 +1,22 @@
 /**
  * Entity layer of the map window: map objects, buildings, flags, serfs — backend independent.
  *
- * ## Order: three passes PER ROW
+ * ## Order: objects, then the row's serf list — PER ROW
  *
- * The original draws, per row, `draw_serf_row_behind` -> `draw_map_objects_row` -> `draw_serf_row`,
- * all with the same row `pos`. Rows run top to bottom; per row:
- * 1. shaft miners **behind** their building,
- * 2. objects/flags/buildings of that row,
- * 3. ordinary serfs of that row **on top**.
+ * The original splits serf drawing in two. `draw_visible_serfs` @0x15ad7 walks the window, computes
+ * each visible serf's screen position and **appends** it to a list belonging to one half row
+ * (`vp[0x92]`, one list per half row); the map pass `FUN_00033ded` then draws, per half row, the
+ * objects (`draw_map_tile_dispatch`) and right after them that row's serf list
+ * (`draw_deferred_row_sprites` @0x36b12).
+ *
+ * Which list a serf lands in is **not** simply the row of its tile: `serf-sprites.serfRowBias` adds
+ * `-1` for some animations. Hence the two serf sub-passes here, (b) and (c).
  *
  * So a serf in the SAME row as a building is in front of it, while a serf one row further north is
  * behind it — it was drawn in the earlier row pass and the later building covers it. Drawing serfs
  * as one map-wide top layer is therefore wrong (a northern serf would sit on the building), and so
  * is a single pass interleaving object and serf per *tile* — that pushes a serf with a smaller
  * column of the same row behind the building.
- *
- * The only exception to "serf above building of the same row" are the shaft miners (Mining,
- * substate 3/4/9/10); they belong behind their building, hence sub-pass (1).
  *
  * ## Animation phase
  *
@@ -78,6 +78,7 @@ import {
   idleSerfInfo,
   isIdlePathState,
   serfDrawInfo,
+  serfRowBias,
   worksInsideBuilding,
 } from './serf-sprites.js';
 import type { AnimationTable } from './animation-parser.js';
@@ -181,15 +182,6 @@ export function buildEntityIndex(state: SaveGameState): EntityIndex {
   };
 }
 
-/**
- * Miner entering or leaving the shaft (Mining, substate 3/4/9/10). Belongs BEHIND the building,
- * otherwise the worker animation covers the mine. Substate = `field_0xb` (`stateData[0]`).
- */
-function isBehindMiner(serf: SerfRecord): boolean {
-  if (serf.state !== 29) return false;
-  const sub = serf.stateData[0]!;
-  return sub === 3 || sub === 4 || sub === 9 || sub === 10;
-}
 
 /**
  * Draws the entity layer and returns the **hit markers** of the fight overlay pass (see
@@ -361,26 +353,20 @@ export function drawEntityLayer<Img extends DrawImage>(
       if (ambient !== undefined && obj >= 8 && obj <= 0x1f) ambient.treeObjects++;
 
       // **Idle pre-test — ours, not the original's.** It is pixel-identical: this sub-pass draws
-      // exactly three things, each with its own gate — waves `isWater`, the shaft miner
-      // `serfIndex`, the object/building/flag `obj`. With none of them present only the anchor
-      // arithmetic would remain. The two ambient counters therefore sit **above** the test: the
-      // original counts them per tile in the window, regardless of whether it blits anything.
+      // exactly two things, each with its own gate — waves `isWater` and the object/building/flag
+      // `obj`. With neither present only the anchor arithmetic would remain. The two ambient
+      // counters therefore sit **above** the test: the original counts them per tile in the window,
+      // regardless of whether it blits anything.
       //
       // Why the original does not need it: it has no zooming out. Here the number of visited tile
       // positions grows with `1/zoom²` and exceeds the map size — at 512x256 and 9 % zoom, 318472
       // positions over 131072 tiles (2.43 torus periods), with drawing needed on only 19.9 % of
       // them. The rest was anchor arithmetic plus two object allocations per tile.
-      if (obj === 0 && !isWater && t.serfIndex === 0) continue;
+      if (obj === 0 && !isWater) continue;
 
       const flat = entityAnchor(frame, i, k);
       const bx = flat.x;
       const by = flat.y - t.height * heightUnit;
-
-      const activeSerf =
-        showSerfs && t.serfIndex > 0 && animations !== null ? index.serf.get(t.serfIndex) : undefined;
-      if (activeSerf !== undefined && isBehindMiner(activeSerf)) {
-        drawActiveSerf(activeSerf, bx, by, { pos, height: t.height });
-      }
 
       if (isWater) {
         // `draw_map_waves` @0x36a84 computes the window shift **itself** and calls primitive
@@ -506,9 +492,9 @@ export function drawEntityLayer<Img extends DrawImage>(
       }
     }
 
-    // (b) Serf sub-pass of the SAME row: idle + active serfs ABOVE the objects/buildings of this
-    //     row (but below the buildings of the next, lower rows). Shaft miners were already drawn in
-    //     (a), behind their building.
+    // (b) Serf sub-pass of THIS row's list: idle carriers, plus the active serfs whose animation
+    //     carries no row bias — above the objects/buildings of this row, below those of the rows
+    //     further down. See `serf-sprites.serfRowBias` for the list a serf is enqueued into.
     if (!showSerfs) continue;
     for (let k = 0; k < hr.tiles.length; k++) {
       const pos = hr.tiles[k]!;
@@ -531,9 +517,32 @@ export function drawEntityLayer<Img extends DrawImage>(
         if (sp !== null) drawSerfSprite(sp.torso, sp.head, idle.owner, bx + info.dx, by + info.dy);
       }
       const activeSerf = t.serfIndex > 0 && animations !== null ? index.serf.get(t.serfIndex) : undefined;
-      if (activeSerf !== undefined && !isBehindMiner(activeSerf)) {
+      if (activeSerf !== undefined && serfRowBias(activeSerf.animation) === 0) {
         drawActiveSerf(activeSerf, bx, by, { pos, height: t.height });
       }
+    }
+
+    // (c) The rest of THIS row's list: serfs of the NEXT row with bias -1. They are registered one
+    //     row down but still walking into it (or standing in a shaft), so they belong behind that
+    //     row's buildings — which means into this row's list, after (b).
+    //
+    // The original fills all row lists in one sweep before the map pass and then only consumes
+    // them; a single pass over the traversal cannot do that, so the tiles of the next row are
+    // looked at here. Same order, because a list is drawn in append order and the sweep appends
+    // ascending: bias-0 of row i, then bias--1 of row i+1.
+    //
+    // Row 0 has no predecessor, so its bias serfs are dropped — as in the original, where the
+    // 8-bit `add` underflows the row index and the range test rejects it (`jae` @0x27016).
+    const nextRow = frame.halfRows[i + 1];
+    if (nextRow === undefined || animations === null) continue;
+    for (let k = 0; k < nextRow.tiles.length; k++) {
+      const pos = nextRow.tiles[k]!;
+      const t = tiles[pos]!;
+      if (t.serfIndex === 0) continue;
+      const serf = index.serf.get(t.serfIndex);
+      if (serf === undefined || serfRowBias(serf.animation) === 0) continue;
+      const flat = entityAnchor(frame, i + 1, k);
+      drawActiveSerf(serf, flat.x, flat.y - t.height * heightUnit, { pos, height: t.height });
     }
   }
   return hitMarkers;
