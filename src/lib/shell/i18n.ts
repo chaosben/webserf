@@ -72,6 +72,7 @@ const EN = {
 	'overlay.close': 'Close',
 	'page.loading': 'Loading…',
 	'rail.recording': 'recording',
+	'rail.update': 'new version ready',
 
 	// -- Dropzone ------------------------------------------------------------------------------
 	'drop.aria': 'Drop the archive file here',
@@ -188,6 +189,12 @@ const EN = {
 	'info.source.title': 'Source code',
 	'info.source.note':
 		'Open source, and issues and pull requests are always welcome. Bug reports from the “Report a bug” screen land in the same place.',
+	'update.title': 'New version',
+	'update.ready':
+		'A newer version has been downloaded and is ready. It takes effect after a restart — which ends a match in progress, because the game state is not saved automatically.',
+	'update.switched':
+		'Another window has already switched to a newer version. This one is still running on the old files, and parts of it may stop working — sound above all. Restart when it suits you.',
+	'update.apply': 'Restart now',
 	'info.build.title': 'Build',
 	'info.build.unknown': 'This copy was built without a version stamp.',
 	'info.build.modified': 'built with uncommitted changes',
@@ -286,6 +293,7 @@ const DE: Record<ShellKey, string> = {
 	'overlay.close': 'Schließen',
 	'page.loading': 'Lädt…',
 	'rail.recording': 'Aufnahme läuft',
+	'rail.update': 'neue Version bereit',
 
 	'drop.aria': 'Archiv-Datei hier ablegen',
 	'drop.lead': 'Legen Sie Ihr Spiel-Archiv hier ab — oder wählen Sie eine Datei.',
@@ -388,6 +396,12 @@ const DE: Record<ShellKey, string> = {
 	'info.source.title': 'Quelltext',
 	'info.source.note':
 		'Offener Quelltext, und über Issues und Pull Requests freuen wir uns jederzeit. Fehlerberichte aus dem Bildschirm „Fehler melden“ landen an derselben Stelle.',
+	'update.title': 'Neue Version',
+	'update.ready':
+		'Eine neuere Fassung ist geladen und liegt bereit. Sie wird nach einem Neustart wirksam — der beendet eine laufende Partie, weil der Spielstand nicht selbsttätig gesichert wird.',
+	'update.switched':
+		'Ein anderes Fenster ist schon auf eine neuere Fassung umgeschaltet. Diese hier läuft noch auf den alten Dateien; Teile davon können ausfallen, vor allem der Klang. Starten Sie neu, wenn es passt.',
+	'update.apply': 'Jetzt neu starten',
 	'info.build.title': 'Programmstand',
 	'info.build.unknown': 'Diese Fassung wurde ohne Stand-Angabe gebaut.',
 	'info.build.modified': 'mit noch nicht eingecheckten Änderungen gebaut',

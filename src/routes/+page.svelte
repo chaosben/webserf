@@ -32,6 +32,7 @@
 	import IconEnhance from '~icons/material-symbols-light/extension-outline';
 	import IconInfo from '~icons/material-symbols-light/info-outline';
 	import { recordings } from '$lib/shell/recording.svelte.js';
+	import { updates } from '$lib/shell/update.svelte.js';
 	import { log } from '$lib/shell/log.js';
 	import { st } from '$lib/shell/i18n.js';
 	import { settings } from '$lib/settings/settings.svelte.js';
@@ -61,12 +62,17 @@
 	];
 
 	/**
-	 * The mark on the recording icon while a video is running — the only way to see it with the panel
-	 * closed. A module constant rather than an inline literal so the rail is not handed a new array on
-	 * every render.
+	 * The marks on the rail icons — the only way to see either of these two things with the panel
+	 * closed: a video is running, or a newer version is waiting to take over. Module constants and a
+	 * `$derived` list rather than inline literals, so the rail is handed a new array only when one of
+	 * the two conditions actually changes.
 	 */
 	const RECORDING_MARKS: readonly DrawerMark[] = [{ group: 'record', labelKey: 'rail.recording' }];
-	const NO_MARKS: readonly DrawerMark[] = [];
+	const UPDATE_MARKS: readonly DrawerMark[] = [{ group: 'info', labelKey: 'rail.update' }];
+	const marks = $derived([
+		...(recordings.running ? RECORDING_MARKS : []),
+		...(updates.ready || updates.switched ? UPDATE_MARKS : [])
+	]);
 
 	/**
 	 * The tabs of the import/export screen. The two halves are tabs and not one list below each other
@@ -480,7 +486,7 @@
 	<DrawerRail
 		groups={GROUPS}
 		active={activeGroup}
-		marks={recordings.running ? RECORDING_MARKS : NO_MARKS}
+		{marks}
 		onselect={(id) => settings.set('drawerGroup', id)}
 	/>
 

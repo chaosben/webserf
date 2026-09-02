@@ -6,15 +6,33 @@
 	 * It is deliberately not a developer screen: notes for someone standing in front of their own
 	 * devtools have no audience here. The log hint is the exception and stays as the last paragraph —
 	 * it costs one line and helps exactly the person who has to write a report.
+	 *
+	 * The waiting version belongs here because the build stamp does: this is the screen that answers
+	 * "which version am I running", and the restart is the same question in the other direction.
 	 */
 	import { commitDateText, commitUrl, shortCommit } from "./build-info.js";
 	import { shellLanguage, st } from "./i18n.js";
 	import { PROJECT_REPO, PROJECT_URL } from "./project.js";
+	import { updates } from "./update.svelte.js";
 
 	const commit = shortCommit();
 	const commitLink = commitUrl();
 	const commitDate = commitDateText(shellLanguage());
 </script>
+
+{#if updates.ready || updates.switched}
+	<section>
+		<h3>{st("update.title")}</h3>
+		<p class="note">
+			{#if updates.switched}{st("update.switched")}{:else}{st("update.ready")}{/if}
+		</p>
+		<p class="act">
+			<button type="button" onclick={() => updates.apply()} disabled={updates.applying}>
+				{st("update.apply")}
+			</button>
+		</p>
+	</section>
+{/if}
 
 <section>
 	<h3>{st("info.about.title")}</h3>
@@ -80,6 +98,11 @@
 		color: var(--fg-dim);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
+	}
+
+	/* Wraps the button so it keeps its own width — a bare grid child would stretch across. */
+	.act {
+		margin: 0;
 	}
 
 	.note {

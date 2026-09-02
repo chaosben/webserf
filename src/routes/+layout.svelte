@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { resolve } from "$app/paths";
+	import { updates } from "$lib/shell/update.svelte.js";
 
 	let { children } = $props();
+
+	/*
+		Watching the service worker belongs to the layout rather than the page: it needs nothing from
+		the page, and here it exists exactly once no matter what the page shows.
+	*/
+	$effect(() => updates.watch());
 </script>
 
 <svelte:head>
