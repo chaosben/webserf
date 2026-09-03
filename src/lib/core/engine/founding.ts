@@ -23,7 +23,7 @@ import { u16 } from './int.js';
 import { recomputeTerritory, updateThreatLevel } from './territory.js';
 import type { GameState, Building, Flag, Inventory, Serf, Player } from './state.js';
 import { allocBuilding, allocFlag, allocInventory, lowestFreeSlot, growMax } from './alloc.js';
-import { SERF_TYPE_NAMES, SERF_STATE_NAMES } from '../save-parser.js';
+import { SERF_TYPE_NAMES } from '../save-parser.js';
 import { setFlagAcceptByte } from './flag-accept.js';
 
 const CASTLE = 24;
@@ -123,7 +123,6 @@ function createRosterSerf(state: GameState, player: Player, type: number, serfSt
     row,
     tick: state.gameTick,
     state: serfState,
-    stateName: SERF_STATE_NAMES[serfState] ?? String(serfState),
     stateData: castleBuilder ? [0, lo, hi, 0, 0] : [0, 0, 0, lo, hi],
   };
   state.serfs[idx] = serf;

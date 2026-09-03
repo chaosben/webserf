@@ -631,7 +631,6 @@ describe('parseSaveGame', () => {
       row: 46,
       tick: 0x0042,
       state: 1,
-      stateName: 'IdleInStock',
       stateData: [9, 0, 0, 0, 0],
     });
     expect(state.serfRecords[1]).toMatchObject({
@@ -642,7 +641,6 @@ describe('parseSaveGame', () => {
       col: 51,
       row: 42,
       state: 70,
-      stateName: 'DefendingHut',
     });
   });
 

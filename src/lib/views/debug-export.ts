@@ -24,9 +24,7 @@ import { FRAME_TICKS } from '../core/engine/tick.js';
 import { mapSeedInputCode } from '../core/main-menu.js';
 import { PHASE_LABEL, REPORT_PHASES, type RenderMetricsReport } from './render-metrics.js';
 import type { SaveGameState } from '../core/types.js';
-// The stored `stateName` of a record is set once when the serf is created and is never carried
-// along by the 125 places that write `state` — for an engine-run game it is stale and misleads
-// exactly the reader of a bug report. Resolve the name from the number instead.
+// A serf record carries no state name — the name belongs to the number and is resolved here.
 import { SERF_STATE_NAMES } from '../core/save-parser.js';
 import { MAP_FIELD_COUNT, reduceReportState } from '../core/report-state.js';
 import { buildZipDeflated } from '../core/zip.js';

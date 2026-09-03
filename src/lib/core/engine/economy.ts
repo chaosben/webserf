@@ -37,7 +37,7 @@
 import { u16, addU16, subU16 } from './int.js';
 import type { GameState, Serf, Inventory, Player } from './state.js';
 import { setSerfType } from './state.js';
-import { SERF_TYPE_NAMES, SERF_STATE_NAMES } from '../save-parser.js';
+import { SERF_TYPE_NAMES } from '../save-parser.js';
 import { tickKnightShift } from './player-settings.js';
 import { mapObjectGrowth } from './map-growth.js';
 import { viewportAmbientAudio } from './ambient-sound.js';
@@ -54,20 +54,25 @@ const RES_SHIELD = 25;
  * The fixed order is part of the determinism contract and in particular decides which player gets the
  * lower serf index when two reproduce in the same tick — verified against real saves through the
  * alternating indices of new serfs.
+ *
+ * **The whole group is frame-paced, the player tick included.** The call chain is closed: the frame
+ * loop calls @0xec9d at @0xbdfa and nowhere else, and @0xec9d calls `player_tick_reproduction`
+ * @0xf03a four times (@0xecb7/@0xecc7/@0xecd7/@0xece7), one per slot. That matters because two of the
+ * blocks inside the player tick are plain `-1` decrements and not tick-delta driven — the knight
+ * shift countdown (@0xf0fc) and the two AI countdowns (@0xf0c3/@0xf0dd). Run per tick they are eight
+ * times too fast, and the shift change then finishes inside a single sweep of the building driver,
+ * which needs 49 frames to reach every building.
  */
-export function updateEconomy(state: GameState, frameBoundary: boolean): void {
- // The round-robin housekeeping is frame-paced (once per frame, first in the group); the frame clock
- // belongs to `advanceFrameClock`, so it only runs on a frame boundary here. `playerTick` in contrast
- // runs every game tick, driven by the tick delta.
-  if (frameBoundary) roundRobinServiceReset(state);
+export function updateEconomy(state: GameState): void {
+  roundRobinServiceReset(state);
  // @0xeca2 `call 0xef29` — the **ambient sounds**. Draws exactly one random value per frame
  // (regardless of what is visible) and must therefore come BEFORE the map growth, otherwise the
  // random stream shifts against the original.
-  if (frameBoundary) viewportAmbientAudio(state);
+  viewportAmbientAudio(state);
  // @0xeca7 `call 0xf2d5` — the **map growth** (saplings to trees, grain, decay, fish). In the
- // original it sits between the housekeeping (@0xeced) and the player loop. Frame-paced like the
- // housekeeping — the routine derives its workload from the tick delta anyway.
-  if (frameBoundary) mapObjectGrowth(state);
+ // original it sits between the housekeeping (@0xeced) and the player loop. The routine derives its
+ // workload from the tick delta anyway.
+  mapObjectGrowth(state);
   for (let slot = 0; slot < 4; slot++) {
     const player = state.players[slot];
     if (player !== null) playerTick(state, player);
@@ -380,7 +385,6 @@ function setupGeneric(state: GameState, player: Player, serf: Serf, inv: Invento
   serf.row = bld ? bld.row : null;
   serf.tick = state.gameTick;
   serf.state = STATE_IDLE_IN_STOCK;
-  serf.stateName = SERF_STATE_NAMES[STATE_IDLE_IN_STOCK];
   serf.stateData = [0, 0, 0, inv.index & 0xff, (inv.index >> 8) & 0xff]; // field_0xe = inventory index
 }
 
@@ -431,7 +435,6 @@ export function createSerf(state: GameState, start = 1): Serf | null {
     row: null,
     tick: 0,
     state: 0,
-    stateName: SERF_STATE_NAMES[0],
     stateData: [0, 0, 0, 0, 0],
   };
   serfs[idx] = serf;

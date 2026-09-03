@@ -161,7 +161,7 @@ export function tick(state: GameState): void {
 
  // Subsystem drivers in frame-loop order, one per original routine. Frame-paced parts run only on a
  // boundary; the rotation has already been advanced.
-  updateEconomy(state, frameBoundary); // FUN_0000ec9d @0xbdfa — player tick every tick, round robin per frame
+  if (frameBoundary) updateEconomy(state); // FUN_0000ec9d @0xbdfa — the whole group, player tick included
   if (frameBoundary) dispatchFrameRotation(state); // rest of FUN_0000f787 @0xbdff
   if (frameBoundary) updateFlags(state); // FUN_0004b858 @0xbe04 — goods scheduler
   if (frameBoundary) updateBuildings(state); // FUN_000130f2 @0xbe09 — includes request_serf phase A

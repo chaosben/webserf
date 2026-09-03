@@ -67,7 +67,7 @@ import {
   HUMAN_FACE_2,
   setupRecordIndex,
 } from '../player-setup.js';
-import { SERF_STATE_NAMES, SERF_TYPE_NAMES, BUILDING_TYPE_NAMES } from '../save-parser.js';
+import { SERF_TYPE_NAMES, BUILDING_TYPE_NAMES } from '../save-parser.js';
 import type { SaveGameHeader, SaveGameState, PlayerRecord, MenuPlayerSetup } from '../types.js';
 import { clearFlagAcceptBytes } from './flag-accept.js';
 import { VIEW_OPTIONS_DEFAULT } from './view-options.js';
@@ -728,7 +728,6 @@ function createScenarioKnight(
     row,
     tick: state.gameTick,
     state: serfState,
-    stateName: SERF_STATE_NAMES[serfState] ?? String(serfState),
     stateData: [0, 0, 0, 0, 0],
   };
   state.serfs[idx] = serf as unknown as NonNullable<GameState['serfs'][number]>;

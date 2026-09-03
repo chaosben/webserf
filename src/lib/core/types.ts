@@ -458,9 +458,12 @@ export interface SerfRecord {
   readonly row: number | null;
   /** Tick stamp (bytes 8-9, u16). */
   readonly tick: number;
-  /** State 0..76 (byte 10). */
+  /**
+   * State 0..76 (byte 10). The **name** is deliberately not stored: the original does not carry one,
+   * and a copy kept next to the number goes stale the moment any of the state writers runs. Resolve
+   * it where it is displayed, with `SERF_STATE_NAMES[serf.state]`.
+   */
   readonly state: number;
-  readonly stateName: string;
   /** The 5 state-dependent union bytes (11..15) — the only storage; reading via `serfStateFields`. */
   readonly stateData: readonly number[];
 }

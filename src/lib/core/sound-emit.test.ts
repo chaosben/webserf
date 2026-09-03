@@ -56,7 +56,6 @@ function srf(over: Partial<SerfRecord> = {}): SerfRecord {
     row: 1,
     tick: 0,
     state: 1,
-    stateName: '',
     stateData: [0, 0, 0, 0, 0],
     ...over,
   } as unknown as SerfRecord;

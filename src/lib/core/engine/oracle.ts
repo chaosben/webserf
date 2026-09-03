@@ -11,7 +11,7 @@
  *
  * Only BEHAVIOUR-DEFINING fields are compared. Deliberately omitted, because they would produce false
  * deviations rather than real state divergence:
- * - derived display strings (`typeName`/`stateName`), which are redundant,
+ * - the derived display string `typeName`, which is redundant,
  * - the serf `tick` stamp: only a "last updated" timestamp, staggered by 1/16 rotation in the
  *   original and set to `gameTick` every tick here, so it differs by design and does not affect
  *   progress, since only the delta sum matters,

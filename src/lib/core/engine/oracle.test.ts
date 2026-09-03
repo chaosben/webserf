@@ -23,7 +23,6 @@ function serf(index: number, over: Partial<SerfRecord> = {}): SerfRecord {
     row: 6,
     tick: 42,
     state: 3,
-    stateName: 'Transporting',
     stateData: [0, 0, 0, 0, 0],
     ...over,
   };

@@ -1466,7 +1466,10 @@ function enteringBuildingDispatch(state: GameState, serf: Serf, bldTile: number,
  * - Insert the knight at the head of the garrison list: `serf[0xe] = building.firstKnight` (the old
  * head), `building.firstKnight = serf.index`.
  * - **Castle / inventory building** (`building+8 == 0xff`, `hasInventory`): -> DefendingCastle (75),
- * `counter=6000`. OPEN: `player+0x18c++` (the castle knight counter) is not modelled.
+ * `counter=6000`, and `player+0x18c += 1` (@0x23e7c) — the castle knight counter the second knight
+ * menu shows. It is the only one of the six write sites of that cell that lies outside
+ * `castle-garrison.ts`, and the castle handler compares it against its target: if it does not count
+ * the arrival, the garrison grows past the target and is never trimmed again.
  * - **Hut/Tower/Fortress**: garrison count `building+8 += 0x0f` (nibble byte), state by type
  * (hut -> 70 / tower -> 71 / fortress -> 72), `counter=6000`. On **first occupation** (`!active`):
  * `active=true` **and** a territory recolour.
@@ -1489,9 +1492,10 @@ function knightGarrisonEnter(state: GameState, serf: Serf, bldTile: number, bld:
   bld.firstKnight = serf.index;
 
   if (bld.hasInventory) {
- // OPEN: player+0x18c++ (castle knight counter) is not modelled.
     serf.state = 75;
     serf.counter = 6000;
+    const player = state.players[bld.owner];
+    if (player) player.knightMenuCounter = (player.knightMenuCounter + 1) & 0xffff; // @0x23e7c
     return;
   }
 

@@ -1061,7 +1061,6 @@ function decodeSerf(
     row,
     tick,
     state,
-    stateName: SERF_STATE_NAMES[state] ?? `Unknown(${state})`,
     stateData,
   };
 }

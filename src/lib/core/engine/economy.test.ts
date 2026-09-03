@@ -203,17 +203,32 @@ describe('economy: serf reproduction', () => {
     const inv1 = makeInventory({ index: 1, owner: 1, building: 2 });
     const occupied: Serf = { index: 1, state: 0 } as unknown as Serf;
     const state = {
-      header: { maxSerfIndex: 2 } as unknown as GameState['header'],
+   // The group is frame-paced as a whole, so the three helpers before the player loop run too. They
+   // are given just enough to fall through: the growth pass returns at once because the tick delta
+   // stays below `mapCounter`, and the ambient pass only draws one random value.
+      header: {
+        maxSerfIndex: 2,
+        maxBuildingIndex: 0,
+        maxFlagIndex: 0,
+        mapTick: 0,
+        mapCounter: 20,
+      } as unknown as GameState['header'],
       gameTick: 1,
       serfBudget: 100,
+      serviceBudget: 0,
+      buildingServiceCursor: 0,
+      flagServiceCursor: 0,
+      rng: { next: () => 0 },
+      ambient: { sound: null, waterVolume: null, windVolume: null, treeObjects: 0, waterTiles: 0 },
       players: [p0, p1, null, null],
       serfs: [null, occupied, null],
+      flags: [],
       inventories: [inv0, inv1],
       buildings: [null, makeBuilding(), { index: 2, col: 51, row: 42 } as unknown as Building],
       blockMeta: { serfs: { recordSize: 16, maxIndex: 2 } } as unknown as GameState['blockMeta'],
     } as unknown as GameState;
 
-    updateEconomy(state, false); // frameBoundary=false: playerTick only
+    updateEconomy(state);
 
     // P0 gets the lower index (2), P1 the next one (3).
     expect(state.serfs[2]!.owner).toBe(0);
