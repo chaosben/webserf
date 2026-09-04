@@ -54,7 +54,10 @@ const RES_DIR_OUT_MASK = 0x0a;
 
 /** The warehouse's carrier request: transporter, no tools (`send_serf_to_flag(0, 0, 0)`). */
 const HOLDER_REQUEST: WorkerRequest = { serfType: SERF_TRANSPORTER, tools: [] };
-/** Generic resupply: unspecialised serf, no tools (`send_serf_to_flag(0x15, 0, 0)`). */
+/**
+ * Generic resupply: unspecialised serf, no tools (`send_serf_to_flag(0x15, 0, 0)`). The type is not
+ * decoration — it selects a separate dispatch tail in the search (`cmpw $0x2a` @0x128cb).
+ */
 const GENERIC_REQUEST: WorkerRequest = { serfType: SERF_GENERIC, tools: [] };
 
 /** The inventory of a stock building (`bld[0xe]`). */
@@ -119,7 +122,18 @@ export function stockBuildingTail(state: GameState, bld: Building): void {
   cleanStaleFlagSerf(state, bld);
 }
 
-/** Resupply branch (@0x1538d): an occupied, outputting warehouse without a generic asks again, throttled. */
+/**
+ * Resupply branch (@0x1538d): an occupied, outputting warehouse without a generic asks again,
+ * throttled.
+ *
+ * **The castle runs this too** — it jumps into the tail at @0x1537e and only skips the carrier
+ * request. That is safe because `send_serf_to_flag` gives serf type `0x15` a dispatch tail of its
+ * own (@0x128d6) which does **not** claim the building's holder slot; for a castle that slot is the
+ * head of the garrison chain. See {@link sendSerfToFlag}'s dispatch.
+ *
+ * Note what is NOT tested here: whether a resupply is already on its way. There is no such gate in
+ * the original, so an empty store asks again every six rounds until one arrives.
+ */
 function requestGenericSupply(
   state: GameState,
   bld: Building,

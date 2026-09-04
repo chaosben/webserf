@@ -36,11 +36,21 @@ import { warehouseBuildingHandler } from './stock-building.js';
 import { buildingConstructionHead } from './building-construction.js';
 
 const SERF_GENERIC = 21;
+/** Serf type 22 (Knight0) — what a recruited generic becomes (`orb $0x58` @0x12df7). */
+const SERF_KNIGHT0 = 22;
+/** Resource 24 = sword (`inv+0x36`), 25 = shield (`inv+0x38`) — the price of one recruit. */
+const RES_SWORD = 24;
+const RES_SHIELD = 25;
+/**
+ * A store hands out a generic for the resupply only from **five** upwards (`cmpw $0x5,0x40(%ebx)`
+ * @0x128d9, `jb` @0x128de). Below that the search walks on — otherwise two half-empty stores would
+ * pass their last settlers back and forth.
+ */
+const GENERIC_RESUPPLY_MIN = 5;
 /** Building type 24 — its own handler (castle garrison), no production worker. */
 const BUILDING_CASTLE = 24;
 /** Building type 10 — its own handler (warehouse plus the shared stock tail). */
 const BUILDING_WAREHOUSE = 10;
-const STATE_IDLE_IN_STOCK = 1;
 const STATE_READY_TO_LEAVE_INVENTORY = 15;
 /** State 7 `ReadyToLeave` — the ejected knight steps out of the building (`serf[0xa] = 7`). */
 const STATE_READY_TO_LEAVE = 7;
@@ -369,11 +379,19 @@ function ejectWeakestKnight(state: GameState, bld: Building): void {
  * Requests a knight for the garrison — the knight path of `request_serf` (`@0x127a2..0x12822`). It uses
  * **the same** network search as the worker request but its own availability test and dispatch tail.
  *
- * - **Rank order K4 -> K0** (`inv+0x76 -> 0x74 -> 0x72 -> 0x70 -> 0x6e`), highest rank first.
- * - **No generic branch.** The `inv+0x6c` path (`@0x12d71`) belongs to the generic request, not to the
- *   knight. Military buildings are filled only from **existing** knights; generics become knights
- *   solely through recruitment in the knight menu.
- * - **No two-phase preference** — that is tied to the generic fallback of the worker search.
+ * - **Rank order K4 -> K0** (`inv+0x76 -> 0x74 -> 0x72 -> 0x70 -> 0x6e`), highest rank first, and the
+ *   slot alone decides (`or ax,ax` @0x12647 ff.) — the serf's state is not looked at.
+ * - **Two-phase, like the worker search.** A store with a knight wins at once. A store with only a
+ *   generic **plus sword plus shield** (@0x126df: `inv+0x6c`, `inv+0x36`, `inv+0x38`) is merely
+ *   *remembered* and arms the wave budget from `player+0x10a` (@0x1277b); when the budget runs out the
+ *   remembered generic is **recruited into a Knight0** (@0x12d8a..@0x12e5f). Without that branch a
+ *   settlement whose stores hold weapons but no knight never fills a hut.
+ * - **The zero cascade is not rebuilt, and that is a proven equivalence, not a shortcut.** The
+ *   original clears the first occupied slot K4 -> K0 (@0x127b8..@0x1281e) instead of the slot it took
+ *   from. It is the same slot: the selection above also runs K4 -> K0 and stops at the first occupied
+ *   one, so everything above it is empty, and between the hit (@0x127a2) and the cascade nothing
+ *   writes to the inventory. The recruiting branch does not run the cascade at all — it only clears
+ *   `inv+0x6c`.
  *
  * The tail calls `request_serf` with type parameter `0xffffffff` (`mov $0xffffffff,%eax` @0x156de),
  * meaning "no particular type, any knight". The original has *one* routine `@0x12428` branching
@@ -386,33 +404,82 @@ function ejectWeakestKnight(state: GameState, bld: Building): void {
  */
 export function requestKnightForBuilding(state: GameState, bld: Building): boolean {
   const rankParam = knightRequestRankParam(state.players[bld.owner] ?? null);
-  let found: { inv: Inventory; serf: Serf; knightType: number } | null = null;
-  walkFlagNetwork(state, bld.flag, (fIdx) => {
-    const fl = state.flags[fIdx];
-    if (!fl) return false;
-    const inv = flagInventory(state, fl);
-    if (!inv) return false;
-    for (let i = 0; i < KNIGHT_TYPES_HIGH_FIRST.length; i++) {
-      const kt = KNIGHT_TYPES_HIGH_FIRST[i]!;
-      const idx = inv.serfIndices[kt];
-      const s = idx !== 0 ? state.serfs[idx] : null;
-      if (s && s.state === STATE_IDLE_IN_STOCK) {
-        found = { inv, serf: s, knightType: kt };
-        return true;
+  let hit: { inv: Inventory; serf: Serf; knightType: number } | null = null;
+  let recruit: { inv: Inventory; serf: Serf } | null = null;
+  // `mov $0xffff,%ax ; mov %ax,0x340(%ebx)` @0x12574 — unlimited until something is remembered.
+  let budget = 0xffff;
+  walkFlagNetwork(
+    state,
+    bld.flag,
+    (fIdx) => {
+      const fl = state.flags[fIdx];
+      if (!fl) return false;
+      const inv = flagInventory(state, fl);
+      if (!inv) return false;
+      for (let i = 0; i < KNIGHT_TYPES_HIGH_FIRST.length; i++) {
+        const kt = KNIGHT_TYPES_HIGH_FIRST[i]!;
+        const idx = inv.serfIndices[kt];
+        const s = idx !== 0 ? state.serfs[idx] : null;
+        if (s) {
+          hit = { inv, serf: s, knightType: kt };
+          return true;
+        }
+        // Rank floor: the original compares the type parameter against a fixed constant after EVERY
+        // rank and gives up on this inventory when it matches (@0x12650/@0x1266f/@0x1268e/@0x126ad).
+        if (rankParam === KNIGHT_RANK_STOP[i]) return false;
       }
-      // Rank floor: the original compares the type parameter against a fixed constant after EVERY
-      // rank and gives up on this inventory when it matches (@0x12650/@0x1266f/@0x1268e/@0x126ad).
-      if (rankParam === KNIGHT_RANK_STOP[i]) return false;
-    }
-    return false;
-  });
-  if (found === null) return false;
-  const { inv, serf, knightType } = found as { inv: Inventory; serf: Serf; knightType: number };
+      // @0x126df — no knight here: can this store make one?
+      if (recruit !== null) return false; // `gs+0x342 != 0` @0x126cf — one is remembered already
+      const g = inv.serfIndices[SERF_GENERIC];
+      const gs = g !== 0 ? state.serfs[g] : null;
+      if (!gs) return false; // @0x126ea
+      if (inv.resources[RES_SWORD] === 0) return false; // @0x126fa
+      if (inv.resources[RES_SHIELD] === 0) return false; // @0x1270a
+      recruit = { inv, serf: gs }; // `mov %eax,0x344(%ebx)` @0x12719
+      budget = state.players[inv.owner]?.contSearchAfterNonOptimalFind ?? 0xffff; // @0x1277b
+      return false;
+    },
+    () => {
+      // `subw $0x1,0x340(%ebx)` @0x12cf2 · `je 0x12d71` — one per wave; at 0 the remembered generic
+      // is recruited.
+      budget = (budget - 1) & 0xffff;
+      return budget === 0;
+    },
+  );
 
-  inv.serfIndices[knightType] = 0;
+  let inv: Inventory;
+  let serf: Serf;
+  if (hit !== null) {
+    const h = hit as { inv: Inventory; serf: Serf; knightType: number };
+    inv = h.inv;
+    serf = h.serf;
+    // The topmost occupied slot — the same one the original's cascade @0x127b8 clears (see above).
+    inv.serfIndices[h.knightType] = 0;
+  } else if (recruit !== null) {
+    const r = recruit as { inv: Inventory; serf: Serf };
+    inv = r.inv;
+    serf = r.serf;
+    inv.serfIndices[SERF_GENERIC] = 0; // @0x12db1
+    inv.genericCount -= 1; // @0x12db8
+    inv.resources[RES_SWORD] -= 1; // @0x12dfd
+    inv.resources[RES_SHIELD] -= 1; // @0x12e05
+    setSerfType(serf, SERF_KNIGHT0); // `andb $0x83 ; orb $0x58` @0x12df1/@0x12df7
+    // The census follows the SERF's owner (`serf[0] & 3` @0x12e1d), not the building's.
+    const player = state.players[serf.owner & 3];
+    if (player) {
+      const sc = player.serfCount as number[];
+      sc[SERF_GENERIC] = (sc[SERF_GENERIC] - 1) & 0xffff; // `subw $0x1,-0x10(%ebx)` @0x12e48
+      sc[SERF_KNIGHT0] = (sc[SERF_KNIGHT0] + 1) & 0xffff; // `addw $0x1,-0xe(%ebx)` @0x12e50
+      player.totalMilitaryScore = (player.totalMilitaryScore + 1) >>> 0; // `addl $0x1` @0x12e58
+    }
+  } else {
+    return false;
+  }
+
+  // The tail both branches share (@0x12822 resp. @0x12dbd).
   const raw = (((bld.stock[0].available & 0xf) << 4) | (bld.stock[0].requested & 0xf)) + 1;
   bld.stock[0] = { available: (raw >> 4) & 0xf, requested: raw & 0xf };
-  bld.serfRequested = false; // `btr $0x7` @0x12831
+  bld.serfRequested = false; // `btr $0x7` @0x12831 / @0x12dcc
 
   const dest = bld.flag;
   serf.stateData = [
@@ -428,21 +495,34 @@ export function requestKnightForBuilding(state: GameState, bld: Building): boole
   return true;
 }
 
-/** What an inventory can supply for this need. */
-type Supply = { kind: 'worker' | 'generic'; serf: Serf };
+/**
+ * What an inventory can supply for this need — and **which of the dispatch tails** applies.
+ *
+ * `resupply` is not a variant of `worker`: for serf type `0x15` the original branches out of the
+ * shared test into a tail of its own (`cmpw $0x2a,0x10(%edi)` @0x128cb, `jne 0x12986` for every other
+ * type). The three differ in what they cost the store and in what they do to the target building; see
+ * {@link dispatchRequestedSerf}.
+ */
+type Supply = { kind: 'worker' | 'generic' | 'resupply'; serf: Serf };
 
 function inventorySupply(state: GameState, inv: Inventory, req: WorkerRequest): Supply | null {
-  // A ready worker of the type in store?
+  // A serf of the type in store? The original tests the slot and nothing else (`or ax,ax` @0x128c2) —
+  // in particular not the serf's state.
   const ready = inv.serfIndices[req.serfType];
   if (ready !== 0) {
     const s = state.serfs[ready];
-    if (s && s.state === STATE_IDLE_IN_STOCK) return { kind: 'worker', serf: s };
+    if (s) {
+      if (req.serfType !== SERF_GENERIC) return { kind: 'worker', serf: s };
+      // The resupply takes an unspecialised settler out of a store that can spare him.
+      if (inv.genericCount < GENERIC_RESUPPLY_MIN) return null; // walk on (@0x128de)
+      return { kind: 'resupply', serf: s };
+    }
   }
   // Or a generic plus all the tools?
   const g = inv.serfIndices[SERF_GENERIC];
   if (g !== 0 && inv.genericCount > 0) {
     const s = state.serfs[g];
-    if (s && s.state === STATE_IDLE_IN_STOCK && req.tools.every((t) => inv.resources[t] > 0)) {
+    if (s && req.tools.every((t) => inv.resources[t] > 0)) {
       return { kind: 'generic', serf: s };
     }
   }
@@ -624,15 +704,30 @@ export function sendGeologistToFlag(state: GameState, flagIndex: number): boolea
 }
 
 /**
- * Dispatches the found serf (state 15 ReadyToLeaveInventory) — the shared body:
+ * Dispatches the found serf (state 15 ReadyToLeaveInventory) — **three** tails, chosen by the type:
  *
  * ```
- * inv.serfs[type] = 0                                        // or serfs[generic] = 0, generic_count--
- * if (type == 20) { serf[0xb] = 6 ; serf[0xc] = flagIndex }  // geologist => flag
- * else { bld[5] |= 0x80 ; serf[0xb] = 0xff ; serf[0xc] = bld[6] }
- * for a generic: serf[0] = (serf[0] & 0x83) | (type << 2) ; consume tools ; census
- * serf[10] = 0xf ; inv[0x4a]++                               // serfs_out
+ * type == 0x15 (resupply)  @0x128d6 : serfs[21] = 0 ; generic_count--
+ *                                     serf[0xb] = 0xfe ; serf[0xc] = bld[6]
+ *                                     ===> NO bts $0x7
+ * type == 0x14 (geologist) @0x129b2 : serf[0xb] = 6 ; serf[0xc] = flagIndex
+ * otherwise                @0x129f6 : bld[5] |= 0x80 ; serf[0xb] = 0xff ; serf[0xc] = bld[6]
+ * a specialised generic             : serf[0] = (serf[0] & 0x83) | (type << 2) ; tools ; census
+ * all                               : serf[0xa] = 0xf ; inv[0x4a]++            // serfs_out
  * ```
+ *
+ * **Why the resupply must not set `serfRequested`, and what it costs when it does.** The bit is a
+ * claim on the building's `bld[0xa]`: the arrival handover writes the arriving serf's index there
+ * (`btr $0x7` @0x202df, then @0x202f1) — and it does so for **whichever** serf with a negative mode
+ * reaches the flag first, not for the one that was sent. For a warehouse that slot is the keeper and
+ * the mechanism is the point. For a **castle** `bld[0xa]` is the head of the garrison chain, and the
+ * chain is gone with it: the knights behind it hang in state 75 and no reader finds them again. The
+ * castle asks for a resupply through the very same shared stock tail (`jmp 0x1537e` @0x15287), so
+ * this is not a corner case.
+ *
+ * The mode is `0xfe` rather than `0xff` for the same reason: a resupply settler carries no request,
+ * so a dead end on the way must make him *lost* instead of booking a request back
+ * (`arrivalCleanup`, `dir1 <= -2` @0x20901).
  */
 function dispatchRequestedSerf(
   state: GameState,
@@ -642,7 +737,10 @@ function dispatchRequestedSerf(
   target: RequestTarget,
 ): void {
   const serf = supply.serf;
-  if (supply.kind === 'worker') {
+  if (supply.kind === 'resupply') {
+    inv.serfIndices[SERF_GENERIC] = 0; // @0x128fa
+    inv.genericCount -= 1; // `subw $0x1,0x40(%ebx)` @0x12932 — the store really loses him
+  } else if (supply.kind === 'worker') {
     inv.serfIndices[req.serfType] = 0;
   } else {
     // Specialise a generic.
@@ -659,7 +757,7 @@ function dispatchRequestedSerf(
   }
   // `field_0xb` = mode, `field_0xc` = target flag, `field_0xe` = inventory (already correct for a
   // stored serf; the original does not rewrite it here).
-  const mode = target.kind === 'flag' ? 6 : -1;
+  const mode = target.kind === 'flag' ? 6 : supply.kind === 'resupply' ? 0xfe : 0xff;
   const dest = target.kind === 'flag' ? target.flagIndex : target.bld.flag;
   serf.stateData = [
     mode & 0xff,
@@ -671,5 +769,8 @@ function dispatchRequestedSerf(
   serf.state = STATE_READY_TO_LEAVE_INVENTORY;
   serf.tick = state.gameTick;
   inv.serfIndices[4] = (inv.serfIndices[4] + 1) & 0xffff; // inv+0x4a serfs_out
-  if (target.kind === 'building') target.bld.serfRequested = true; // bld[5] |= 0x80
+  // Only the two tails that end in @0x12a06 claim the building's holder slot.
+  if (target.kind === 'building' && supply.kind !== 'resupply') {
+    target.bld.serfRequested = true; // `bts $0x7` @0x12a06
+  }
 }

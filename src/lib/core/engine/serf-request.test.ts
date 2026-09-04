@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { requestBuildingWorkers, sendGeologistToFlag, militaryOccupancyTarget } from './serf-request.js';
+import {
+  requestBuildingWorkers,
+  sendGeologistToFlag,
+  militaryOccupancyTarget,
+  sendSerfToFlag,
+  requestKnightForBuilding,
+} from './serf-request.js';
 import type { GameState, Building, Flag, Inventory, Serf, Player } from './state.js';
 import { mapGeometry } from './position.js';
 
@@ -347,6 +353,9 @@ function makeMilitary(
     knightShiftTimer: over.knightShiftTimer ?? 0,
     knightOccupation: over.occupation ?? [0x10, 0x21, 0x32, 0x43],
     serfCount: new Array(27).fill(0),
+    // The knight recruitment books both of these (@0x12e50 / @0x12e58).
+    totalMilitaryScore: 0,
+    contSearchAfterNonOptimalFind: 7,
  // A building UNDER CONSTRUCTION runs through `buildingConstructionHead`, which reads these three.
     messageFlags: 0,
     messageBuildingSlots: [0, 0, 0],
@@ -583,5 +592,131 @@ describe('serf-request — rank floor of the knight shift', () => {
       requestBuildingWorkers(state);
       expect(state.serfs[4]!.state).toBe(takesK0 ? 15 : 1);
     }
+  });
+});
+
+/**
+ * The generic resupply of the shared stock tail — serf type `0x15` leaves `send_serf_to_flag` through
+ * a tail of its own (`cmpw $0x2a` @0x128cb).
+ *
+ * What makes it its own tail matters far beyond bookkeeping: it does **not** set `serfRequested`. That
+ * bit is a claim on `bld[0xa]`, and the arrival handover fills the slot with whichever serf with a
+ * negative mode reaches the flag first (@0x202f1). For a castle `bld[0xa]` is the head of the garrison
+ * chain, and the castle asks for a resupply through this very tail.
+ */
+describe('serf-request — the generic resupply tail', () => {
+  const RESUPPLY = { serfType: 21, tools: [] as number[] };
+  const TRANSPORTER = { serfType: 0, tools: [] as number[] };
+
+  /** A store with `generics` unspecialised settlers and one representative serf (#9). */
+  function withGenerics(generics: number) {
+    const made = makeMilitary({ knights: {} });
+    made.inv.genericCount = generics;
+    made.inv.serfIndices[21] = 9;
+    made.state.serfs[9] = {
+      index: 9,
+      type: 21,
+      state: 1,
+      stateData: [0, 0, 0, 0, 0],
+    } as unknown as Serf;
+    return made;
+  }
+
+  it('takes a settler from five upwards and books him out of the store', () => {
+    const { state, bld, inv } = withGenerics(5);
+    expect(sendSerfToFlag(state, bld, RESUPPLY)).toBe(true);
+    expect(inv.genericCount).toBe(4); // `subw $0x1,0x40(%ebx)` @0x12932
+    expect(inv.serfIndices[21]).toBe(0);
+    expect(inv.serfIndices[4]).toBe(1); // serfs_out
+    expect(state.serfs[9]!.state).toBe(15); // ReadyToLeaveInventory
+    expect(state.serfs[9]!.type).toBe(21); // he stays a generic — no specialisation
+  });
+
+  it('leaves a store with four alone (the search walks on)', () => {
+    const { state, bld, inv } = withGenerics(4);
+    expect(sendSerfToFlag(state, bld, RESUPPLY)).toBe(false);
+    expect(inv.genericCount).toBe(4);
+    expect(state.serfs[9]!.state).toBe(1);
+  });
+
+  it('sends him with mode 0xfe and does NOT claim the holder slot', () => {
+    const { state, bld } = withGenerics(5);
+    sendSerfToFlag(state, bld, RESUPPLY);
+    expect(state.serfs[9]!.stateData[0]).toBe(0xfe); // `mov $0xfe,%al` @0x12909
+    expect(state.serfs[9]!.stateData[1]).toBe(1); // dest = the requesting building's flag
+    expect(bld.serfRequested).toBe(false); // no `bts $0x7`
+  });
+
+  it('CONTRAST: any other type does claim it, with mode 0xff', () => {
+    const { state, bld, inv } = withGenerics(5);
+    inv.serfIndices[0] = 8; // a stored transporter
+    state.serfs[8] = { index: 8, type: 0, state: 1, stateData: [0, 0, 0, 0, 0] } as unknown as Serf;
+    expect(sendSerfToFlag(state, bld, TRANSPORTER)).toBe(true);
+    expect(bld.serfRequested).toBe(true); // `bts $0x7` @0x12a06
+    expect(state.serfs[8]!.stateData[0]).toBe(0xff);
+    expect(inv.genericCount).toBe(5); // a stored specialist is not a generic
+  });
+});
+
+/**
+ * Recruiting a generic into a Knight0 — the fallback of the knight request (@0x126df, dispatched at
+ * @0x12d8a when the search budget runs out). Without it a settlement whose stores hold weapons but no
+ * knight never fills a hut.
+ */
+describe('serf-request — recruiting a generic into a knight', () => {
+  function armed(over: { sword?: number; shield?: number; generic?: boolean } = {}) {
+    const made = makeMilitary({ knights: {} });
+    made.inv.resources[24] = over.sword ?? 2; // sword
+    made.inv.resources[25] = over.shield ?? 2; // shield
+    if (over.generic !== false) {
+      made.inv.serfIndices[21] = 9;
+      made.state.serfs[9] = {
+        index: 9,
+        type: 21,
+        state: 1,
+        stateData: [0, 0, 0, 0, 0],
+      } as unknown as Serf;
+    }
+    return made;
+  }
+
+  it('turns the generic into a Knight0 and pays sword plus shield', () => {
+    const { state, bld, inv } = armed();
+    expect(requestKnightForBuilding(state, bld)).toBe(true);
+    expect(state.serfs[9]!.type).toBe(22); // `andb $0x83 ; orb $0x58` @0x12df1/@0x12df7
+    expect(state.serfs[9]!.state).toBe(15);
+    expect(inv.resources[24]).toBe(1);
+    expect(inv.resources[25]).toBe(1);
+    expect(inv.genericCount).toBe(4);
+    expect(inv.serfIndices[21]).toBe(0);
+    expect(bld.serfRequested).toBe(false); // `btr $0x7` @0x12dcc — cleared, not set
+  });
+
+  it('books the census on the SERF owner and the military score', () => {
+    const { state, bld } = armed();
+    const player = state.players[0]!;
+    requestKnightForBuilding(state, bld);
+    expect(player.serfCount[21]).toBe(0xffff); // 0 - 1, u16 like the original
+    expect(player.serfCount[22]).toBe(1);
+    expect(player.totalMilitaryScore).toBe(1); // `addl $0x1,0x11a(%ebx)` @0x12e58
+  });
+
+  it('needs generic AND sword AND shield — each alone blocks it', () => {
+    const noShield = armed({ shield: 0 });
+    expect(requestKnightForBuilding(noShield.state, noShield.bld)).toBe(false);
+    const noSword = armed({ sword: 0 });
+    expect(requestKnightForBuilding(noSword.state, noSword.bld)).toBe(false);
+    const noGeneric = armed({ generic: false });
+    expect(requestKnightForBuilding(noGeneric.state, noGeneric.bld)).toBe(false);
+  });
+
+  it('a stored knight always beats recruiting', () => {
+    const { state, bld, inv } = armed();
+    inv.serfIndices[23] = 7; // a Knight1 in store
+    state.serfs[7] = { index: 7, type: 23, state: 1, stateData: [0, 0, 0, 0, 0] } as unknown as Serf;
+    expect(requestKnightForBuilding(state, bld)).toBe(true);
+    expect(state.serfs[7]!.state).toBe(15);
+    expect(state.serfs[9]!.type).toBe(21); // the generic is untouched
+    expect(inv.resources[24]).toBe(2);
   });
 });

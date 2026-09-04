@@ -176,8 +176,10 @@ export function singleBitDir(mask: number): number | null {
  *   *Precondition, established from the routine itself:* its own tail sets `field_0xb = -2`. A serf
  *   whose job was cancelled here therefore walks home with `-2`; if it fails **again** (a second dead
  *   end or a second failed search), this branch applies — "cannot even get home, so it is lost". The
- *   only other writers of `field_0xb = -2` with state 2 are `find_inventory` (@0x1ecf7/@0x1ecef) and
- *   `FUN_00019156` (@0x19165/@0x19177), and both send the same homecomer off.
+ *   other writers of `field_0xb = -2` with state 2 are `find_inventory` (@0x1ecf7/@0x1ecef),
+ *   `FUN_00019156` (@0x19165/@0x19177) and the **generic resupply** of `send_serf_to_flag`
+ *   (@0x12909) — all of them send off a settler who carries no request, which is exactly why this
+ *   branch may drop him instead of booking one back.
  * - Otherwise the **tail @0x2091c**: `field_0xb = 0xfe` (dir1 = -2), `field_0xc = 0` (dest = 0),
  *   `counter = 0`.
  */
