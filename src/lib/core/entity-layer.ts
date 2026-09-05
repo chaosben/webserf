@@ -333,13 +333,38 @@ export function drawEntityLayer<Img extends DrawImage>(
   }
   const hasIdlePath = idleByPos.size > 0;
 
+  // The resting carriers of ONE half row, collected in (a) and drawn in (d). The original does
+  // exactly this: `draw_map_tile_dispatch` appends a command per resting carrier (@0x3402e) into
+  // `DAT_0003450c` — it borrows the driver's list cursor for that and saves it in its prologue
+  // (@0x34001) — and the driver drains that list only after the active serf list of the same half
+  // row (@0x33f00/@0x33f09). Two arrays instead of one of objects: this loop runs per tile
+  // position, and at low zoom that is a multiple of the map size.
+  const restingSerf: SerfRecord[] = [];
+  const restingK: number[] = [];
+
   for (let i = 0; i < frame.halfRows.length; i++) {
     const hr = frame.halfRows[i]!;
+    restingSerf.length = 0;
+    restingK.length = 0;
 
     // (a) Object/building sub-pass of this row (preceded by the shaft miners, i.e. behind).
     for (let k = 0; k < hr.tiles.length; k++) {
       const pos = hr.tiles[k]!;
       const t = tiles[pos]!;
+
+      // The resting-carrier test is the FIRST thing the tile dispatch does (@0x34023, bit 7 of the
+      // game tuple), before the water branch and before the object — hence its place here, above
+      // the idle pre-test below. Only appended, never drawn: see (d).
+      //
+      // `hasIdlePath` saves the per-tile hash lookup on a map **without** resting carriers — not an
+      // edge case: a save with 0 serfs spent 2.61 of 16.74 ms on that lookup alone.
+      if (hasIdlePath) {
+        const idle = idleByPos.get(pos);
+        if (idle !== undefined) {
+          restingSerf.push(idle);
+          restingK.push(k);
+        }
+      }
 
       const obj = t.object;
       // **Water branch of the tile dispatch** (`draw_map_tile_dispatch` @0x3403c..@0x34056): if the
@@ -492,34 +517,18 @@ export function drawEntityLayer<Img extends DrawImage>(
       }
     }
 
-    // (b) Serf sub-pass of THIS row's list: idle carriers, plus the active serfs whose animation
-    //     carries no row bias — above the objects/buildings of this row, below those of the rows
-    //     further down. See `serf-sprites.serfRowBias` for the list a serf is enqueued into.
+    // (b) Serf sub-pass of THIS row's list: the ACTIVE serfs whose animation carries no row bias —
+    //     above the objects/buildings of this row, below those of the rows further down. See
+    //     `serf-sprites.serfRowBias` for the list a serf is enqueued into.
     if (!showSerfs) continue;
     for (let k = 0; k < hr.tiles.length; k++) {
       const pos = hr.tiles[k]!;
       const t = tiles[pos]!;
-
-      // The same idle pre-test as in (a), with this sub-pass's two gates: an idle carrier (lookup
-      // in `idleByPos`) or an active serf on the tile. `hasIdlePath` saves the per-tile hash lookup
-      // on a map **without** idle carriers — not an edge case: a save with 0 serfs spent 2.61 of
-      // 16.74 ms in this sub-pass for nothing at all.
-      const idle = hasIdlePath ? idleByPos.get(pos) : undefined;
-      if (idle === undefined && t.serfIndex === 0) continue;
-
+      if (t.serfIndex === 0 || animations === null) continue;
+      const serf = index.serf.get(t.serfIndex);
+      if (serf === undefined || serfRowBias(serf.animation) !== 0) continue;
       const flat = entityAnchor(frame, i, k);
-      const bx = flat.x;
-      const by = flat.y - t.height * heightUnit;
-
-      if (idle !== undefined) {
-        const info = idleSerfInfo(idle.type, pos, t.paths, state.header.tick);
-        const sp = bodyToSprites(info.body);
-        if (sp !== null) drawSerfSprite(sp.torso, sp.head, idle.owner, bx + info.dx, by + info.dy);
-      }
-      const activeSerf = t.serfIndex > 0 && animations !== null ? index.serf.get(t.serfIndex) : undefined;
-      if (activeSerf !== undefined && serfRowBias(activeSerf.animation) === 0) {
-        drawActiveSerf(activeSerf, bx, by, { pos, height: t.height });
-      }
+      drawActiveSerf(serf, flat.x, flat.y - t.height * heightUnit, { pos, height: t.height });
     }
 
     // (c) The rest of THIS row's list: serfs of the NEXT row with bias -1. They are registered one
@@ -534,15 +543,40 @@ export function drawEntityLayer<Img extends DrawImage>(
     // Row 0 has no predecessor, so its bias serfs are dropped — as in the original, where the
     // 8-bit `add` underflows the row index and the range test rejects it (`jae` @0x27016).
     const nextRow = frame.halfRows[i + 1];
-    if (nextRow === undefined || animations === null) continue;
-    for (let k = 0; k < nextRow.tiles.length; k++) {
-      const pos = nextRow.tiles[k]!;
+    if (nextRow !== undefined && animations !== null) {
+      for (let k = 0; k < nextRow.tiles.length; k++) {
+        const pos = nextRow.tiles[k]!;
+        const t = tiles[pos]!;
+        if (t.serfIndex === 0) continue;
+        const serf = index.serf.get(t.serfIndex);
+        if (serf === undefined || serfRowBias(serf.animation) === 0) continue;
+        const flat = entityAnchor(frame, i + 1, k);
+        drawActiveSerf(serf, flat.x, flat.y - t.height * heightUnit, { pos, height: t.height });
+      }
+    }
+
+    // (d) The resting carriers of THIS row — the second deferred list, and the last thing a half
+    //     row draws. `draw_deferred_sprite_list` @0x36b1e is the body of `draw_deferred_row_sprites`
+    //     without its head, and the driver calls it after the serf list (@0x33f09). So a resting
+    //     carrier lies above every active serf of its own row *and* above the bias serfs of the
+    //     next one — collecting them in (a) is what puts them in that order here.
+    for (let n = 0; n < restingK.length; n++) {
+      const k = restingK[n]!;
+      const idle = restingSerf[n]!;
+      const pos = hr.tiles[k]!;
       const t = tiles[pos]!;
-      if (t.serfIndex === 0) continue;
-      const serf = index.serf.get(t.serfIndex);
-      if (serf === undefined || serfRowBias(serf.animation) === 0) continue;
-      const flat = entityAnchor(frame, i + 1, k);
-      drawActiveSerf(serf, flat.x, flat.y - t.height * heightUnit, { pos, height: t.height });
+      const flat = entityAnchor(frame, i, k);
+      const info = idleSerfInfo(idle.type, pos, t.paths, state.header.tick);
+      const sp = bodyToSprites(info.body);
+      if (sp !== null) {
+        drawSerfSprite(
+          sp.torso,
+          sp.head,
+          idle.owner,
+          flat.x + info.dx,
+          flat.y - t.height * heightUnit + info.dy,
+        );
+      }
     }
   }
   return hitMarkers;
