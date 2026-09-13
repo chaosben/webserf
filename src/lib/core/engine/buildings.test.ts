@@ -385,6 +385,31 @@ describe('razing a building', () => {
     expect(state.serfs[398]?.state).toBe(28); // inside the building -> EscapeBuilding
   });
 
+  it('a military building UNDER CONSTRUCTION has no garrison chain: only its builder is ejected', () => {
+ // The original branches on the CODED type `bld[4] & 0xfc`, and that mask keeps bit 7: a hut site is
+ // `0xac` and matches none of 0x2c/0x54/0x58/0x60, so it takes the single-worker branch (@0x4960d).
+ // `bld[0xa]` holds the BUILDER there; reading his state union as a next-knight pointer sends the walk
+ // to an arbitrary serf, and ejecting that one destroys whatever resource he carries.
+    const b = forester({ type: 11, constructing: true, firstKnight: 399 });
+    const { state, p } = razeState(b, 43508);
+    p.incompleteBuildingCount[10] = 1; // type 11 -> index 10
+ // The builder: type 3 (Digger/Builder) in state 9 (Building). His `stateData[3..4]` are NOT a next
+ // knight here — they carry whatever the Building union puts there, and 350 is a plausible reading.
+    (state.serfs as (Serf | null)[])[399] = {
+      index: 399, owner: 0, type: 3, col: COL, row: ROW, tick: 0, state: 9,
+      animation: 0, counter: 0, sound: false, stateData: [0, 0, 0, 350 & 0xff, (350 >> 8) & 0xff],
+    } as unknown as Serf;
+ // An unrelated carrier somewhere else on the map, loaded with a booked plank (raw 8).
+    (state.serfs as (Serf | null)[])[350] = {
+      index: 350, owner: 0, type: 4, col: 2, row: 3, tick: 0, state: 11,
+      animation: 0, counter: 0, sound: false, stateData: [8, 71, 0, 0, 0],
+    } as unknown as Serf;
+    demolishBuilding(state, b);
+    expect(state.serfs[399]?.state).toBe(28); // the builder leaves
+    expect(state.serfs[350]?.state).toBe(11); // the foreign carrier is NOT touched
+    expect(state.serfs[350]?.stateData[0]).toBe(8); // ...and keeps his load
+  });
+
   it('guard: already burning -> no-op', () => {
     const b = forester({ burning: true, firstKnight: 500 });
     const { state, p } = razeState(b, 43508);

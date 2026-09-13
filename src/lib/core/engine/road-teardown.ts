@@ -93,7 +93,14 @@ export function returnTransitResourceToStock(
   if (cat == null || cat < 0) return;
   if (destFlagIdx === 0) return;
   const destFlag = state.flags[destFlagIdx];
-  if (!destFlag || !destFlag.hasBuilding) return;
+  if (!destFlag) return;
+  // The original follows `flag+0x34` **unconditionally** (@0x4a42a) and gates only on the coded type
+  // below — there is no test of `flag[4]` bit 6 here. `hasBuilding` is a cached duplicate of this very
+  // endpoint (0 disagreements over 6120 flags of the original-written corpus), so testing it as well
+  // buys nothing and adds a second way for a legitimate decrement to be swallowed: a stale cache then
+  // leaves the booking standing, and the demand tail falls silent at
+  // `available + requested == stockMaximum`. The structural test stays because the decoded endpoint
+  // can be a flag, which the raw pointer of the original cannot express.
   const conn = destFlag.connections[Direction.UpLeft];
   if (!conn || conn.kind !== 'building') return;
   const bld = state.buildings[conn.index];

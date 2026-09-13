@@ -174,13 +174,23 @@ function updateBurning(state: GameState, bld: Building, index: number): void {
  *
  * Each serf goes to state **25 Lost** if it is the visible tile occupancy (`serfIndex ==
  * tile.serfIndex`), otherwise to **28 EscapeBuilding** — the difference being whether it stands
- * outside or inside. Military buildings and the castle walk the garrison chain `firstKnight ->
- * serf[0xe]`; a non-military holder is a single worker serf, additionally reset from type 4
+ * outside or inside. Hut, tower, fortress and the castle walk the garrison chain `firstKnight ->
+ * serf[0xe]`; everything else has a single worker serf as its holder, additionally reset from type 4
  * (TransporterInventory) back to generic.
+ *
+ * **The branch is on the CODED type `bld[4] & 0xfc`** (@0x494c5 / @0x494cf / @0x494d9 / @0x494e3),
+ * and that mask **keeps bit 7** (`constructing`). A building SITE therefore carries `0xac` / `0xd4` /
+ * `0xd8` / `0xe0`, matches none of the four comparison values and falls through to the single-worker
+ * branch — which is correct, because `bld[0xa]` holds its **builder**, never a garrison chain.
+ * Branching on the decoded `bld.type` instead walks a builder's state union as a next-knight pointer:
+ * the chain then leads to an arbitrary serf anywhere on the map, and whatever that serf is carrying is
+ * destroyed by {@link ejectOne} without the booking at its destination coming back.
  */
 function ejectHolderSerfs(state: GameState, bld: Building, oldFirstKnight: number): number {
   const geo = state.geo;
-  const military = bld.type === 11 || bld.type === 21 || bld.type === 22; // hut/tower/fortress
+  const coded = ((bld.type << 2) & 0xfc) | (bld.constructing ? 0x80 : 0);
+  const garrison = coded === 0x2c || coded === 0x54 || coded === 0x58; // hut / tower / fortress
+  const castle = coded === 0x60;
   const ejectOne = (s: Serf): void => {
     const onTile =
       s.col !== null && s.row !== null && state.mapTiles[posOf(s.col, s.row, geo)].serfIndex === s.index;
@@ -192,8 +202,8 @@ function ejectHolderSerfs(state: GameState, bld: Building, oldFirstKnight: numbe
     }
   };
 
-  if (!military && bld.type !== 24) {
-    // Non-military holder: the single worker serf.
+  if (!garrison && !castle) {
+    // No garrison: the single worker serf (a building site included — its holder is the builder).
     const s = state.serfs[oldFirstKnight & 0xffff];
     if (s) {
       if (s.type === 4) {
@@ -208,7 +218,7 @@ function ejectHolderSerfs(state: GameState, bld: Building, oldFirstKnight: numbe
   }
 
   let burnTicks = BURN_DURATION;
-  if (bld.type === 24) {
+  if (castle) {
     // ── Castle branch (@0x494e3 `cmpb $0x60` … @0x49522) ──
     // Losing your own castle: clear "has castle", lower the **castle balance** by 1 (the counterpart
     // to the `+1` for capturing a foreign castle in serf state 52), and burn four times as long.
@@ -230,7 +240,7 @@ function ejectHolderSerfs(state: GameState, bld: Building, oldFirstKnight: numbe
     burnTicks = CASTLE_BURN_DURATION;
   }
 
-  // Garrison chain: firstKnight -> serf[0xe]. Runs for military buildings **and** the castle (the
+  // Garrison chain: firstKnight -> serf[0xe]. Runs for hut/tower/fortress **and** the castle (the
   // original shares the loop head behind the type dispatch).
   let k = oldFirstKnight & 0xffff;
   let guard = 0;
