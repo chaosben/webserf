@@ -14,8 +14,16 @@
    * accessible name and as the fallback — without an archive there are no pictures.
    *
    * Unlike the stock overview this layer takes the pointer, so every event it gets is stopped here:
-   * the viewport underneath carries panning, zoom, the map click and the long press, and a switch
-   * that also placed a building would be worse than no switch.
+   * the viewport underneath carries panning, zoom and the long press, and a switch that also placed
+   * a building would be worse than no switch.
+   *
+   * **What this shield can and cannot do.** It stops the viewport's own `on*` handlers, because
+   * Svelte delegates both theirs and ours to one root listener and walks the tree itself — within
+   * that system `stopPropagation()` arrives in time. It would NOT stop a listener the viewport
+   * attached with `addEventListener`: the native bubble passes that long before the delegated walk
+   * begins. The map click is such a listener, which is why it hangs on the CANVAS instead of the
+   * viewport (reasoning in `MapView.svelte`); a plate is then out of its reach by construction
+   * rather than by this shield.
    */
   import { HACKS, hackOn, hackShown, type Hack } from './hacks.js';
   import { mapObjectImage, type IconImage } from './icon-images.svelte.js';

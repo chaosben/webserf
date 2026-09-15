@@ -3749,7 +3749,7 @@
   let downOnBar = false;
   /** Is a **left drag** running (touchpad pan, addition)? See `onPointerMove`. */
   let leftDragging = false;
-  /** The viewport itself — for the imperatively attached `click` listener (reasoning there). */
+  /** The viewport itself — for pointer capture and the imperative `gesture*` listeners. */
   let viewportEl = $state<HTMLDivElement | null>(null);
   /** Up to this client pixel distance a left press still counts as a click. */
   const DRAG_THRESHOLD = 5;
@@ -4091,14 +4091,22 @@
    * released — a pure pan grip (right/middle button) produces none.
    */
   /**
-   * The `click` listener hangs on the viewport **imperatively**, not as an `onclick` attribute: the
-   * a11y rules demand a keyboard twin for `click` on a non-interactive element. A pure pointer
-   * surface (drag, zoom, key combination) has no sensible keyboard counterpart, and an empty handler
-   * merely to silence the warning would be a sham. The gestures are in the viewport's `aria-label`.
+   * The `click` listener hangs **imperatively**, not as an `onclick` attribute: the a11y rules
+   * demand a keyboard twin for `click` on a non-interactive element. A pure pointer surface (drag,
+   * zoom, key combination) has no sensible keyboard counterpart, and an empty handler merely to
+   * silence the warning would be a sham. The gestures are in the viewport's `aria-label`.
+   *
+   * IT HANGS ON THE CANVAS, NOT ON THE VIEWPORT, and that is a correctness matter rather than a
+   * preference: the canvas IS the game screen — bar and popup are blitted into it — while the
+   * viewport also contains our own DOM plates. A native listener on the viewport catches a click on
+   * a plate on the way up, and a `stopPropagation()` inside the plate cannot prevent it: Svelte
+   * DELEGATES `onclick` to the document root, so the plate's handler runs long after the native
+   * bubble has passed the viewport. On the canvas the plates are out of reach by construction.
+   * Nothing is lost: the canvas fills the viewport 1:1.
    */
   $effect(() => {
-    const el = viewportEl;
-    if (el === null) return;
+    const el = host;
+    if (el === undefined) return;
     el.addEventListener('click', onClick);
     return () => el.removeEventListener('click', onClick);
   });
