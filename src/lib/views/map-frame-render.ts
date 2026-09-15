@@ -32,6 +32,7 @@ import { metrics } from './render-metrics.js';
 import { entityAnchorAll, type Camera } from '../core/viewport-camera.js';
 import { CURSOR_MARKER_BASE, type CursorMarkerPair } from '../core/ui-render.js';
 import { posOf, type MapGeometry } from '../core/engine/position.js';
+import { drawMineralSigns } from '../core/mineral-sign-layer.js';
 import type { AnimationTable } from '../core/animation-parser.js';
 import type { IndexedSprite } from '../core/sprite-indexed.js';
 import type { GameState } from '../core/engine/state.js';
@@ -44,6 +45,15 @@ export interface LayerToggles {
   readonly flags: boolean;
   readonly serfs: boolean;
   readonly roads: boolean;
+}
+
+/**
+ * Which of OUR additions may draw. Deliberately not a sixth entry in {@link LayerToggles}: that one
+ * switches the original's passes, and mixing an invention into it would make "no original pass
+ * changes" unreadable.
+ */
+export interface HackToggles {
+  readonly minerals: boolean;
 }
 
 export interface MapFrameInput {
@@ -73,6 +83,7 @@ export interface MapFrameInput {
   readonly surfaceVersion: string;
 
   readonly show: LayerToggles;
+  readonly hacks: HackToggles;
   readonly buildHelper: boolean;
   readonly buildPlayer: number;
   readonly selected: { readonly col: number; readonly row: number } | null;
@@ -147,6 +158,7 @@ export function renderMapFrame(input: MapFrameInput): boolean {
     presenter,
     surfaceVersion,
     show,
+    hacks,
     buildHelper,
     buildPlayer,
     selected,
@@ -252,6 +264,18 @@ export function renderMapFrame(input: MapFrameInput): boolean {
       ambient: engineState.ambient,
     });
     metrics.end('entities');
+    // Our own layer, and the only one outside the original's order — hence before every original
+    // overlay, so build helper, selector and hit markers keep the top.
+    if (hacks.minerals) {
+      metrics.begin('hacks');
+      drawMineralSigns(blitter, frame, {
+        tiles: rs.mapTiles,
+        heightUnit,
+        tick: rs.header.tick,
+        sprite: (index) => kit.sprite(index, 'transparent'),
+      });
+      metrics.end('hacks');
+    }
     metrics.begin('overlays');
     // Before the selector, so its symbol stays on top (order as in `ui_draw_viewport`).
     if (buildHelper) {

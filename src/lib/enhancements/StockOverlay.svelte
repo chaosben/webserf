@@ -13,24 +13,23 @@
   import { iconImage } from './icon-images.svelte.js';
   import { goodName, serfName } from './entity-names.js';
   import { st } from '../shell/i18n.js';
-  import type { StockCorner, StockRow, StockView } from './stock-overview.js';
+  import type { StockRow, StockView } from './stock-overview.js';
 
   let {
     view,
-    corner,
     opacity,
     perRow,
     scale
   }: {
     /** `null` = nothing selected, or no player to show. */
     view: StockView | null;
-    corner: StockCorner;
     opacity: number;
     /** How many entries stand side by side before the list wraps. */
     perRow: number;
     /**
      * The control bar's own scale (`uiScaleFor`), passed straight through: the readout is sized
-     * like the bar below and by nothing else — stepless, and not a setting.
+     * like the bar below and by nothing else — stepless, and not a setting. What it turns into is
+     * the shared `.game-overlay` rule, so this plate and the hack switches cannot drift apart.
      */
     scale: number;
   } = $props();
@@ -73,10 +72,10 @@
   <!-- No `aria-live`: a region that changes several times a second is a barrage for a screen
        reader. Findable in the tree, but not announced. -->
   <section
-    class="overview {corner}"
+    class="overview game-overlay"
     style:--plate-opacity={opacity}
     style:--per-row={perRow}
-    style:--stock-scale={scale}
+    style:--overlay-scale={scale}
     aria-label={st('enh.stock.aria')}
   >
     {#each groups as group (group.key)}
@@ -103,40 +102,22 @@
    * `pointer-events: none` is not cosmetic: the viewport underneath carries panning, zoom and every
    * click. Without it the overlay would eat clicks in its corner and one could not build there.
    *
+   * WHERE it sits is not decided here — `GameOverlays` stacks the plates of one corner.
+   *
    * Padding and gaps are in the same factor as the pictures, so the plate grows as ONE piece rather
    * than as icons drifting apart inside a frame that stays put.
    */
   .overview {
-    position: absolute;
     display: flex;
     flex-direction: column;
-    gap: calc(0.4rem * var(--stock-scale));
-    /* Wide enough for a full strip at twelve entries; beyond that the plate would be cut off. */
-    max-width: 92%;
-    max-height: 80%;
-    padding: calc(0.35rem * var(--stock-scale)) calc(0.45rem * var(--stock-scale));
+    gap: calc(0.4rem * var(--overlay-scale));
+    max-width: 100%;
+    padding: calc(0.35rem * var(--overlay-scale)) calc(0.45rem * var(--overlay-scale));
     background: color-mix(in srgb, var(--bg-sunken) calc(var(--plate-opacity) * 100%), transparent);
     border: 1px solid color-mix(in srgb, var(--line) calc(var(--plate-opacity) * 100%), transparent);
     pointer-events: none;
     user-select: none;
     overflow: hidden;
-  }
-
-  .tl {
-    top: 0.5rem;
-    left: 0.5rem;
-  }
-  .tr {
-    top: 0.5rem;
-    right: 0.5rem;
-  }
-  .bl {
-    bottom: 0.5rem;
-    left: 0.5rem;
-  }
-  .br {
-    bottom: 0.5rem;
-    right: 0.5rem;
   }
 
   /*
@@ -146,21 +127,21 @@
   ul {
     display: grid;
     grid-template-columns: repeat(var(--per-row), max-content);
-    gap: calc(0.15rem * var(--stock-scale)) calc(0.6rem * var(--stock-scale));
+    gap: calc(0.15rem * var(--overlay-scale)) calc(0.6rem * var(--overlay-scale));
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   ul + ul {
-    padding-top: calc(0.35rem * var(--stock-scale));
+    padding-top: calc(0.35rem * var(--overlay-scale));
     border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
   }
 
   li {
     display: flex;
     align-items: center;
-    gap: calc(0.2rem * var(--stock-scale));
+    gap: calc(0.2rem * var(--overlay-scale));
   }
 
   /*
@@ -179,13 +160,12 @@
 
   /*
    * The number carries the information, so it grows with the picture — a triple-size icon beside
-   * thirteen-pixel text would be the wrong half enlarged. `min-width` keeps the column from jumping
-   * on every step from 9 to 10.
+   * thirteen-pixel text would be the wrong half enlarged; that growth comes from `.game-overlay`
+   * on the plate. `min-width` keeps the column from jumping on every step from 9 to 10.
    */
   .value {
     min-width: 2ch;
     color: var(--fg);
-    font-size: calc(1rem * var(--stock-scale));
     font-variant-numeric: tabular-nums;
   }
 </style>

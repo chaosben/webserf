@@ -66,6 +66,18 @@
 		image-rendering: pixelated;
 	}
 
+	/*
+	 * The text size of OUR OWN overlays over the game surface, defined once.
+	 *
+	 * Every one of them takes the control bar's scale (`uiScaleFor`) and nothing else, so it grows
+	 * and shrinks with the map exactly as the bar does. Writing the same `calc` in each plate would
+	 * be two rules that merely happen to agree today; this is one rule they share. Buttons inside
+	 * pick it up through `font: inherit` below, which is why a switch is the size of a readout.
+	 */
+	:global(.game-overlay) {
+		font-size: calc(1rem * var(--overlay-scale, 1));
+	}
+
 	:global(button) {
 		font: inherit;
 		color: inherit;

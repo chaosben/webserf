@@ -129,6 +129,7 @@ function input(over: Partial<DebugReportInput> = {}): DebugReportInput {
       playing: true,
       barIcons: [1, 2, 3, 4, 5],
       marked: { col: 1, row: 0 },
+      hacks: [],
     },
     ...over,
   };
@@ -298,6 +299,20 @@ describe('buildDebugReport — what actually ends up in the package', () => {
     expect(md).toContain('zoom 200 %');
     // And how it got there.
     expect(md).toContain('tick 100: `placeBuilding`');
+  });
+
+  /**
+   * The hacks draw onto the canvas, so they are in the screenshot while the save carries nothing of
+   * them. A report that stays silent about that sends the reader hunting an engine fault.
+   */
+  it('names the hacks in force — the picture shows what the save does not', async () => {
+    expect(await mdOf()).toContain('- hacks none');
+
+    const md = await mdOf({
+      view: { ...input().view, hacks: ['minerals'] }
+    });
+    expect(md).toContain('- hacks minerals');
+    expect(md).toContain('not in the save game');
   });
 
   it('marks rejected commands visibly (often the interesting case)', async () => {

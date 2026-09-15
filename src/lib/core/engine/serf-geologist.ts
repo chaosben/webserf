@@ -16,14 +16,14 @@
  * hits two existing signs, at which point `Walking` (dir1 = -2) takes it back into the network.
  *
  * ## Mineral sign encoding
- * Mineral byte `(mineral<<5)|amount`; sign sprite `0x6e + mineral*2 (+1 if amount < 12)` — gold
- * 0x70/0x71, iron 0x72/0x73, coal 0x74/0x75, stone 0x76/0x77; "empty" = 0x78.
+ * In `mineral-sign.ts` — the map display needs the same rule and must not restate it.
  */
 
 import { i8, subU16 } from './int.js';
 import { posOf, neighbor, Direction } from './position.js';
 import { SPIRAL_PATTERN, spiralPos } from './spiral.js';
 import { addPlayerMessage } from './player-messages.js';
+import { MINERAL_SIGN_NOTHING, mineralSignObject } from './mineral-sign.js';
 import type { GameState, Serf } from './state.js';
 
 /**
@@ -79,15 +79,11 @@ export function samplingGeoSpot(state: GameState, serf: Serf): void {
     const pos = posOf(serf.col, serf.row, geo);
     const tile = state.mapTiles[pos];
     if (tile.object === 0) {
-      const mineralByte = ((tile.mineral & 7) << 5) | (tile.resourceAmount & 0x1f);
-      if (mineralByte === 0) {
-        tile.object = 0x78; // „nichts gefunden"-Schild
+      const sign = mineralSignObject(tile.mineral, tile.resourceAmount);
+      if (sign === MINERAL_SIGN_NOTHING) {
+        tile.object = MINERAL_SIGN_NOTHING;
       } else {
-        const amount = mineralByte & 0x1f;
-        let signOff = (mineralByte & 0xe0) >> 4; // = mineral·2
-        if (amount < 0xc) signOff += 1; // kleines Vorkommen → +1
-        sd(serf, NEG_DIST1, 0xff); // toggle ~0 (beprobt-Marker)
-        const sign = (signOff + 0x6e) & 0xff; // 0x70..0x77
+        sd(serf, NEG_DIST1, 0xff); // toggle ~0 (sampled marker)
         tile.object = sign;
         serf.animation = 0x8e;
  // Scan the 59 nearest spiral neighbours for a sign of the same kind (`&0x7e` = mineral type without size).

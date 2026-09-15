@@ -25,10 +25,6 @@ export const GOOD_SLOTS = RESOURCE_TYPE_NAMES.length;
 /** Selectable serf types: 0..26 — type 27 ("dead") is not a profession. */
 export const SERF_SLOTS = SERF_TYPE_NAMES.length - 1;
 
-/** Which corner of the game surface the overlay sits in. */
-export const STOCK_CORNERS = ['tl', 'tr', 'bl', 'br'] as const;
-export type StockCorner = (typeof STOCK_CORNERS)[number];
-
 /**
  * What the serf numbers mean.
  *
@@ -59,11 +55,10 @@ export const STOCK_PER_ROW_DEFAULT = 1;
  * step 1 and given an explicit, whole-pixel size on the `<img>`, which the browser then scales
  * nearest-neighbour. That is the same treatment the bar gets on the canvas, and the rounding is the
  * same rule as `originBoxRect`.
+ *
+ * Corner and opacity are not here either — both overlays of ours ask the same two questions, and
+ * they are asked once in `overlay-place.ts`.
  */
-
-export const STOCK_OPACITY_MIN = 0.2;
-export const STOCK_OPACITY_MAX = 1;
-export const STOCK_OPACITY_DEFAULT = 0.8;
 
 /**
  * How long one displayed set of numbers stands, in wall-clock milliseconds.

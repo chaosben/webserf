@@ -95,11 +95,28 @@ describe('tables', () => {
 			expect(marks(SHELL_TABLES.de[k]), `placeholders in ${k}`).toEqual(marks(SHELL_TABLES.en[k]));
 	});
 
+	/**
+	 * Words that read the same in both languages — named, not counted.
+	 *
+	 * A ceiling ("fewer than six identical") says nothing about WHICH line is identical and grows
+	 * stale with the table: the next honest loan word pushes it over, and raising it then hides a
+	 * line that really was copied. Each entry here has to earn its place.
+	 */
+	const SAME_IN_BOTH: readonly ShellKey[] = [
+		'saves.empty', // an em dash
+		'set.simulation',
+		'set.pause',
+		'enh.place.corner',
+		'record.videoTitle',
+		'enh.hacks.name', // loan word — "Hacks" is what they are called in German too
+		'enh.hacks.tab.list'
+	];
+
 	it('really differ — otherwise one side was copied', () => {
-		// Proper nouns and symbols may stay identical. Everything else has to differ, otherwise the
-		// translation was not written but copied.
 		const same = keys.filter((k) => SHELL_TABLES.de[k] === SHELL_TABLES.en[k]);
-		expect(same.length, `identical: ${same.join(', ')}`).toBeLessThan(6);
+		expect(same.slice().sort(), 'identical lines not listed as loan words').toEqual(
+			SAME_IN_BOTH.slice().sort()
+		);
 	});
 });
 

@@ -40,6 +40,10 @@ export const RENDER_PHASES = [
   'terrain',
   'entities',
   'overlays',
+  // Ours, and only measured while a hack is on. It sits outside `overlays` on purpose: that
+  // phase is the original's cursor and build helper, and one number swallowing the other
+  // would hide exactly the cost this switch adds.
+  'hacks',
   'rgba',
   'upload',
   'scale',
@@ -71,6 +75,7 @@ export const PHASE_LABEL: Record<RenderPhase, string> = {
   terrain: 'ground (retained)',
   entities: 'entities',
   overlays: 'cursor / build helper',
+  hacks: 'hacks (ours)',
   rgba: 'palette → colour (CPU)',
   upload: 'putImageData',
   scale: 'drawImage (zoom)',

@@ -23,6 +23,8 @@ import type { ShellKey } from '../shell/i18n.js';
 import StockGoodsTab from './StockGoodsTab.svelte';
 import StockSerfsTab from './StockSerfsTab.svelte';
 import StockDisplayTab from './StockDisplayTab.svelte';
+import HacksTab from './HacksTab.svelte';
+import HacksDisplayTab from './HacksDisplayTab.svelte';
 
 /** A tab of the enhancements panel, plus the body it shows. */
 export interface EnhancementTab extends OverlayTab {
@@ -44,6 +46,14 @@ export const ENHANCEMENTS: readonly Enhancement[] = [
       { id: 'stock.goods', labelKey: 'enh.stock.tab.goods', panel: StockGoodsTab },
       { id: 'stock.serfs', labelKey: 'enh.stock.tab.serfs', panel: StockSerfsTab },
       { id: 'stock.view', labelKey: 'enh.stock.tab.view', panel: StockDisplayTab },
+    ],
+  },
+  {
+    id: 'hacks',
+    labelKey: 'enh.hacks.name',
+    tabs: [
+      { id: 'hacks.list', labelKey: 'enh.hacks.tab.list', panel: HacksTab },
+      { id: 'hacks.view', labelKey: 'enh.hacks.tab.view', panel: HacksDisplayTab },
     ],
   },
 ];

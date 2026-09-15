@@ -26,19 +26,21 @@ import { DEFAULT_TICKS_PER_SECOND } from '../core/engine/scheduler.js';
 import {
 	GOOD_SLOTS,
 	SERF_SLOTS,
-	STOCK_CORNERS,
 	STOCK_GOODS_DEFAULT,
-	STOCK_OPACITY_DEFAULT,
-	STOCK_OPACITY_MAX,
-	STOCK_OPACITY_MIN,
 	STOCK_PER_ROW_DEFAULT,
 	STOCK_PER_ROW_MAX,
 	STOCK_PER_ROW_MIN,
 	STOCK_SERFS_DEFAULT,
 	STOCK_SERF_MODES,
-	type StockCorner,
 	type StockSerfMode
 } from '../enhancements/stock-overview.js';
+import {
+	OVERLAY_CORNERS,
+	OVERLAY_OPACITY_DEFAULT,
+	OVERLAY_OPACITY_MAX,
+	OVERLAY_OPACITY_MIN,
+	type OverlayCorner
+} from '../enhancements/overlay-place.js';
 
 const KEY = 'webserf.settings';
 
@@ -85,14 +87,48 @@ export interface SettingsShape {
 	/** Which professions it lists — bit i = serf type i. */
 	stockSerfs: number;
 	/** Which corner of the game surface it sits in. */
-	stockCorner: StockCorner;
+	stockCorner: OverlayCorner;
 	/** What the serf numbers mean: resting in a store, or what could be made of the unemployed. */
 	stockSerfMode: StockSerfMode;
 	/** How opaque the backing plate is. */
 	stockOpacity: number;
 	/** How many entries stand side by side — the choice between a column and a strip. */
 	stockPerRow: number;
+
+	// -- Hacks. One boolean per hack, named `hack<Id>` — see `enhancements/hacks.ts`. ------------
+	/**
+	 * NOT a mask over the hack list: `stockGoods` may be one because its bit order is the original's
+	 * resource enum and cannot move, while the order of our own hacks can. Dropping a hack would
+	 * silently re-point every stored bit above it, and a validator reading "a number below 2^n"
+	 * could not tell. One field per hack is additive as well, so adding one costs no version bump.
+	 */
+	/**
+	 * TWO fields per hack, and they are not the same question: `hackShow<Id>` gives it a switch in
+	 * the overlay over the game view, `hack<Id>` is that switch. A hack out of the overlay is out
+	 * of force as well (`hackActive` in `enhancements/hacks.ts`), so none can keep drawing where
+	 * nobody can reach it.
+	 */
+	// -- Where the hack switches sit. Named after the enhancement, like `stock…` — and deliberately
+	// `hacks…` and not `hack…`: the latter spelling names a HACK (see `HackSettingKey`).
+	hacksCorner: OverlayCorner;
+	hacksOpacity: number;
+
+	/** Listed in the hack overlay. */
+	hackShowMinerals: boolean;
+	/** Signs on every tile carrying a deposit. */
+	hackMinerals: boolean;
 }
+
+/**
+ * The settings fields whose name begins with `hack`. The name carries the rule: `hacks.ts` binds
+ * each hack's id to `hack<Id>` and `hackShow<Id>`, so `music` and `sfx` are out of reach even
+ * though they are booleans too.
+ *
+ * `hacksCorner`/`hacksOpacity` fall in here by spelling and match neither template — `Capitalize`
+ * of an id always yields a capital letter, and those two carry a lowercase `s`. They are the
+ * enhancement's own, not a hack's.
+ */
+export type HackSettingKey = Extract<keyof SettingsShape, `hack${string}`>;
 
 const DEFAULTS: SettingsShape = {
 	drawerGroup: null,
@@ -105,8 +141,17 @@ const DEFAULTS: SettingsShape = {
 	stockSerfs: STOCK_SERFS_DEFAULT,
 	stockCorner: 'tl',
 	stockSerfMode: 'idle',
-	stockOpacity: STOCK_OPACITY_DEFAULT,
-	stockPerRow: STOCK_PER_ROW_DEFAULT
+	stockOpacity: OVERLAY_OPACITY_DEFAULT,
+	stockPerRow: STOCK_PER_ROW_DEFAULT,
+	// The opposite corner to the stock overview's default: the two plates are the only things of
+	// ours over the game surface, and out of the box they must not sit on top of each other.
+	hacksCorner: 'tr',
+	hacksOpacity: OVERLAY_OPACITY_DEFAULT,
+	// Every enhancement ships switched off — an addition of ours must not appear over the game
+	// screen until someone asks for it. That holds for both halves: no switch in the overlay,
+	// and the switch itself off.
+	hackShowMinerals: false,
+	hackMinerals: false
 };
 
 /**
@@ -142,15 +187,20 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	viewOptions: (v): v is [number, number] => Array.isArray(v) && v.length === 2 && v.every(isByte),
 	stockGoods: (v): v is number => isMask(v, GOOD_SLOTS),
 	stockSerfs: (v): v is number => isMask(v, SERF_SLOTS),
-	stockCorner: (v): v is StockCorner => isOneOf(v, STOCK_CORNERS),
+	stockCorner: (v): v is OverlayCorner => isOneOf(v, OVERLAY_CORNERS),
 	stockSerfMode: (v): v is StockSerfMode => isOneOf(v, STOCK_SERF_MODES),
 	stockOpacity: (v): v is number =>
-		typeof v === 'number' && v >= STOCK_OPACITY_MIN && v <= STOCK_OPACITY_MAX,
+		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
 	stockPerRow: (v): v is number =>
 		typeof v === 'number' &&
 		Number.isInteger(v) &&
 		v >= STOCK_PER_ROW_MIN &&
-		v <= STOCK_PER_ROW_MAX
+		v <= STOCK_PER_ROW_MAX,
+	hacksCorner: (v): v is OverlayCorner => isOneOf(v, OVERLAY_CORNERS),
+	hacksOpacity: (v): v is number =>
+		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
+	hackShowMinerals: (v): v is boolean => typeof v === 'boolean',
+	hackMinerals: (v): v is boolean => typeof v === 'boolean'
 };
 
 function read(): SettingsShape {

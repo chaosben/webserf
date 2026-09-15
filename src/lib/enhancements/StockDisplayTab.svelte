@@ -1,44 +1,20 @@
 <script lang="ts">
-  /** Where the stock overview sits, how wide it runs and how far it shows through. */
-  import {
-    STOCK_CORNERS,
-    STOCK_OPACITY_MAX,
-    STOCK_OPACITY_MIN,
-    STOCK_PER_ROW_MAX,
-    STOCK_PER_ROW_MIN,
-    type StockCorner,
-  } from "./stock-overview.js";
-  import { settings } from "../settings/settings.svelte.js";
-  import { st } from "../shell/i18n.js";
-
-  const CORNER_LABEL = {
-    tl: "enh.corner.tl",
-    tr: "enh.corner.tr",
-    bl: "enh.corner.bl",
-    br: "enh.corner.br",
-  } as const satisfies Record<StockCorner, Parameters<typeof st>[0]>;
-
-  const percent = $derived(Math.round(settings.value.stockOpacity * 100));
+  /** Where the stock overview sits, how far it shows through and how wide it runs. */
+  import OverlayPlacement from './OverlayPlacement.svelte';
+  import { STOCK_PER_ROW_MAX, STOCK_PER_ROW_MIN } from './stock-overview.js';
+  import { settings } from '../settings/settings.svelte.js';
+  import { st } from '../shell/i18n.js';
 </script>
 
-<section>
-  <h3>{st("enh.stock.view.corner")}</h3>
-  <div class="row">
-    {#each STOCK_CORNERS as corner (corner)}
-      <button
-        type="button"
-        class:on={settings.value.stockCorner === corner}
-        aria-pressed={settings.value.stockCorner === corner}
-        onclick={() => settings.set("stockCorner", corner)}
-      >
-        {st(CORNER_LABEL[corner])}
-      </button>
-    {/each}
-  </div>
-</section>
+<OverlayPlacement
+  corner={settings.value.stockCorner}
+  opacity={settings.value.stockOpacity}
+  oncorner={(corner) => settings.set('stockCorner', corner)}
+  onopacity={(opacity) => settings.set('stockOpacity', opacity)}
+/>
 
 <section>
-  <h3>{st("enh.stock.view.perRow")}</h3>
+  <h3>{st('enh.stock.view.perRow')}</h3>
   <div class="row">
     <input
       type="range"
@@ -46,37 +22,18 @@
       max={STOCK_PER_ROW_MAX}
       step="1"
       value={settings.value.stockPerRow}
-      aria-label={st("enh.stock.view.perRow")}
-      oninput={(e) => settings.set("stockPerRow", Number(e.currentTarget.value))}
+      aria-label={st('enh.stock.view.perRow')}
+      oninput={(e) => settings.set('stockPerRow', Number(e.currentTarget.value))}
     />
     <span class="note">{settings.value.stockPerRow}</span>
   </div>
-  <p class="note">{st("enh.stock.view.perRowNote")}</p>
-</section>
-
-<section>
-  <h3>{st("enh.stock.view.opacity")}</h3>
-  <div class="row">
-    <input
-      type="range"
-      min={STOCK_OPACITY_MIN}
-      max={STOCK_OPACITY_MAX}
-      step="0.05"
-      value={settings.value.stockOpacity}
-      aria-label={st("enh.stock.view.opacity")}
-      oninput={(e) => settings.set("stockOpacity", Number(e.currentTarget.value))}
-    />
-    <span class="note">{percent} %</span>
-  </div>
+  <p class="note">{st('enh.stock.view.perRowNote')}</p>
 </section>
 
 <style>
   section {
     display: grid;
     gap: 0.5rem;
-  }
-
-  section + section {
     padding-top: 0.9rem;
     border-top: 1px solid var(--line);
   }
@@ -94,11 +51,6 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-  }
-
-  button.on {
-    border-color: var(--accent);
-    color: var(--accent);
   }
 
   .note {

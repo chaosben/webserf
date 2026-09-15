@@ -74,9 +74,10 @@ describe('enhancementTabFor', () => {
    * reset code anywhere.
    */
   it('lands on the new first tab when the remembered id belongs to another enhancement', () => {
-    const foreign = ALL_TABS.find((t) => !ENHANCEMENTS[0]!.tabs.includes(t));
     const enh = ENHANCEMENTS[0]!;
-    // With only one enhancement registered, an invented foreign id serves the same purpose.
-    expect(enhancementTabFor(enh, foreign?.id ?? 'other.tab')).toBe(enh.tabs[0]);
+    const foreign = ALL_TABS.find((t) => !enh.tabs.includes(t));
+    // A real id from a real neighbour — the situation this fallback exists for.
+    expect(foreign, 'needs a second enhancement to be a real case').toBeDefined();
+    expect(enhancementTabFor(enh, foreign!.id)).toBe(enh.tabs[0]);
   });
 });

@@ -53,6 +53,12 @@ export interface DebugViewContext {
   readonly playing: boolean;
   readonly barIcons: readonly (number | undefined)[];
   readonly marked: { col: number; row: number } | null;
+  /**
+   * The hacks in force (`enhancements/hacks.ts`). They draw onto the canvas, so they are IN the
+   * screenshot — without this line a picture full of mineral signs reads as an engine fault, while
+   * the save carries no such object at all.
+   */
+  readonly hacks: readonly string[];
 }
 
 export interface DebugReportInput {
@@ -272,6 +278,8 @@ function buildReport(input: DebugReportInput, id: string): string {
       `map view ${view.previewOpen ? 'open' : 'closed'} · road building ${view.roadBuilding ? 'active' : 'off'} · ` +
       `simulation ${view.playing ? 'running' : 'paused'}`,
     `- panel icons [${view.barIcons.map((i) => (i === undefined ? '—' : `0x${i.toString(16)}`)).join(', ')}]`,
+    `- hacks ${view.hacks.length === 0 ? 'none' : view.hacks.join(', ')}` +
+      (view.hacks.length === 0 ? '' : ' (drawn over the map — not in the save game)'),
   );
   if (input.render !== undefined) lines.push(...renderCostLines(input.render));
   lines.push(

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { samplingGeoSpot, lookingForGeoSpot } from './serf-geologist.js';
+import { mineralSignObject, MINERAL_SIGN_NOTHING } from './mineral-sign.js';
 import { mapGeometry, posOf } from './position.js';
 import { Rng } from './rng.js';
 import type { GameState, Serf, Tile } from './state.js';
@@ -184,5 +185,53 @@ describe('serf-geologist — LookingForGeoSpot (42)', () => {
 
     expect(serf.state).toBe(2); // Walking (aborted after 2 signs)
     expect((serf.stateData[0] << 24) >> 24).toBe(-2);
+  });
+});
+
+/**
+ * The map display shows the sign a geologist WOULD plant, and asks `mineral-sign.ts` for it. That
+ * only holds as long as the geologist asks the same module — so the equivalence is proven over the
+ * whole input range instead of being asserted in a comment.
+ */
+describe('serf-geologist — the planted sign is exactly `mineralSignObject`', () => {
+  it('agrees over every mineral and every amount', () => {
+    for (let mineral = 0; mineral <= 4; mineral++) {
+      for (let amount = 0; amount <= 31; amount++) {
+        const state = makeState();
+        const pos = posOf(20, 20, geo);
+        state.mapTiles[pos] = tile({ mineral, resourceAmount: amount });
+        const serf = mkSerf({ index: 5, type: 20, stateData: [0, 0, 0, 0, 0] });
+
+        samplingGeoSpot(state, serf);
+
+        expect(state.mapTiles[pos].object, `mineral ${mineral}, amount ${amount}`).toBe(
+          mineralSignObject(mineral, amount),
+        );
+      }
+    }
+  });
+
+  /**
+   * The quirk a caller other than the geologist walks into: the zero test is on the WHOLE byte, so
+   * a tile with no mineral but an amount — the fish encoding — yields ripe grain, not a sign. The
+   * geologist never reaches it (he samples mountain terrain only); a pass over every tile has to
+   * gate on `mineral !== 0` itself.
+   */
+  it('no mineral but an amount -> ripe grain, not the nothing-found sign', () => {
+    for (const [amount, object] of [
+      [20, 0x6e], // >= 12 behaves like a "large" deposit
+      [5, 0x6f], // < 12 adds the small-circle offset
+    ] as const) {
+      const state = makeState();
+      const pos = posOf(20, 20, geo);
+      state.mapTiles[pos] = tile({ mineral: 0, resourceAmount: amount });
+      const serf = mkSerf({ index: 5, type: 20, stateData: [0, 0, 0, 0, 0] });
+
+      samplingGeoSpot(state, serf);
+
+      expect(state.mapTiles[pos].object, `amount ${amount}`).toBe(object);
+      expect(mineralSignObject(0, amount)).toBe(object);
+    }
+    expect(mineralSignObject(0, 0)).toBe(MINERAL_SIGN_NOTHING);
   });
 });

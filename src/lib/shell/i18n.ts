@@ -232,14 +232,23 @@ const EN = {
 		'“Could be made” adds the unemployed settlers to every profession whose tool lies in the store. ' +
 		'One settler therefore counts in several rows — the question is “how many of these could I ' +
 		'have”, not “how would they divide up”.',	
-	'enh.stock.view.corner': 'Position',
 	'enh.stock.view.perRow': 'Entries per row',
 	'enh.stock.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
-	'enh.stock.view.opacity': 'Opacity',
+	// Shared by every overlay of ours — see `enhancements/overlay-place.ts`.
+	'enh.place.corner': 'Position',
+	'enh.place.opacity': 'Opacity',
 	'enh.corner.tl': 'Top left',
 	'enh.corner.tr': 'Top right',
 	'enh.corner.bl': 'Bottom left',
 	'enh.corner.br': 'Bottom right',
+	'enh.hacks.name': 'Hacks',
+	'enh.hacks.tab.list': 'Hacks',
+	'enh.hacks.tab.view': 'Display',
+	'enh.hacks.title': 'Show',
+	'enh.hacks.note': 'Use them via the overlay',
+	'enh.hacks.minerals': 'All mineral deposits',
+	'enh.hacks.minerals.note':
+		'The sign a geologist would plant',
 
 	// -- Screen-reader labels for the game surfaces --------------------------------------------
 	// These are OURS, not the original's: the original has none. That is why they live here and not
@@ -434,15 +443,23 @@ const DE: Record<ShellKey, string> = {
 		'„Wer daraus werden könnte“ rechnet die freien Siedler jedem Beruf zu, dessen Werkzeug im Lager ' +
 		'liegt. Ein Siedler zählt damit in mehreren Zeilen — gefragt ist „wie viele davon könnte ich ' +
 		'haben“, nicht „wie würden sie sich aufteilen“.',	
-	'enh.stock.view.corner': 'Position',
 	'enh.stock.view.perRow': 'Einträge je Zeile',
 	'enh.stock.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
-	'enh.stock.view.opacity': 'Deckkraft',
+	'enh.place.corner': 'Position',
+	'enh.place.opacity': 'Deckkraft',
 	'enh.corner.tl': 'Oben links',
 	'enh.corner.tr': 'Oben rechts',
 	'enh.corner.bl': 'Unten links',
 	'enh.corner.br': 'Unten rechts',
-
+	'enh.hacks.name': 'Hacks',
+	'enh.hacks.tab.list': 'Hacks',
+	'enh.hacks.tab.view': 'Darstellung',
+	'enh.hacks.title': 'Anzeigen',
+	'enh.hacks.note':
+		'Nutze sie über das Overlay',
+	'enh.hacks.minerals': 'Alle Bodenschätze',
+	'enh.hacks.minerals.note':
+		'Das Schild, das ein Geologe aufstellen würde',
 	'record.stillTitle': 'Bildschirmfoto',
 	'record.stillNote':
 		'Aufgenommen, als dieses Fenster aufging — Karte, Bedienleiste und ein offenes Fenster, so wie sie gezeichnet waren.',

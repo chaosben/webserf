@@ -43,7 +43,7 @@
   import { demolishOutcomeAt } from '../core/engine/demolish.js';
   import EndCreditsView from './EndCreditsView.svelte';
   import TextEntryField from './TextEntryField.svelte';
-  import StockOverlay from '../enhancements/StockOverlay.svelte';
+  import GameOverlays from '../enhancements/GameOverlays.svelte';
   import {
     buildStockView,
     stockRefreshDue,
@@ -95,6 +95,7 @@
   import { st } from '../shell/i18n.js';
   import { metrics } from './render-metrics.js';
   import { settings, ticksPerSecondOf } from '../settings/settings.svelte.js';
+  import { activeHackIds, hackInForce } from '../enhancements/hacks.js';
   import { logicFrame, runTicks } from '../core/engine/tick.js';
   import { missionEndScreenDue, writeMissionEndPassword } from '../core/engine/economy.js';
   import {
@@ -776,6 +777,7 @@
         playing,
         barIcons: barIcons.slice(),
         marked: selected,
+        hacks: activeHackIds(settings.value),
       },
     });
   }
@@ -3569,6 +3571,12 @@
         serfs: showSerfs,
         roads: showRoads,
       },
+      // Read straight here on purpose: the effect already re-runs on every signal it touches, so
+      // the checkbox takes effect with the next frame. A derived would need the early return BEFORE
+      // `void frameVersion` to avoid running a hundred times a second for nothing.
+      // A hack is in force only while it also has a switch in the overlay — `hackInForce` holds that
+      // one rule, so it cannot drift apart from what the bug report reports.
+      hacks: { minerals: hackInForce(settings.value, 'minerals') },
       buildHelper,
       buildPlayer,
       selected,
@@ -4423,16 +4431,10 @@
       active={disk?.nameInput != null}
       onkey={runDiskKey}
     />
-    <!-- Our own readout, and the one thing to know about it: it is a DOM layer, so it is NOT in a
-         screenshot or a screen recording, which see the canvas alone. It sits before the end
-         credits so that those, which take the whole stage, cover it. -->
-    <StockOverlay
-      view={stockView}
-      corner={settings.value.stockCorner}
-      opacity={settings.value.stockOpacity}
-      perRow={settings.value.stockPerRow}
-      scale={uiScale}
-    />
+    <!-- Our own plates, and the one thing to know about them: they are a DOM layer, so they are NOT
+         in a screenshot or a screen recording, which see the canvas alone — but what a hack DRAWS
+         is. They sit before the end credits so that those, which take the whole stage, cover them. -->
+    <GameOverlays {stockView} scale={uiScale} />
     {#if showEndCredits && archive !== null}
       <!-- The end credits (`run_end_credits` @0x38b55): a full-screen sequence on a 352 × 240 surface
            of its own, not abortable, about 75 seconds. It covers the whole game screen because the

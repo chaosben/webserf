@@ -89,7 +89,13 @@ describe('settings store', () => {
 		['an opacity outside 0.2..1', { stockOpacity: 5 }, 'stockOpacity'],
 		['no entry per row at all', { stockPerRow: 0 }, 'stockPerRow'],
 		['more entries per row than offered', { stockPerRow: 13 }, 'stockPerRow'],
-		['a fractional row width', { stockPerRow: 1.5 }, 'stockPerRow']
+		['a fractional row width', { stockPerRow: 1.5 }, 'stockPerRow'],
+		// A hack switch is a boolean and nothing else — a truthy string must not turn one on.
+		['a hack switched on with a string', { hackMinerals: 'yes' }, 'hackMinerals'],
+		['a hack switched on with a number', { hackMinerals: 1 }, 'hackMinerals'],
+		['a hack listed with a string', { hackShowMinerals: 'yes' }, 'hackShowMinerals'],
+		['a corner the hack plate cannot sit in', { hacksCorner: 'middle' }, 'hacksCorner'],
+		['a hack plate faded to nothing', { hacksOpacity: 0 }, 'hacksOpacity']
 	])('rejects %s', async (_name, data, key) => {
 		const { settings, defaults } = await load({ v: 6, data });
 		expect(settings.value[key as keyof typeof defaults]).toEqual(

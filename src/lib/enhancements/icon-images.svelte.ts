@@ -1,5 +1,5 @@
 /**
- * Original UI icons as pictures the DOM can show.
+ * Original sprites as pictures the DOM can show.
  *
  * Two users that never meet: the overlay over the game surface, and the pickers inside the
  * enhancements dialog. Neither has the archive to hand — the overlay lives in the game view, the
@@ -11,6 +11,7 @@
  * a picker lists more than fifty of them and is re-rendered on every click.
  */
 import { decodeSprite } from '../core/sprite-decoder.js';
+import { mapObjectSprite } from '../core/map-render.js';
 import { UI_ICON_BASE } from '../core/ui-render.js';
 import { spriteCanvas } from '../views/sprite-image.js';
 import type { PaArchive } from '../core/pa-parser.js';
@@ -41,17 +42,18 @@ export interface IconImage {
  * pass, the first time a picture is asked for. A reactive map would turn that into a state change
  * while rendering. The reactivity lives in {@link source}, which changes only when the archive does.
  *
- * Keyed by icon AND step, because the same icon is shown at several sizes at once (the dialog at a
- * fixed step, the readout at its own). {@link cacheKey} has to be injective over that pair — a
- * collision would put a neighbour's picture on an entry.
+ * Keyed by the ARCHIVE ENTRY and the step, because the same picture is shown at several sizes at
+ * once (the dialog at a fixed step, the readout at its own) and because two banks are in play — a
+ * key built from a bank-relative number would put a map object on a UI icon. {@link cacheKey} has
+ * to be injective over that pair.
  */
 const images = new Map<number, IconImage | null>();
 
 /** The highest step any caller may ask for; the key arithmetic below rests on it. */
 export const ICON_SCALE_MAX = 4;
 
-export const cacheKey = (bankIcon: number, scale: number): number =>
-  bankIcon * (ICON_SCALE_MAX + 1) + scale;
+export const cacheKey = (entry: number, scale: number): number =>
+  entry * (ICON_SCALE_MAX + 1) + scale;
 
 /**
  * Step of the pickers in the dialog. Fixed rather than settable: there the picture has to be big
@@ -71,26 +73,25 @@ export function provideIconSource(archive: PaArchive, palette: Palette): () => v
 }
 
 /**
- * A bank-relative UI icon, rendered at a WHOLE step — `null` without a source, without a 2D
- * context, or for an empty archive slot. Callers fall back to the plain name then; an icon is never
- * the only carrier of meaning.
+ * An ABSOLUTE archive entry, rendered at a WHOLE step — `null` without a source, without a 2D
+ * context, or for an empty slot. Callers fall back to the plain name then; a picture is never the
+ * only carrier of meaning.
  *
  * The step is whole because that is the only factor `spriteCanvas` can blit without resampling. A
  * caller that wants a fractional size takes step 1 and gives the `<img>` an explicit pixel size
  * from {@link IconImage.width} — nearest-neighbour upscaling by the browser, which is what the
- * control bar does on the canvas too, and the reason the size is returned at all: the icons differ
+ * control bar does on the canvas too, and the reason the size is returned at all: the sprites differ
  * in size, so nobody could compute it from the outside.
  */
-export function iconImage(bankIcon: number, step = 1): IconImage | null {
+export function spriteImage(entry: number, step = 1): IconImage | null {
   const src = source;
   if (src === null || typeof document === 'undefined') return null;
   const s = Math.max(1, Math.min(ICON_SCALE_MAX, Math.floor(step)));
-  const key = cacheKey(bankIcon, s);
+  const key = cacheKey(entry, s);
   const hit = images.get(key);
   if (hit !== undefined) return hit;
   let image: IconImage | null = null;
   try {
-    const entry = UI_ICON_BASE + bankIcon;
     const raw = src.archive.getRaw(entry);
     if (raw !== null) {
       const sprite = decodeSprite(raw, src.palette, { physicalIndex: entry });
@@ -108,6 +109,23 @@ export function iconImage(bankIcon: number, step = 1): IconImage | null {
   }
   images.set(key, image);
   return image;
+}
+
+/** A bank-relative UI icon — the form every dialog and the readout use. */
+export function iconImage(bankIcon: number, step = 1): IconImage | null {
+  return spriteImage(UI_ICON_BASE + bankIcon, step);
+}
+
+/**
+ * A MAP OBJECT, the thing a hack shows on the map — the same picture the game draws out there.
+ *
+ * Tick 0 on purpose: `mapObjectSprite` animates only the first 0x18 objects (trees, water), and no
+ * caller here asks for one. A picture in a dialog that flickered with game time would be worse than
+ * one that stands still.
+ */
+export function mapObjectImage(object: number, step = 1): IconImage | null {
+  const entry = mapObjectSprite(object, 0);
+  return entry === null ? null : spriteImage(entry, step);
 }
 
 /** Just the picture, for callers that let the layout size it. */
