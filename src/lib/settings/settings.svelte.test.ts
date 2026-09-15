@@ -54,15 +54,39 @@ describe('settings store', () => {
 	 * A stored entry that still carries the fields of a removed panel must not bring them back —
 	 * otherwise the shape grows with every removed control, and `reset()` returns something other
 	 * than `read()`.
+	 *
+	 * `drawerGroup` is the live case: entries written before it moved into the page still carry it,
+	 * and reading it back would reopen a panel on every reload — exactly what it was taken out for.
+	 * That its removal needs no version bump is the same property seen from the other side.
 	 */
 	it('does not resurrect fields of a removed panel', async () => {
 		const { settings } = await load({
 			v: 6,
-			data: { consoleOpen: true, consoleHeight: 400, logLevel: 'debug', volume: 12 }
+			data: {
+				consoleOpen: true,
+				consoleHeight: 400,
+				logLevel: 'debug',
+				drawerGroup: 'io',
+				volume: 12
+			}
 		});
 		expect(Object.keys(settings.value)).not.toContain('consoleOpen');
 		expect(Object.keys(settings.value)).not.toContain('logLevel');
+		expect(Object.keys(settings.value)).not.toContain('drawerGroup');
 		expect(settings.value.volume).toBe(12); // the valid neighbour survives
+	});
+
+	/**
+	 * The class behind it, so the next panel state does not quietly land here: nothing persisted may
+	 * name a screen that is open. A setting says how the program behaves; what someone is looking at
+	 * belongs to the component that draws it and starts afresh on a reload.
+	 */
+	it('persists no "which screen is open" state', async () => {
+		const { defaults } = await load(undefined);
+		const named = Object.keys(defaults).filter((k) =>
+			/^(drawer|panel|overlay|dialog|tab)|(Open|Tab|Panel)$/.test(k)
+		);
+		expect(named).toEqual([]);
 	});
 
 	/**
@@ -77,7 +101,6 @@ describe('settings store', () => {
 		['viewOptions as an object', { viewOptions: { 0: 1, 1: 2 } }, 'viewOptions'],
 		['viewOptions too short', { viewOptions: [0x39] }, 'viewOptions'],
 		['viewOptions not a byte', { viewOptions: [0x39, 300] }, 'viewOptions'],
-		['drawer group as a number', { drawerGroup: 7 }, 'drawerGroup'],
 		// The stock overview. Every one of these would slip through `typeof v === 'number'` or
 		// `=== 'string'` — the shortcut the comment above `CHECK` rules out.
 		['a negative goods mask', { stockGoods: -1 }, 'stockGoods'],

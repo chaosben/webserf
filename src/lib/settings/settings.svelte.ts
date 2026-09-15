@@ -13,6 +13,10 @@
  * its state. Once a game runs the save game owns them, and a save loaded later brings its own — the
  * starting value then does not apply. It is persisted again when the in-game options screen changes
  * it.
+ *
+ * WHAT DOES NOT BELONG HERE: which panel is open. A setting answers "how should it behave", a panel
+ * answers "what am I looking at right now" — and reopening on its own after a reload is the second
+ * kind pretending to be the first. Such state lives in the component that owns the overlay.
  */
 import {
 	MUSIC_DEFAULT,
@@ -65,8 +69,6 @@ const VERSION = 6;
 export const SPEED_FACTORS: readonly number[] = [0.25, 0.5, 1, 2, 4, 8];
 
 export interface SettingsShape {
-	/** Drawer group opened last (`null` = collapsed). */
-	drawerGroup: string | null;
 	/** Multiple of the original tick rate; one of {@link SPEED_FACTORS}. */
 	speedFactor: number;
 	/** Background music on (original: `gs+0x1cb` bit 1). */
@@ -131,7 +133,6 @@ export interface SettingsShape {
 export type HackSettingKey = Extract<keyof SettingsShape, `hack${string}`>;
 
 const DEFAULTS: SettingsShape = {
-	drawerGroup: null,
 	speedFactor: 1,
 	music: MUSIC_DEFAULT,
 	sfx: SFX_DEFAULT,
@@ -178,7 +179,6 @@ const isOneOf = <T extends string>(v: unknown, values: readonly T[]): v is T =>
  * failure would surface far away from here.
  */
 const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K] } = {
-	drawerGroup: (v): v is string | null => v === null || typeof v === 'string',
 	speedFactor: (v): v is number => typeof v === 'number' && SPEED_FACTORS.includes(v),
 	music: (v): v is boolean => typeof v === 'boolean',
 	sfx: (v): v is boolean => typeof v === 'boolean',

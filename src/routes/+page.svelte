@@ -191,14 +191,13 @@
 				}
 	);
 	/**
-	 * The remembered group — but only if it still EXISTS. The id is persisted, and a group can
-	 * disappear between two versions ("developer tools" became "about webserf"): a stale id would
-	 * otherwise leave the rail unmarked and every overlay closed, which reads as "the drawer is
-	 * broken" rather than "that screen is gone".
+	 * Which drawer group is open (`null` = collapsed). Deliberately NOT persisted: a panel is what
+	 * you are looking at, not how the program should behave, and a reload is where you want the game
+	 * and not the screen you last read. Being session state also drops the guard the persisted id
+	 * needed — a stored group can vanish between two versions, a variable holding one of `GROUPS`
+	 * cannot.
 	 */
-	const activeGroup = $derived(
-		GROUPS.some((g) => g.id === settings.value.drawerGroup) ? settings.value.drawerGroup : null
-	);
+	let activeGroup = $state<string | null>(null);
 
 	function apply(loaded: PaArchive, name: string): void {
 		archive = loaded;
@@ -387,7 +386,7 @@
 		archiveName = null;
 		palettes = {};
 		game = null;
-		settings.set('drawerGroup', null);
+		activeGroup = null;
 		log.info('assets', 'Archive removed from the browser.');
 	}
 
@@ -487,7 +486,7 @@
 		groups={GROUPS}
 		active={activeGroup}
 		{marks}
-		onselect={(id) => settings.set('drawerGroup', id)}
+		onselect={(id) => (activeGroup = id)}
 	/>
 
 	<div class="stage">
@@ -540,7 +539,7 @@
 		{/if}
 
 		{#if activeGroup === 'settings'}
-			<OverlayPanel title={st('group.settings')} onclose={() => settings.set('drawerGroup', null)}>
+			<OverlayPanel title={st('group.settings')} onclose={() => (activeGroup = null)}>
 				<SettingsPanel />
 			</OverlayPanel>
 		{:else if activeGroup === 'io'}
@@ -549,7 +548,7 @@
 				tabs={IO_TABS}
 				tab={ioTab}
 				ontab={(id) => (ioTab = id)}
-				onclose={() => settings.set('drawerGroup', null)}
+				onclose={() => (activeGroup = null)}
 			>
 				{#if ioTab === 'saves'}
 					<SavesPanel store={saveStore} folder={saveDirName} />
@@ -592,11 +591,11 @@
 				{/if}
 			</OverlayPanel>
 		{:else if activeGroup === 'bug'}
-			<OverlayPanel title={st('group.bug')} onclose={() => settings.set('drawerGroup', null)}>
+			<OverlayPanel title={st('group.bug')} onclose={() => (activeGroup = null)}>
 				<BugReportPanel />
 			</OverlayPanel>
 		{:else if activeGroup === 'record'}
-			<OverlayPanel title={st('group.record')} onclose={() => settings.set('drawerGroup', null)}>
+			<OverlayPanel title={st('group.record')} onclose={() => (activeGroup = null)}>
 				<RecordingPanel />
 			</OverlayPanel>
 		{:else if activeGroup === 'enhance'}
@@ -605,7 +604,7 @@
 				tabs={enhancement.tabs}
 				tab={enhancementTabFor(enhancement, enhanceTab).id}
 				ontab={(id) => (enhanceTab = id)}
-				onclose={() => settings.set('drawerGroup', null)}
+				onclose={() => (activeGroup = null)}
 			>
 				{#snippet nav()}
 					<EnhancementNav
@@ -617,7 +616,7 @@
 				<EnhancementsPanel {enhancement} tab={enhanceTab} />
 			</OverlayPanel>
 		{:else if activeGroup === 'info'}
-			<OverlayPanel title={st('group.info')} onclose={() => settings.set('drawerGroup', null)}>
+			<OverlayPanel title={st('group.info')} onclose={() => (activeGroup = null)}>
 				<InfoPanel />
 			</OverlayPanel>
 		{/if}
