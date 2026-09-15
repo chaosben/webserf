@@ -92,6 +92,7 @@
   import { bugReports } from '../shell/bug-report.svelte.js';
   import { simulation } from '../shell/simulation.svelte.js';
   import { log } from '../shell/log.js';
+  import { buttonTransition } from './button-ledger.js';
   import { st } from '../shell/i18n.js';
   import { metrics } from './render-metrics.js';
   import { settings, ticksPerSecondOf } from '../settings/settings.svelte.js';
@@ -3729,16 +3730,30 @@
   /** Was the right button held while the left one was pressed? ⇒ special click (`vp[1]` bit 3). */
   let downSpecial = false;
   /**
-   * **Track the right button ourselves** instead of reading it from `e.buttons` per event.
-   *
-   * Once the right press has called `setPointerCapture()`, the left button's `pointerdown` no longer
-   * reaches our handler — `downSpecial` and the press point `downX/downY` would go stale, and the
-   * drag threshold discarded the click entirely. Reading the button here and the special click from
-   * the `click` event is the source that survives a capture; with one canvas for the whole game
-   * screen, bar and map are on it anyway.
+   * **Track the right button ourselves** instead of reading it from `e.buttons` per event: it is
+   * held across the whole gesture, and the events that report its rise and fall are not the ones a
+   * per-button reading would expect (see {@link heldButtons}). It is the fallback source of the
+   * special click for a `click` whose press we did not see.
    */
   let rightDown = false;
-  /** Did the left button deliver its `pointerdown` to us? ⇒ is `downX/downY` usable? */
+  /**
+   * **The button ledger.** A mouse fires `pointerdown` only for the FIRST button and `pointerup`
+   * only when the LAST one goes up — and that one event names the button released last. A button
+   * pressed or released in between arrives as a `pointermove` with a changed `buttons` and nothing
+   * else. The special click is exactly such an in-between press (right held, left pressed), so no
+   * `pointerdown` reports it; and the right button going up is invisible to `onPointerUp` whenever
+   * the left one outlives it, which would leave a pan running and `rightDown` standing.
+   */
+  let heldButtons = 0;
+  /**
+   * A special click was already answered on its PRESS, the way the original does it: the left press
+   * sets `vp[0]` bit 2 in its first frame and `vp[1]` bit 3 is read as a level, so the order in
+   * which the two buttons are let go carries no meaning. The browser's `click` must then not repeat
+   * it — and it need not arrive at all: letting go of the right button first fires `contextmenu`,
+   * and that swallows the pending click.
+   */
+  let specialPressDone = false;
+  /** Did we see the left press — as a `pointerdown` or through the ledger? ⇒ is `downX/downY` usable? */
   let sawLeftDown = false;
   /**
    * Did the press start on the control bar? With the bar drawn INTO the map canvas there is no
@@ -3747,8 +3762,6 @@
    * map area (`FUN_0000d630`).
    */
   let downOnBar = false;
-  /** Is a **left drag** running (touchpad pan, addition)? See `onPointerMove`. */
-  let leftDragging = false;
   /** The viewport itself — for pointer capture and the imperative `gesture*` listeners. */
   let viewportEl = $state<HTMLDivElement | null>(null);
   /** Up to this client pixel distance a left press still counts as a click. */
@@ -3807,16 +3820,71 @@
   }
 
   /** A capture is given back only while it is still ours — `pointercancel` has already taken it. */
-  function releaseCapture(el: HTMLElement | null, id: number): void {
+  function releaseCapture(id: number): void {
+    const el = viewportEl;
     if (el !== null && el.hasPointerCapture(id)) el.releasePointerCapture(id);
   }
 
-  /** Ends a running drag, whichever button or finger started it. */
-  function endDrag(el: HTMLElement | null): void {
-    if (dragPointerId !== null) releaseCapture(el, dragPointerId);
+  /**
+   * Ends a running drag, whichever button or finger started it. The element is not a parameter: a
+   * capture is always taken on the viewport, and a caller handing in a different one would leave it
+   * standing for good — `hasPointerCapture` would simply answer no and nothing would be released.
+   */
+  function endDrag(): void {
+    if (dragPointerId !== null) releaseCapture(dragPointerId);
     dragPointerId = null;
     dragMode = null;
-    leftDragging = false;
+  }
+
+  /**
+   * Button changes that reach us as a move instead of as a press or a release — see
+   * {@link heldButtons}. Touch stays out of it: there every finger is its own pointer with its own
+   * `pointerdown`, and the phase machine in `touch-gesture.ts` owns them.
+   */
+  function trackButtons(e: PointerEvent): void {
+    if (e.pointerType === 'touch') return;
+    if (e.buttons === heldButtons) return;
+    const change = buttonTransition(heldButtons, e.buttons);
+    heldButtons = e.buttons;
+    if (change.rightPressed) rightDown = true;
+    if (change.leftPressedWhileHeld) pressLeftWhileHeld(e);
+    if (change.rightReleased) releaseRight(e.clientX, e.clientY);
+    if (change.middleReleased) endDrag();
+  }
+
+  /**
+   * The left button pressed while another one is already down. With the right button that IS the
+   * special click, and it is answered here rather than at the release, because that is where the
+   * original answers it (see {@link specialPressDone}). No drag threshold applies: with the right
+   * button down the map is being pushed, so a left press is never the start of a left drag.
+   */
+  function pressLeftWhileHeld(e: PointerEvent): void {
+    sawLeftDown = true;
+    downOnBar = barPixel(e.clientX, e.clientY) !== null;
+    downSpecial = isSpecialModifier(e);
+    downX = e.clientX;
+    downY = e.clientY;
+    specialPressDone = downSpecial;
+    if (!downSpecial) return;
+    resumeAudio();
+    dispatchClickAt(e.clientX, e.clientY, true);
+  }
+
+  /** One place for the right button going up, whether it arrives as a release or as a move. */
+  function releaseRight(clientX: number, clientY: number): void {
+    rightDown = false;
+    endDrag();
+    // Right *clicked* (not dragged) ⇒ double-click detection like `vp[1]` bit 4/5 + `vp[0x9e]`:
+    // the second click within the window triggers the fast map click (option `vp[0x86]` bit 1).
+    if (Math.hypot(clientX - rightDownX, clientY - rightDownY) >= DRAG_THRESHOLD) return;
+    const now = performance.now();
+    const dt = now - lastRightClick;
+    if (dt >= DOUBLE_CLICK_MIN_MS && dt <= DOUBLE_CLICK_MAX_MS) {
+      lastRightClick = 0;
+      if (fastMapClickEnabled) fastMapClick();
+    } else {
+      lastRightClick = now;
+    }
   }
 
   function clearHold(): void {
@@ -3843,7 +3911,7 @@
       const r = touchTick(touch, performance.now(), TOUCH_HOLD_MS);
       touch = r.state;
       if (r.outcome?.kind !== 'hold') return;
-      endDrag(viewportEl);
+      endDrag();
       // The press point is the one the left-button branch recorded — client coordinates, which is
       // what the dispatcher takes.
       dispatchClickAt(downX, downY, true);
@@ -3851,9 +3919,9 @@
   }
 
   /** Grabs the scene point under the first midpoint; a running drag has to give way. */
-  function beginPinch(o: { dist: number; midX: number; midY: number }, el: HTMLElement | null): void {
+  function beginPinch(o: { dist: number; midX: number; midY: number }): void {
     clearHold();
-    endDrag(el);
+    endDrag();
     sawLeftDown = false;
     downOnBar = false;
     panRestX = 0;
@@ -3886,13 +3954,14 @@
 
   function onPointerDown(e: PointerEvent) {
     resumeAudio();
+    if (e.pointerType !== 'touch') heldButtons = e.buttons;
     if (e.pointerType === 'touch') {
       // The very first thing in the handler: two fingers landing in the same frame deliver two
       // `pointerdown`, and the second would otherwise overwrite the click ledger of the first.
       const r = touchDown(touch, e.pointerId, e.offsetX, e.offsetY, performance.now());
       touch = r.state;
       if (r.outcome?.kind === 'pinchStart') {
-        beginPinch(r.outcome, e.currentTarget as HTMLElement);
+        beginPinch(r.outcome);
         return;
       }
       // Only a single finger goes on as a left button. Anything else is a further finger or the tail
@@ -3907,17 +3976,19 @@
     // bit 1 is clear — so with a popup open nothing scrolls either. Middle button (button 1) =
     // grab pan (addition); `preventDefault` suppresses the browser autoscroll.
     if (e.button === 2 || e.button === 1) {
-      if (e.button === 2) rightDown = true;
+      if (e.button === 2) {
+        rightDown = true;
+        // Its press point belongs to the button, not to the map: the original counts the double
+        // click in the input layer (`vp[0x9e]`), which knows nothing about where the pointer is.
+        rightDownX = e.clientX;
+        rightDownY = e.clientY;
+      }
       // A press on the bar is not a map drag (see `downOnBar`). The right button still counts as
       // held: that posture IS the special click, and it belongs to the bar button underneath.
       if (barPixel(e.clientX, e.clientY) !== null) return;
       if (!mapAcceptsClicks) return;
       if (e.button === 1) e.preventDefault();
       dragMode = e.button === 2 ? 'push' : 'grab';
-      if (e.button === 2) {
-        rightDownX = e.clientX;
-        rightDownY = e.clientY;
-      }
       lastX = e.clientX;
       lastY = e.clientY;
       panRestX = 0;
@@ -3927,7 +3998,10 @@
       return;
     }
     if (e.button !== 0) return;
-    // Left button: click candidate. `e.buttons` bit 1 = right button held at the same time.
+    // Left button as the FIRST one down: an ordinary click candidate, answered at its release so the
+    // drag threshold can still discard it. A left press on top of another button goes elsewhere
+    // ({@link pressLeftWhileHeld}).
+    specialPressDone = false;
     sawLeftDown = true;
     downOnBar = barPixel(e.clientX, e.clientY) !== null;
     downSpecial = isSpecialModifier(e);
@@ -3955,6 +4029,8 @@
     return (e.buttons & 2) !== 0 || e.shiftKey || e.altKey;
   }
   function onPointerMove(e: PointerEvent) {
+    // Before anything else: a move is also how a second button arrives and how one goes up again.
+    trackButtons(e);
     // Pointer position for the screen recording. `offsetX/offsetY` and not a measured rectangle:
     // the canvas fills the viewport 1:1, so this is already the canvas pixel — and it costs no
     // layout, which matters at pointer-move rate. Only the primary pointer: with two fingers the
@@ -3983,7 +4059,6 @@
     if (dragMode === null && sawLeftDown && !downOnBar && (e.buttons & 1) !== 0 && mapAcceptsClicks) {
       if (Math.hypot(e.clientX - downX, e.clientY - downY) >= DRAG_THRESHOLD) {
         dragMode = 'grab';
-        leftDragging = true;
         lastX = e.clientX;
         lastY = e.clientY;
         panRestX = 0;
@@ -4037,32 +4112,19 @@
       clearHold();
       if (touch.phase === 'spent') {
         // Tail of a gesture: nothing pans, and the `click` that follows is swallowed in `onClick`.
-        endDrag(e.currentTarget as HTMLElement);
+        endDrag();
         return;
       }
     }
-    if (e.button === 2 || e.button === 1) {
-      if (e.button === 2) rightDown = false;
-      endDrag(e.currentTarget as HTMLElement);
-      // Right *clicked* (not dragged) ⇒ double-click detection like `vp[1]` bit 4/5 + `vp[0x9e]`:
-      // the second click within the window triggers the fast map click (option `vp[0x86]` bit 1).
-      if (e.button === 2 && Math.hypot(e.clientX - rightDownX, e.clientY - rightDownY) < DRAG_THRESHOLD) {
-        const now = performance.now();
-        const dt = now - lastRightClick;
-        if (dt >= DOUBLE_CLICK_MIN_MS && dt <= DOUBLE_CLICK_MAX_MS) {
-          lastRightClick = 0;
-          if (fastMapClickEnabled) fastMapClick();
-        } else {
-          lastRightClick = now;
-        }
-      }
+    // A mouse `pointerup` says that no button is left; which one it names is merely the one released
+    // last, so every other one has already passed the ledger.
+    if (e.pointerType !== 'touch') heldButtons = e.buttons;
+    if (e.button === 2) {
+      releaseRight(e.clientX, e.clientY);
       return;
     }
-    // Left button released: end a running left drag. The click is still suppressed by the 5 px
-    // threshold in the click dispatcher — nothing extra to do here.
-    if (e.button === 0 && leftDragging && dragPointerId === e.pointerId) {
-      endDrag(e.currentTarget as HTMLElement);
-    }
+    // Left or middle released last — a drag can belong to either, and to a finger as well.
+    if (dragPointerId === e.pointerId) endDrag();
   }
 
   /**
@@ -4075,17 +4137,19 @@
       if (touch.phase !== 'pinch') pinchStart = null;
     }
     clearHold();
-    if (dragPointerId === e.pointerId) endDrag(e.currentTarget as HTMLElement);
+    if (e.pointerType !== 'touch') heldButtons = e.buttons;
+    if (dragPointerId === e.pointerId) endDrag();
   }
 
   /**
-   * **Map click on the `click` event** — not on the left button's `pointerup`.
+   * **Map click on the `click` event** — not on the left button's `pointerup`: a left press that is
+   * the first button down keeps its click candidate until the release, so the drag threshold can
+   * still discard it, and `click` is the event that marks precisely that.
    *
-   * If the user holds the right button for the special click, its `pointerdown` has already called
-   * `setPointerCapture()`; the left button's `pointerdown`/`pointerup` pair then never reaches our
-   * handlers, so both the special-click state and the press point for the drag threshold were
-   * missing and the click expired silently. The `click` event does arrive and carries the still held
-   * right button in `e.buttons`.
+   * It is not a source the special click may rest on. A `click` is not delivered at all when the
+   * right button is let go while the left one is still down — that release fires `contextmenu`, and
+   * the pending click goes with it. The special click is therefore answered at its press
+   * ({@link pressLeftWhileHeld}), and what arrives here afterwards is its echo.
    *
    * No drag detection is needed here: a `click` only arises when the left button was pressed AND
    * released — a pure pan grip (right/middle button) produces none.
@@ -4140,6 +4204,14 @@
     // Tail of a touch gesture: a pinch or a long press has already had its say. The phase holds
     // until the next fresh press, because this click arrives AFTER the last finger has left.
     if (touch.phase === 'spent') {
+      sawLeftDown = false;
+      downSpecial = false;
+      downOnBar = false;
+      return;
+    }
+    // The press has already been answered; this is its echo (see {@link specialPressDone}).
+    if (specialPressDone) {
+      specialPressDone = false;
       sawLeftDown = false;
       downSpecial = false;
       downOnBar = false;
