@@ -40,6 +40,7 @@ const DB_NAME = 'siedler-savegames';
 const SLOT_STORE = 'slots';
 const META_STORE = 'meta';
 const DIR_HANDLE_KEY = 'directory';
+const DIR_LAPSES_KEY = 'directoryLapses';
 const VERSION = 1;
 
 /**
@@ -58,6 +59,19 @@ export interface SaveDirectory {
   /** Display only — the name the user picked. */
   readonly label: string;
 }
+
+/**
+ * Is this the folder permission going away rather than a genuine I/O failure?
+ *
+ * The two names are what a browser raises once a granted handle stops being usable — after the tab
+ * has been in the background for a while, or simply because the grant only ever covered the
+ * session. It has to be told apart from a full disk or a missing file, because the answer is a
+ * different one: not "saving failed", but "the folder is gone and has to be granted again".
+ */
+export const isPermissionLoss = (err: unknown): boolean => {
+  const name = (err as { name?: string } | null | undefined)?.name;
+  return name === 'NotAllowedError' || name === 'SecurityError';
+};
 
 interface StoredSlot {
   readonly entry: ArrayBuffer;
@@ -82,6 +96,32 @@ export class SaveStore {
     private dir: SaveDirectory | null,
     private index: Uint8Array,
   ) {}
+
+  /**
+   * Called when the folder permission goes away while the session runs.
+   *
+   * A callback and not a return value: the loss can surface in any of five methods, and
+   * {@link reconcile} is driven from screens that have nowhere to put such a report — they have
+   * already switched to the next view and are waiting for it to come back.
+   */
+  onDirectoryLost: (() => void) | null = null;
+
+  /**
+   * Let go of the folder when an error says the permission is gone. Returns whether it was that —
+   * everything else is a real failure and keeps its error code.
+   *
+   * The handle stays in the database on purpose: it is still the right folder, only the permission
+   * has to be granted again, and that needs a user gesture this call does not have.
+   */
+  private noteLoss(err: unknown, dir: SaveDirectory): boolean {
+    if (!isPermissionLoss(err)) return false;
+    // A failure that comes back late must not take down a folder that has been granted again in the
+    // meantime: a call started before the new grant can still be in flight.
+    if (this.dir !== dir) return true;
+    this.dir = null;
+    this.onDirectoryLost?.();
+    return true;
+  }
 
   /** Opens the database and builds the index. The folder is **not** attached here. */
   static async open(): Promise<SaveStore> {
@@ -159,10 +199,37 @@ export class SaveStore {
     }
   }
 
-  /** Forget the folder (the database keeps the saves). */
+  /**
+   * How often the stored handle has come back WITHOUT its permission — the measure of whether this
+   * environment keeps the grant across a restart (see `views/save-directory.ts`).
+   */
+  async storedDirectoryLapses(): Promise<number> {
+    try {
+      const v = await this.db.get(META_STORE, DIR_LAPSES_KEY);
+      return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** Record that count. Failing to store it costs only the learning, as with the handle itself. */
+  async setDirectoryLapses(n: number): Promise<void> {
+    try {
+      await this.db.put(META_STORE, n, DIR_LAPSES_KEY);
+    } catch {
+      // See above.
+    }
+  }
+
+  /**
+   * Forget the folder (the database keeps the saves). The lapse count goes with it — it is a
+   * statement about THIS handle, and a newly picked folder must not inherit the history of the old
+   * one.
+   */
   async detachDirectory(): Promise<void> {
     this.dir = null;
     await this.db.delete(META_STORE, DIR_HANDLE_KEY);
+    await this.db.delete(META_STORE, DIR_LAPSES_KEY);
   }
 
   /** Reconcile both stores. Without a folder it is a no-op. */
@@ -173,33 +240,44 @@ export class SaveStore {
       return { toDirectory: [], toDatabase: [], unchanged: [] };
     }
     const dbSlots = await this.readDatabaseSlots();
-    const dirSlots = await this.readDirectorySlots(dir);
-    const plan = reconcileSlots(dbSlots, dirSlots);
     const toDirectory: number[] = [];
     const toDatabase: number[] = [];
     const unchanged: number[] = [];
-    for (const a of plan.actions) {
-      if (a.kind === 'keep') {
-        unchanged.push(a.slot);
-        continue;
+    try {
+      const dirSlots = await this.readDirectorySlots(dir);
+      const plan = reconcileSlots(dbSlots, dirSlots);
+      for (const a of plan.actions) {
+        if (a.kind === 'keep') {
+          unchanged.push(a.slot);
+          continue;
+        }
+        if (a.from === 'db') {
+          const rec = dbSlots.find((r) => r.index === a.slot)!;
+          await dir.writeFile(saveFileName(a.slot), rec.data!);
+          toDirectory.push(a.slot);
+        } else {
+          const rec = dirSlots.find((r) => r.index === a.slot)!;
+          await this.db.put(
+            SLOT_STORE,
+            { entry: buffer(rec.entry), data: buffer(rec.data!), savedAt: rec.savedAt },
+            a.slot,
+          );
+          toDatabase.push(a.slot);
+        }
       }
-      if (a.from === 'db') {
-        const rec = dbSlots.find((r) => r.index === a.slot)!;
-        await dir.writeFile(saveFileName(a.slot), rec.data!);
-        toDirectory.push(a.slot);
-      } else {
-        const rec = dirSlots.find((r) => r.index === a.slot)!;
-        await this.db.put(
-          SLOT_STORE,
-          { entry: buffer(rec.entry), data: buffer(rec.data!), savedAt: rec.savedAt },
-          a.slot,
-        );
-        toDatabase.push(a.slot);
+      this.index = plan.archiv;
+      if (toDirectory.length > 0 || toDatabase.length > 0) {
+        await dir.writeFile(ARCHIV_FILE_NAME, this.index);
       }
-    }
-    this.index = plan.archiv;
-    if (toDirectory.length > 0 || toDatabase.length > 0) {
-      await dir.writeFile(ARCHIV_FILE_NAME, this.index);
+    } catch (err) {
+      // A LOST PERMISSION MUST NOT PROPAGATE FROM HERE. The disk menu switches to its "reading the
+      // index" screen BEFORE awaiting this call and only moves on afterwards — a throw would leave
+      // it standing there for good. Letting go of the folder and reporting what got done keeps the
+      // saves in the database, which is where they always are anyway.
+      if (!this.noteLoss(err, dir)) throw err;
+      // Only when the folder really came off: a failure this late can belong to a folder that has
+      // already been replaced, and that one has just written the index we would be overwriting.
+      if (this.dir === null) this.index = assembleArchiv(await this.readDatabaseSlots());
     }
     return { toDirectory, toDatabase, unchanged };
   }
@@ -230,15 +308,18 @@ export class SaveStore {
       return DISK_RESULT.writeFailed;
     }
     this.index = new Uint8Array(archiv);
-    if (this.dir) {
+    const dir = this.dir;
+    if (dir) {
       try {
-        await this.dir.writeFile(ARCHIV_FILE_NAME, this.index);
-      } catch {
+        await dir.writeFile(ARCHIV_FILE_NAME, this.index);
+      } catch (err) {
+        this.noteLoss(err, dir);
         return DISK_RESULT.archivFailed;
       }
       try {
-        await this.dir.writeFile(saveFileName(slot), data);
-      } catch {
+        await dir.writeFile(saveFileName(slot), data);
+      } catch (err) {
+        this.noteLoss(err, dir);
         return DISK_RESULT.writeFailed;
       }
     }
@@ -257,11 +338,13 @@ export class SaveStore {
     } catch {
       return { code: DISK_RESULT.readFailed, data: null };
     }
-    if (this.dir) {
+    const dir = this.dir;
+    if (dir) {
       try {
-        const f = await this.dir.readFile(saveFileName(slot));
+        const f = await dir.readFile(saveFileName(slot));
         if (f) return { code: DISK_RESULT.loaded, data: f.data };
-      } catch {
+      } catch (err) {
+        this.noteLoss(err, dir);
         return { code: DISK_RESULT.readFailed, data: null };
       }
     }
@@ -295,15 +378,18 @@ export class SaveStore {
     const index = new Uint8Array(this.index);
     index.set(entry.subarray(0, ARCHIV_SLOT_SIZE), slot * ARCHIV_SLOT_SIZE);
     this.index = index;
-    if (this.dir) {
+    const dir = this.dir;
+    if (dir) {
       try {
-        await this.dir.writeFile(ARCHIV_FILE_NAME, this.index);
-      } catch {
+        await dir.writeFile(ARCHIV_FILE_NAME, this.index);
+      } catch (err) {
+        this.noteLoss(err, dir);
         return DISK_RESULT.archivFailed;
       }
       try {
-        await this.dir.writeFile(saveFileName(slot), data);
-      } catch {
+        await dir.writeFile(saveFileName(slot), data);
+      } catch (err) {
+        this.noteLoss(err, dir);
         return DISK_RESULT.writeFailed;
       }
     }
@@ -327,7 +413,8 @@ export class SaveStore {
     if (typeof dir.removeFile === 'function') {
       try {
         await dir.removeFile(saveFileName(slot));
-      } catch {
+      } catch (err) {
+        this.noteLoss(err, dir);
         gone = false;
       }
     } else {
@@ -337,7 +424,8 @@ export class SaveStore {
       // The index is written even if the file stayed: it is the view the original reads, and there
       // the slot is free now.
       await dir.writeFile(ARCHIV_FILE_NAME, this.index);
-    } catch {
+    } catch (err) {
+      this.noteLoss(err, dir);
       return false;
     }
     return gone;

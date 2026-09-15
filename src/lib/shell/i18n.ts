@@ -73,6 +73,7 @@ const EN = {
 	'page.loading': 'Loading…',
 	'rail.recording': 'recording',
 	'rail.update': 'new version ready',
+	'rail.folder': 'save folder needs permission',
 
 	// -- Dropzone ------------------------------------------------------------------------------
 	'drop.aria': 'Drop the archive file here',
@@ -112,6 +113,8 @@ const EN = {
 	'folder.detach': 'Detach the folder',
 	'folder.choose': 'Choose a save folder',
 	'folder.allow': 'Allow the remembered folder again',
+	'folder.lapsed':
+		'This browser does not keep the permission across a restart, so it is no longer asked for by itself.',
 
 	// -- Import & export: archive --------------------------------------------------------------
 	'archive.title': 'Archive',
@@ -303,6 +306,7 @@ const DE: Record<ShellKey, string> = {
 	'page.loading': 'Lädt…',
 	'rail.recording': 'Aufnahme läuft',
 	'rail.update': 'neue Version bereit',
+	'rail.folder': 'Ordner braucht Erlaubnis',
 
 	'drop.aria': 'Archiv-Datei hier ablegen',
 	'drop.lead': 'Legen Sie Ihr Spiel-Archiv hier ab — oder wählen Sie eine Datei.',
@@ -333,6 +337,8 @@ const DE: Record<ShellKey, string> = {
 	'folder.detach': 'Ordner lösen',
 	'folder.choose': 'Ordner auswählen',
 	'folder.allow': 'Gemerkten Ordner wieder erlauben',
+	'folder.lapsed':
+		'Dieser Browser behält die Erlaubnis über einen Neustart nicht, daher wird nicht mehr von selbst gefragt.',
 
 	'archive.title': 'Archiv',
 	'archive.none': 'Kein Archiv geladen.',

@@ -17,10 +17,11 @@
  * separates the two routes: {@link restoreSaveDirectory} is silent and returns `null` when asking
  * would be required; {@link pickSaveDirectory} and {@link grantSaveDirectory} need a gesture — the
  * picker a button (it is a choice), the renewal just *any* gesture (it continues a choice already
- * made, see {@link SaveDirectoryGrant}).
+ * made, see {@link SaveDirectoryGrant}). Where the permission turns out never to survive,
+ * {@link mayRenewOnGesture} takes the automatic renewal out again.
  */
 
-import type { SaveDirectory } from '$lib/core/save-store.js';
+import { isPermissionLoss, type SaveDirectory } from '$lib/core/save-store.js';
 
 /** Does this browser have the file-system access API? */
 export const saveDirectorySupported = (): boolean =>
@@ -46,9 +47,14 @@ function wrap(handle: FsDirHandle): SaveDirectory {
         const fh = await handle.getFileHandle(name);
         const f = await fh.getFile();
         return { data: new Uint8Array(await f.arrayBuffer()), modifiedAt: f.lastModified };
-      } catch {
+      } catch (err) {
         // A missing file is not an error — `NotFoundError` simply means "slot empty". The original
         // agrees: without `ARCHIV.DS` it reads ten free slots (@0x46ced).
+        //
+        // A WITHDRAWN PERMISSION IS NOT THAT, and swallowing it here would be worse than throwing:
+        // every read fails at once, the folder looks EMPTY — and an empty folder is an instruction
+        // to write every occupied slot into it.
+        if (isPermissionLoss(err)) throw err;
         return null;
       }
     },
@@ -93,6 +99,20 @@ export async function pickSaveDirectory(): Promise<{
 }
 
 /**
+ * Is this stored value still a handle this browser can work with?
+ *
+ * It separates the two things {@link restoreSaveDirectory} folds into one `null`: a permission that
+ * merely has to be renewed, and a value nothing can be done with any more. Only the first is worth
+ * counting or marking — the second would leave a permanent mark next to a button that cannot
+ * achieve anything, because {@link grantSaveDirectory} answers `denied` for it on sight.
+ */
+export const saveDirectoryUsable = (handle: unknown): boolean => {
+  const h = handle as FsDirHandle | null;
+  if (!h || typeof h.getFileHandle !== 'function') return false;
+  return typeof h.requestPermission === 'function';
+};
+
+/**
  * Revive a stored handle SILENTLY. Returns `null` when the permission does not (or no longer)
  * hold — then {@link grantSaveDirectory} has to hang off a button, not off this.
  */
@@ -105,6 +125,31 @@ export async function restoreSaveDirectory(handle: unknown): Promise<SaveDirecto
   }
   return wrap(h);
 }
+
+/**
+ * How many lost permissions it takes before the renewal stops asking by itself.
+ *
+ * NOT ONE, and the browser's own dialog is the reason: the three-way prompt including "allow on
+ * every visit" appears only on `requestPermission` for a STORED handle, never on the first pick.
+ * Asking once after a loss is therefore the only route to a permanent grant, and on a desktop
+ * browser it settles the matter for good — a limit of one would withhold that dialog from exactly
+ * the user it helps. A SECOND loss after a granted permission says the opposite: here the
+ * permission is session-scoped by construction (which is the case on Android, where installing the
+ * app changes nothing about it), and from then on a mark on the rail is better than a prompt per
+ * start.
+ *
+ * Counting beats asking the user agent: a platform table would need maintenance and would be wrong
+ * the moment a browser starts persisting. A count of what happened cannot go stale that way.
+ *
+ * ONLY A `granted` AT STARTUP CLEARS THE COUNT, a successful `requestPermission` does not — and it
+ * must not: where every start needs a fresh grant, every start would also clear the count and the
+ * limit would never be reached. The price is the browser whose user keeps picking "allow this
+ * time": it lands here too, which is right, because that is what its starts look like.
+ */
+export const SAVE_DIR_LAPSE_LIMIT = 2;
+
+/** May the first user gesture still renew the permission on its own? */
+export const mayRenewOnGesture = (lapses: number): boolean => lapses < SAVE_DIR_LAPSE_LIMIT;
 
 /**
  * How a permission request ended.

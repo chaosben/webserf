@@ -43,9 +43,12 @@
 	import { SaveStore, type SaveDirectory } from '$lib/core/save-store.js';
 	import {
 		grantSaveDirectory,
+		mayRenewOnGesture,
 		pickSaveDirectory,
 		restoreSaveDirectory,
-		saveDirectorySupported
+		SAVE_DIR_LAPSE_LIMIT,
+		saveDirectorySupported,
+		saveDirectoryUsable
 	} from '$lib/views/save-directory.js';
 	import { startNewGameSteps } from '$lib/core/engine/new-game.js';
 	import { snapshot } from '$lib/core/engine/state.js';
@@ -60,19 +63,6 @@
 		{ id: 'enhance', icon: IconEnhance, labelKey: 'group.enhance' },
 		{ id: 'info', icon: IconInfo, labelKey: 'group.info' }
 	];
-
-	/**
-	 * The marks on the rail icons — the only way to see either of these two things with the panel
-	 * closed: a video is running, or a newer version is waiting to take over. Module constants and a
-	 * `$derived` list rather than inline literals, so the rail is handed a new array only when one of
-	 * the two conditions actually changes.
-	 */
-	const RECORDING_MARKS: readonly DrawerMark[] = [{ group: 'record', labelKey: 'rail.recording' }];
-	const UPDATE_MARKS: readonly DrawerMark[] = [{ group: 'info', labelKey: 'rail.update' }];
-	const marks = $derived([
-		...(recordings.running ? RECORDING_MARKS : []),
-		...(updates.ready || updates.switched ? UPDATE_MARKS : [])
-	]);
 
 	/**
 	 * The tabs of the import/export screen. The two halves are tabs and not one list below each other
@@ -147,6 +137,34 @@
 	let saveDirName = $state<string | null>(null);
 	/** A stored folder handle without permission — the button has to renew it. */
 	let saveDirPending = $state<unknown | null>(null);
+	/**
+	 * How often that handle has already come back without its permission. Read and written EXACTLY
+	 * ONCE per session, in `openSaves` — that is what keeps it from drifting apart from the handle
+	 * beside it.
+	 */
+	let saveDirLapses = $state(0);
+	/**
+	 * The handle belonging to the attached folder. Deliberately NOT `$state`: nothing draws it, and
+	 * it exists only so a folder lost mid-session can be offered for renewal again.
+	 */
+	let saveDirHandle: unknown = null;
+
+	/**
+	 * The marks on the rail icons — the only way to see any of these with the panel closed: a video is
+	 * running, a newer version is waiting to take over, or the remembered save folder is not
+	 * attached. Module constants and a `$derived` list rather than inline literals, so the rail is
+	 * handed a new array only when one of the conditions actually changes.
+	 */
+	const RECORDING_MARKS: readonly DrawerMark[] = [{ group: 'record', labelKey: 'rail.recording' }];
+	const UPDATE_MARKS: readonly DrawerMark[] = [{ group: 'info', labelKey: 'rail.update' }];
+	const FOLDER_MARKS: readonly DrawerMark[] = [{ group: 'io', labelKey: 'rail.folder' }];
+	const marks = $derived([
+		...(recordings.running ? RECORDING_MARKS : []),
+		...(updates.ready || updates.switched ? UPDATE_MARKS : []),
+		// A remembered folder that is not attached, whatever the reason — after a "no" as well. The
+		// statement is the same either way, and it is the only one visible with the panel closed.
+		...(saveDirPending !== null ? FOLDER_MARKS : [])
+	]);
 	/**
 	 * The open tab of the import/export screen. Deliberately NOT in the settings: on opening it
 	 * should sit where most of the work happens, not where someone removed the archive once three
@@ -239,19 +257,39 @@
 	async function openSaves(): Promise<void> {
 		try {
 			const store = await SaveStore.open();
+			store.onDirectoryLost = saveFolderLost;
 			const handle = await store.storedDirectoryHandle();
-			if (handle !== null) {
+			if (handle !== null && !saveDirectoryUsable(handle)) {
+				// Neither counted nor marked: renewing this one cannot succeed, so a mark would sit
+				// next to a button that has nothing to offer.
+				log.warn('assets', 'The remembered save folder cannot be used by this browser.');
+			} else if (handle !== null) {
 				const dir = await restoreSaveDirectory(handle);
+				const lapses = await store.storedDirectoryLapses();
 				if (dir !== null) {
+					saveDirHandle = handle;
 					const report = await store.attachDirectory(dir);
-					saveDirName = dir.label;
+					// Read back from the store, not from `dir`: the permission can go away during that
+					// sync, and then the folder is already gone by the time we get here.
+					saveDirName = store.directoryLabel;
+					if (lapses !== 0) await store.setDirectoryLapses(0);
+					saveDirLapses = 0;
 					log.info(
 						'assets',
 						`Save folder "${dir.label}": ${report.toDirectory.length} slot(s) written, ${report.toDatabase.length} imported.`
 					);
 				} else {
+					const next = Math.min(lapses + 1, SAVE_DIR_LAPSE_LIMIT);
+					if (next !== lapses) await store.setDirectoryLapses(next);
+					// The two in one breath, with no `await` between them: the gesture renewal below
+					// reads them together, and a gesture landing in the gap would ask the very question
+					// the count is there to stop.
+					saveDirLapses = next;
 					saveDirPending = handle;
-					log.info('assets', 'A save folder is remembered but needs permission again.');
+					log.info(
+						'assets',
+						`A save folder is remembered but needs permission again (${next} of ${SAVE_DIR_LAPSE_LIMIT}).`
+					);
 				}
 			}
 			saveStore = store;
@@ -270,12 +308,40 @@
 		handle: unknown
 	): Promise<void> {
 		saveDirPending = null;
-		const report = await store.attachDirectory(dir, handle);
-		saveDirName = dir.label;
-		log.info(
-			'assets',
-			`Save folder "${dir.label}": ${report.toDirectory.length} slot(s) written, ${report.toDatabase.length} imported.`
-		);
+		saveDirHandle = handle;
+		try {
+			const report = await store.attachDirectory(dir, handle);
+			// See `openSaves`: the store is the one that knows whether the folder survived the sync.
+			saveDirName = store.directoryLabel;
+			log.info(
+				'assets',
+				`Save folder "${dir.label}": ${report.toDirectory.length} slot(s) written, ${report.toDatabase.length} imported.`
+			);
+		} catch (err) {
+			saveDirName = store.directoryLabel;
+			// Only offer it again if the folder really came off — a full disk leaves it attached, and
+			// a button asking for a permission that already holds explains nothing.
+			if (saveDirName === null) saveDirPending = handle;
+			log.error(
+				'assets',
+				`Save folder could not be synced: ${err instanceof Error ? err.message : String(err)}`
+			);
+		}
+	}
+
+	/**
+	 * The folder permission went away while the session ran.
+	 *
+	 * NOT asked for again on the next gesture. A permission that merely failed to survive a restart
+	 * is a choice waiting to be continued; one taken away with the app running is a choice being
+	 * made, and answering it with a dialog is exactly the spam the renewal below avoids. The mark on
+	 * the rail and the button stay as the way back.
+	 */
+	function saveFolderLost(): void {
+		saveDirName = null;
+		saveDirAsked = true;
+		if (saveDirHandle !== null) saveDirPending = saveDirHandle;
+		log.warn('assets', 'The save folder lost its permission — the saves stay in the browser.');
 	}
 
 	/** Pick a folder — on the button, because the permission needs a user gesture. */
@@ -310,6 +376,11 @@
 	 * so nobody here needs to know which event types carry a user activation (on touch only
 	 * `pointerup` does, not `pointerdown`).
 	 *
+	 * AND IT STOPS ON ITS OWN where it cannot achieve anything: once `saveDirLapses` has reached the
+	 * limit, this browser has shown that it does not carry the permission across a restart, and a
+	 * dialog per start would ask a question that has already been answered twice. The mark on the
+	 * rail and the button in the import/export screen take over.
+	 *
 	 * Why an `$effect` and NOT a `$derived`: nothing is derived here. It is a side effect with a
 	 * dialog and file access, it is asynchronous, and it runs exactly once per session. That
 	 * `attachSaveFolder` clears `saveDirPending` — one of its own dependencies — is intended and
@@ -322,7 +393,8 @@
 	$effect(() => {
 		const handle = saveDirPending;
 		const store = saveStore;
-		if (handle === null || store === null || saveDirAsked) return;
+		const lapses = saveDirLapses;
+		if (handle === null || store === null || saveDirAsked || !mayRenewOnGesture(lapses)) return;
 		const ctrl = new AbortController();
 		let asking = false;
 		const ask = async (): Promise<void> => {
@@ -352,6 +424,8 @@
 		await saveStore?.detachDirectory();
 		saveDirName = null;
 		saveDirPending = null;
+		saveDirHandle = null;
+		saveDirLapses = 0;
 		log.info('assets', 'Save folder detached — the saves stay in the browser.');
 	}
 
@@ -564,6 +638,9 @@
 								{st('folder.detach')}
 							</button>
 						{:else}
+							{#if saveDirPending !== null && !mayRenewOnGesture(saveDirLapses)}
+								<p class="note">{st('folder.lapsed')}</p>
+							{/if}
 							<button type="button" onclick={() => void chooseSaveFolder()}>
 								{saveDirPending !== null ? st('folder.allow') : st('folder.choose')}
 							</button>
