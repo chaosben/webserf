@@ -40,7 +40,6 @@ const DB_NAME = 'siedler-savegames';
 const SLOT_STORE = 'slots';
 const META_STORE = 'meta';
 const DIR_HANDLE_KEY = 'directory';
-const DIR_LAPSES_KEY = 'directoryLapses';
 const VERSION = 1;
 
 /**
@@ -199,37 +198,10 @@ export class SaveStore {
     }
   }
 
-  /**
-   * How often the stored handle has come back WITHOUT its permission — the measure of whether this
-   * environment keeps the grant across a restart (see `views/save-directory.ts`).
-   */
-  async storedDirectoryLapses(): Promise<number> {
-    try {
-      const v = await this.db.get(META_STORE, DIR_LAPSES_KEY);
-      return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : 0;
-    } catch {
-      return 0;
-    }
-  }
-
-  /** Record that count. Failing to store it costs only the learning, as with the handle itself. */
-  async setDirectoryLapses(n: number): Promise<void> {
-    try {
-      await this.db.put(META_STORE, n, DIR_LAPSES_KEY);
-    } catch {
-      // See above.
-    }
-  }
-
-  /**
-   * Forget the folder (the database keeps the saves). The lapse count goes with it — it is a
-   * statement about THIS handle, and a newly picked folder must not inherit the history of the old
-   * one.
-   */
+  /** Forget the folder (the database keeps the saves). */
   async detachDirectory(): Promise<void> {
     this.dir = null;
     await this.db.delete(META_STORE, DIR_HANDLE_KEY);
-    await this.db.delete(META_STORE, DIR_LAPSES_KEY);
   }
 
   /** Reconcile both stores. Without a folder it is a no-op. */

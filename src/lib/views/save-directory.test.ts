@@ -12,13 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import {
-  grantSaveDirectory,
-  mayRenewOnGesture,
-  restoreSaveDirectory,
-  SAVE_DIR_LAPSE_LIMIT,
-  saveDirectoryUsable,
-} from './save-directory.js';
+import { grantSaveDirectory, restoreSaveDirectory, saveDirectoryUsable } from './save-directory.js';
 
 const ROOT = new URL('../../..', import.meta.url).pathname; // app/
 const read = (path: string): string => readFileSync(ROOT + path, 'utf8');
@@ -89,42 +83,11 @@ describe('reading through a granted folder', () => {
 
 describe('saveDirectoryUsable', () => {
   it('separates "needs permission" from "cannot work at all"', () => {
-    // Only the first deserves a count and a mark; the second would mark a button with nothing to do.
+    // Only the first deserves a mark; the second would mark a button with nothing to do.
     expect(saveDirectoryUsable(readingHandle('NotFoundError'))).toBe(true);
     expect(saveDirectoryUsable(null)).toBe(false);
     expect(saveDirectoryUsable({ name: 'x' })).toBe(false);
     expect(saveDirectoryUsable({ name: 'x', getFileHandle: () => {} })).toBe(false);
-  });
-});
-
-describe('mayRenewOnGesture', () => {
-  it('allows exactly one lapse to be answered by itself', () => {
-    // The three-way dialog including "allow on every visit" cannot appear on the first pick — it
-    // hangs off `requestPermission` for a STORED handle. Asking after the first lapse is therefore
-    // the only route to a permanent grant, and a limit of one would withhold it.
-    expect(mayRenewOnGesture(0)).toBe(true);
-    expect(mayRenewOnGesture(1)).toBe(true);
-    expect(mayRenewOnGesture(SAVE_DIR_LAPSE_LIMIT)).toBe(false);
-    expect(mayRenewOnGesture(SAVE_DIR_LAPSE_LIMIT + 7)).toBe(false);
-  });
-
-  it('asks twice where the permission never survives, and not again', () => {
-    // Walk the starts of a browser that hands the permission back every time. Counting is what
-    // `openSaves` does: clamp at the limit, and only a `granted` AT STARTUP clears it.
-    let lapses = 0;
-    const asked: number[] = [];
-    for (let start = 1; start <= 6; start++) {
-      if (mayRenewOnGesture(lapses)) asked.push(start);
-      lapses = Math.min(lapses + 1, SAVE_DIR_LAPSE_LIMIT);
-    }
-    expect(asked).toEqual([1, 2]);
-  });
-
-  it('forgets what it learned as soon as one start comes back granted', () => {
-    let lapses = SAVE_DIR_LAPSE_LIMIT;
-    expect(mayRenewOnGesture(lapses)).toBe(false);
-    lapses = 0; // a start that found the permission still in place
-    expect(mayRenewOnGesture(lapses)).toBe(true);
   });
 });
 
@@ -135,24 +98,25 @@ describe('mayRenewOnGesture', () => {
 describe('the wiring around them', () => {
   it('keeps the permission in this one module', () => {
     // The store must not learn to ask by itself — then there would be two places deciding when a
-    // dialog appears, and the count would only see one of them.
+    // dialog appears, and the session latch below would only cover one of them.
     const store = read('src/lib/core/save-store.ts');
     expect(store).not.toMatch(/queryPermission|requestPermission/);
   });
 
-  it('drops the lapse count together with the folder', () => {
-    // A newly picked folder must not inherit the history of the old one.
-    const store = read('src/lib/core/save-store.ts');
-    const body = store.slice(store.indexOf('async detachDirectory'));
-    const end = body.indexOf('\n  }');
-    expect(body.slice(0, end)).toMatch(/DIR_HANDLE_KEY[\s\S]*DIR_LAPSES_KEY/);
+  it('asks at most once per session, and gates it where the question is asked', () => {
+    // The WHOLE condition, not just the name: `saveDirAsked` stands at four places in the page, so a
+    // scan for the name alone stays green while the renewal itself has lost its gate — and without
+    // the gate every gesture opens a dialog.
+    expect(read('src/routes/+page.svelte')).toMatch(
+      /if \(handle === null \|\| store === null \|\| saveDirAsked\) return;/
+    );
   });
 
-  it('gates the gesture renewal on the count', () => {
-    // The whole condition, not just the name: the panel names the rule as well, and a scan for the
-    // name alone stays green while the renewal itself has lost its gate.
-    expect(read('src/routes/+page.svelte')).toMatch(
-      /saveDirAsked \|\| !mayRenewOnGesture\(lapses\)/
-    );
+  it('keeps that latch out of the reactive graph', () => {
+    // `saveDirAsked` is READ in the effect and SET in its callback. As `$state` it would be a
+    // dependency of the very effect that sets it, and the effect would re-run itself. The literal
+    // form is the point: an absence check (`not.toMatch(/\$state/)`) would also pass once the
+    // variable has been renamed away, and would then prove nothing.
+    expect(read('src/routes/+page.svelte')).toMatch(/\blet saveDirAsked = false;/);
   });
 });

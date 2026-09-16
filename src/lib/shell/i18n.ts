@@ -113,8 +113,8 @@ const EN = {
 	'folder.detach': 'Detach the folder',
 	'folder.choose': 'Choose a save folder',
 	'folder.allow': 'Allow the remembered folder again',
-	'folder.lapsed':
-		'This browser does not keep the permission across a restart, so it is no longer asked for by itself.',
+	'folder.renews':
+		'The folder is remembered; the next touch asks for its permission again. Some browsers do not keep that permission across a restart.',
 
 	// -- Import & export: archive --------------------------------------------------------------
 	'archive.title': 'Archive',
@@ -337,8 +337,8 @@ const DE: Record<ShellKey, string> = {
 	'folder.detach': 'Ordner lösen',
 	'folder.choose': 'Ordner auswählen',
 	'folder.allow': 'Gemerkten Ordner wieder erlauben',
-	'folder.lapsed':
-		'Dieser Browser behält die Erlaubnis über einen Neustart nicht, daher wird nicht mehr von selbst gefragt.',
+	'folder.renews':
+		'Der Ordner ist gemerkt; die nächste Berührung fragt erneut nach seiner Erlaubnis. Manche Browser behalten sie über einen Neustart nicht.',
 
 	'archive.title': 'Archiv',
 	'archive.none': 'Kein Archiv geladen.',

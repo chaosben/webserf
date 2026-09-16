@@ -43,10 +43,8 @@
 	import { SaveStore, type SaveDirectory } from '$lib/core/save-store.js';
 	import {
 		grantSaveDirectory,
-		mayRenewOnGesture,
 		pickSaveDirectory,
 		restoreSaveDirectory,
-		SAVE_DIR_LAPSE_LIMIT,
 		saveDirectorySupported,
 		saveDirectoryUsable
 	} from '$lib/views/save-directory.js';
@@ -137,12 +135,6 @@
 	let saveDirName = $state<string | null>(null);
 	/** A stored folder handle without permission — the button has to renew it. */
 	let saveDirPending = $state<unknown | null>(null);
-	/**
-	 * How often that handle has already come back without its permission. Read and written EXACTLY
-	 * ONCE per session, in `openSaves` — that is what keeps it from drifting apart from the handle
-	 * beside it.
-	 */
-	let saveDirLapses = $state(0);
 	/**
 	 * The handle belonging to the attached folder. Deliberately NOT `$state`: nothing draws it, and
 	 * it exists only so a folder lost mid-session can be offered for renewal again.
@@ -260,35 +252,26 @@
 			store.onDirectoryLost = saveFolderLost;
 			const handle = await store.storedDirectoryHandle();
 			if (handle !== null && !saveDirectoryUsable(handle)) {
-				// Neither counted nor marked: renewing this one cannot succeed, so a mark would sit
-				// next to a button that has nothing to offer.
+				// Not marked: renewing this one cannot succeed, so the mark would sit next to a
+				// button that has nothing to offer.
 				log.warn('assets', 'The remembered save folder cannot be used by this browser.');
 			} else if (handle !== null) {
 				const dir = await restoreSaveDirectory(handle);
-				const lapses = await store.storedDirectoryLapses();
 				if (dir !== null) {
 					saveDirHandle = handle;
 					const report = await store.attachDirectory(dir);
 					// Read back from the store, not from `dir`: the permission can go away during that
 					// sync, and then the folder is already gone by the time we get here.
 					saveDirName = store.directoryLabel;
-					if (lapses !== 0) await store.setDirectoryLapses(0);
-					saveDirLapses = 0;
 					log.info(
 						'assets',
 						`Save folder "${dir.label}": ${report.toDirectory.length} slot(s) written, ${report.toDatabase.length} imported.`
 					);
 				} else {
-					const next = Math.min(lapses + 1, SAVE_DIR_LAPSE_LIMIT);
-					if (next !== lapses) await store.setDirectoryLapses(next);
-					// The two in one breath, with no `await` between them: the gesture renewal below
-					// reads them together, and a gesture landing in the gap would ask the very question
-					// the count is there to stop.
-					saveDirLapses = next;
 					saveDirPending = handle;
 					log.info(
 						'assets',
-						`A save folder is remembered but needs permission again (${next} of ${SAVE_DIR_LAPSE_LIMIT}).`
+						'A save folder is remembered but needs permission again — the next gesture asks.'
 					);
 				}
 			}
@@ -365,10 +348,10 @@
 	 *
 	 * The browser's "allow on every visit" dialog cannot be *requested* — the API has no field for
 	 * it, and on the first pick it structurally cannot appear (it hangs off `requestPermission` on a
-	 * STORED handle, i.e. on the second visit). What we do control is the MOMENT: while only the
-	 * button in the import/export screen called it, the dialog appeared only once the user found
-	 * that drawer — and because everything keeps working out of IndexedDB, nothing hinted that the
-	 * folder was detached.
+	 * STORED handle, i.e. on the second visit). What we do control is the MOMENT, and the button in
+	 * the import/export screen cannot be it on its own: it is only found by someone who opens that
+	 * drawer, and because everything keeps working out of IndexedDB, nothing else hints that the
+	 * folder is detached.
 	 *
 	 * THIS IS NOT DIALOG SPAM but the continuation of a choice made in an earlier session:
 	 * `saveDirPending` is only set when a handle IS stored. A "no" (`denied`) ends the question for
@@ -376,10 +359,10 @@
 	 * so nobody here needs to know which event types carry a user activation (on touch only
 	 * `pointerup` does, not `pointerdown`).
 	 *
-	 * AND IT STOPS ON ITS OWN where it cannot achieve anything: once `saveDirLapses` has reached the
-	 * limit, this browser has shown that it does not carry the permission across a restart, and a
-	 * dialog per start would ask a question that has already been answered twice. The mark on the
-	 * rail and the button in the import/export screen take over.
+	 * AND THERE IS DELIBERATELY NO CAP ACROSS SESSIONS. Where the permission is session-scoped, a
+	 * session IS an app start — a cap would then hit precisely the user who says yes every time and
+	 * leave them opening a drawer on every start, for a question one tap settles. Whoever does not
+	 * want to be asked again detaches the folder; that button is the way out, not a count.
 	 *
 	 * Why an `$effect` and NOT a `$derived`: nothing is derived here. It is a side effect with a
 	 * dialog and file access, it is asynchronous, and it runs exactly once per session. That
@@ -393,8 +376,7 @@
 	$effect(() => {
 		const handle = saveDirPending;
 		const store = saveStore;
-		const lapses = saveDirLapses;
-		if (handle === null || store === null || saveDirAsked || !mayRenewOnGesture(lapses)) return;
+		if (handle === null || store === null || saveDirAsked) return;
 		const ctrl = new AbortController();
 		let asking = false;
 		const ask = async (): Promise<void> => {
@@ -425,7 +407,6 @@
 		saveDirName = null;
 		saveDirPending = null;
 		saveDirHandle = null;
-		saveDirLapses = 0;
 		log.info('assets', 'Save folder detached — the saves stay in the browser.');
 	}
 
@@ -638,8 +619,8 @@
 								{st('folder.detach')}
 							</button>
 						{:else}
-							{#if saveDirPending !== null && !mayRenewOnGesture(saveDirLapses)}
-								<p class="note">{st('folder.lapsed')}</p>
+							{#if saveDirPending !== null}
+								<p class="note">{st('folder.renews')}</p>
 							{/if}
 							<button type="button" onclick={() => void chooseSaveFolder()}>
 								{saveDirPending !== null ? st('folder.allow') : st('folder.choose')}
