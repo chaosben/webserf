@@ -146,6 +146,25 @@ const FLAG_RECORD_SIZE = 70;
 const BUILDING_RECORD_SIZE = 18;
 const INVENTORY_RECORD_SIZE = 120;
 
+/**
+ * Where the inventory array lives in the original's memory. Needed because a castle under
+ * construction stores an ABSOLUTE pointer in `bld+0xe` (see `writeBuilding`), and the original
+ * dereferences it without ever re-deriving it.
+ *
+ * Not guessed. `alloc_gamestate_array` computes
+ * `inventories = buildings_base + bldCap*0x12 + (((bldCap>>3) & 0xfffc) + 4)`, where the capacities
+ * come from `(0xa98 - (0xa98>>1)) << ((gs+0x30c & 0xf) + 2) - 4` divided by 0x81 / 0x231 / 0x91 /
+ * 0x3c1 — so they hang on a configuration cell, NOT on the map size. With shift 10 that yields
+ * `invCap = 1444`, hence `warehouseLimit = invCap >> 2 = 361`, and 361 is what every save carries at
+ * map sizes 3, 4 and 8 alike. The address itself is measured, four times and consistently: the two
+ * castles of an original capture sit at 7282200 and 7282320, one record apart, and two further
+ * founding captures repeat 7282200.
+ *
+ * The checkable witness that this memory configuration applies is `warehouseLimit === 361`. A save
+ * from a differently configured build would need a different base.
+ */
+const INVENTORY_BASE = 7282200;
+
 /** Bitmap length of an entity block (4 bytes per 32 slots, rounded up). */
 function bitmapSize(maxIndex: number): number {
   return 4 * Math.floor((maxIndex + 31) / 32);
@@ -515,10 +534,19 @@ function writeBuilding(out: Uint8Array, dv: DataView, at: number, b: BuildingRec
   for (let i = 0; i < 2; i++) out[at + 8 + i] = ((b.stock[i].available & 0xf) << 4) | (b.stock[i].requested & 0xf);
   dv.setUint16(at + 10, b.firstKnight & 0xffff, true);
   dv.setUint16(at + 12, b.progress & 0xffff, true);
-  // Byte 14 is a union: u32 inventory offset for a finished inventory building, otherwise u16
-  // `level` (and then 16/17 carry the stock maxima while under construction).
-  if (b.inventoryIndex !== null) {
-    dv.setUint32(at + 14, b.inventoryIndex * INVENTORY_RECORD_SIZE, true);
+  // Byte 14 is a union, and which form it takes is decided exactly as `FUN_00048aa2` decides it: the
+  // pointer conversion runs only for buildings that are neither burning nor under construction, so
+  // only those carry a BASE-RELATIVE offset. Everything else keeps the raw in-RAM value — which for a
+  // castle under construction is the ABSOLUTE inventory pointer that `found_castle` wrote. Writing a
+  // base-relative offset there produces a near-null pointer, and the original dereferences it the
+  // moment the first serf leaves the inventory (state 12 -> `bld+0xe` -> `inv+0x4a`).
+  const invIndex = b.inventoryIndex;
+  if (invIndex !== null && !b.constructing && !b.burning) {
+    dv.setUint32(at + 14, invIndex * INVENTORY_RECORD_SIZE, true);
+  } else if (invIndex !== null) {
+    // The u32 spans bytes 14..17, so it also covers the two cells that hold the stock maxima on an
+    // ordinary construction site — here they are the pointer's high half, and that is correct.
+    dv.setUint32(at + 14, (INVENTORY_BASE + invIndex * INVENTORY_RECORD_SIZE) >>> 0, true);
   } else {
     dv.setUint16(at + 14, (b.level ?? 0) & 0xffff, true);
     if (b.stockMaximum) {

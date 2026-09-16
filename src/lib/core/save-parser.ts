@@ -623,6 +623,21 @@ export function parseSaveGame(buffer: ArrayBuffer | ArrayBufferView): SaveGameSt
     decodeInventory(dv, inventoriesRead.recordsOffset + index * INVENTORY_RECORD_SIZE, index),
   );
 
+ // The building -> inventory link, read from the direction that survives a file. The union at
+ // `bld+0xe` cannot carry it while the castle is still under construction: `FUN_00048aa2` converts
+ // that cell only for buildings that are neither burning nor under construction, so a founded castle
+ // keeps the raw ABSOLUTE pointer there (7282200 + index*120 in every capture). The inventory's own
+ // `building` field is a plain slot index and is always meaningful — the original stores the pairing
+ // twice, and this is the half that does not depend on the heap layout.
+ // Index by SLOT, never by array position: `buildingRecords` is compact while `inv.building` is a
+ // slot number, and the building table has holes in a third of the saves.
+  const buildingBySlot = new Map<number, BuildingRecord>();
+  for (const b of buildingRecords) buildingBySlot.set(b.index, b);
+  for (const inv of inventoryRecords) {
+    const owner = buildingBySlot.get(inv.building);
+    if (owner !== undefined) (owner as { inventoryIndex: number | null }).inventoryIndex = inv.index;
+  }
+
   const mapTiles = decodeMapTiles(dv, mapTilesOffset, cols, rows);
 
   return {
@@ -971,12 +986,17 @@ function decodeBuilding(
   const firstKnight = dv.getUint16(base + 10, true);
   const progress = dv.getUint16(base + 12, true);
 
- // Byte 14 is a union: a u32 inventory offset (/120) for a finished inventory building, else the
- // u16 `level`. Bytes 16/17 carry the stock maxima only while under construction.
+ // Byte 14 is a union. It holds a base-relative inventory offset (/120) only for an inventory
+ // building that is FINISHED and not burning — that is exactly the set `FUN_00048aa2` converts on
+ // save. For anything else the cell is raw: the levelling height of a construction site, or, for a
+ // castle under construction, the absolute inventory pointer `found_castle` left there. Its low half
+ // therefore lands in `level` and its high half in `stockMaximum`; the encoder reassembles both, and
+ // the usable link comes from the inventory's `building` back-reference instead.
+ // Bytes 16/17 carry the stock maxima only while under construction.
   let inventoryIndex: number | null = null;
   let level: number | null = null;
   let stockMaximum: [number, number] | null = null;
-  if (hasInventory && !constructing) {
+  if (hasInventory && !constructing && (b5 & 32) === 0) {
     inventoryIndex = Math.trunc(dv.getUint32(base + 14, true) / INVENTORY_RECORD_SIZE);
   } else {
     level = dv.getUint16(base + 14, true);
