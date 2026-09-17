@@ -892,8 +892,17 @@
   const stockSelection = $derived.by((): StockSelection | null => {
     const goods = settings.value.stockGoods;
     const serfs = settings.value.stockSerfs;
-    if (goods === 0 && serfs === 0) return null;
-    return { goods, serfs, mode: settings.value.stockSerfMode };
+    const supply = settings.value.stockSupply;
+    if (goods === 0 && serfs === 0 && supply === 0) return null;
+    return {
+      goods,
+      serfs,
+      supply,
+      mode: settings.value.stockSerfMode,
+      hideUnusedGoods: settings.value.stockGoodsHideUnused,
+      hideUnusedSerfs: settings.value.stockSerfsHideUnused,
+      hideUnusedSupply: settings.value.stockSupplyHideUnused
+    };
   });
 
   /**

@@ -217,16 +217,23 @@ const EN = {
 	'enh.stock.name': 'Stock overview',
 	'enh.stock.tab.goods': 'Goods',
 	'enh.stock.tab.serfs': 'Settlers',
+	'enh.stock.tab.supply': 'Supply',
 	'enh.stock.tab.view': 'Display',
 	'enh.stock.aria': 'Stock overview',
 	'enh.pick.all': 'All',
 	'enh.pick.none': 'None',
 	'enh.pick.count': '{on} of {all} selected',
 	'enh.pick.noIcons': 'Load an archive to see the pictures.',
+	// Shared by the three group tabs: each has a switch of its own, because "says nothing right
+	// now" means something different in each.
+	'enh.stock.hideUnusedNote':
+		'Rows that say nothing right now stay out. With everything hidden the plate is empty and ' +
+		'disappears.',
 	'enh.stock.goods.title': 'Which goods',
 	'enh.stock.goods.note':
 		'Counted over all your warehouses, plus the building reserve the castle parks at its founding — ' +
 		'the same sum the storage statistics show.',
+	'enh.stock.goods.hideUnused': 'Hide goods with none in store',
 	'enh.stock.serfs.title': 'Which settlers',
 	'enh.stock.serfs.mode': 'Count as',
 	'enh.stock.serfs.modeIdle': 'Resting in a store',
@@ -235,6 +242,27 @@ const EN = {
 		'“Could be made” adds the unemployed settlers to every profession whose tool lies in the store. ' +
 		'One settler therefore counts in several rows — the question is “how many of these could I ' +
 		'have”, not “how would they divide up”.',	
+	// The supply pointers of the two chain diagrams (statistics screens 0x10 / 0x11). The receiver
+	// and the good it is waiting for come from the manual legends via `entity-names.ts`; only the
+	// words below are ours, because no legend names a mine, a smelter or a construction site.
+	'enh.stock.serfs.hideUnused': 'Hide professions with nobody',
+	'enh.stock.supply.title': 'Which pointers',
+	'enh.stock.supply.note':
+		'The same pointers the food and merchandise diagrams show. On a consumer the fuller the ' +
+		'better; on a processor the middle is ideal — empty means nothing to do, full means it ' +
+		'cannot keep up.',
+	'enh.stock.supply.hideUnused': 'Hide pointers without a building',
+	'enh.stock.supply.hideUnusedNote':
+		'A pointer whose building you do not have has nothing to measure.',
+	'enh.stock.supply.food': 'Food',
+	'enh.stock.supply.mineGold': 'Gold mine',
+	'enh.stock.supply.mineCoal': 'Coal mine',
+	'enh.stock.supply.mineIron': 'Iron mine',
+	'enh.stock.supply.mineStone': 'Stone mine',
+	'enh.stock.supply.smelterGold': 'Gold smelter',
+	'enh.stock.supply.smelterSteel': 'Steel smelter',
+	'enh.stock.supply.military': 'Military buildings',
+	'enh.stock.supply.sites': 'Construction sites',
 	'enh.stock.view.perRow': 'Entries per row',
 	'enh.stock.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
 	// Shared by every overlay of ours — see `enhancements/overlay-place.ts`.
@@ -431,16 +459,21 @@ const DE: Record<ShellKey, string> = {
 	'enh.stock.name': 'Lager-Übersicht',
 	'enh.stock.tab.goods': 'Waren',
 	'enh.stock.tab.serfs': 'Siedler',
+	'enh.stock.tab.supply': 'Versorgung',
 	'enh.stock.tab.view': 'Darstellung',
 	'enh.stock.aria': 'Lager-Übersicht',	
 	'enh.pick.all': 'Alle',
 	'enh.pick.none': 'Keine',
 	'enh.pick.count': '{on} von {all} ausgewählt',
 	'enh.pick.noIcons': 'Laden Sie ein Archiv, um die Bilder zu sehen.',
+	'enh.stock.hideUnusedNote':
+		'Zeilen, die gerade nichts sagen, bleiben weg. Ist alles ausgeblendet, bleibt die Platte leer ' +
+		'und verschwindet.',
 	'enh.stock.goods.title': 'Welche Waren',
 	'enh.stock.goods.note':
 		'Gezählt über alle Ihre Lager, dazu die Bau-Reserve, die das Schloss bei der Gründung ' +
 		'zurücklegt — dieselbe Summe, die auch die Lager-Statistik zeigt.',
+	'enh.stock.goods.hideUnused': 'Waren ohne Bestand ausblenden',
 	'enh.stock.serfs.title': 'Welche Siedler',
 	'enh.stock.serfs.mode': 'Gezählt wird',
 	'enh.stock.serfs.modeIdle': 'Wer im Lager ruht',
@@ -449,6 +482,24 @@ const DE: Record<ShellKey, string> = {
 		'„Wer daraus werden könnte“ rechnet die freien Siedler jedem Beruf zu, dessen Werkzeug im Lager ' +
 		'liegt. Ein Siedler zählt damit in mehreren Zeilen — gefragt ist „wie viele davon könnte ich ' +
 		'haben“, nicht „wie würden sie sich aufteilen“.',	
+	'enh.stock.serfs.hideUnused': 'Berufe ohne Siedler ausblenden',
+	'enh.stock.supply.title': 'Welche Zeiger',
+	'enh.stock.supply.note':
+		'Dieselben Zeiger wie in der Nahrungs- und der Warenkette. Beim Verbraucher gilt: je voller, ' +
+		'desto besser. Beim Verarbeiter ist die Mitte ideal — leer heißt, er hat nichts zu tun, voll ' +
+		'heißt, er kommt nicht nach.',
+	'enh.stock.supply.hideUnused': 'Zeiger ohne Gebäude ausblenden',
+	'enh.stock.supply.hideUnusedNote':
+		'Ein Zeiger, dessen Gebäude Sie nicht haben, misst nichts.',
+	'enh.stock.supply.food': 'Nahrung',
+	'enh.stock.supply.mineGold': 'Goldmine',
+	'enh.stock.supply.mineCoal': 'Kohlemine',
+	'enh.stock.supply.mineIron': 'Eisenmine',
+	'enh.stock.supply.mineStone': 'Steinmine',
+	'enh.stock.supply.smelterGold': 'Goldschmelze',
+	'enh.stock.supply.smelterSteel': 'Stahlschmelze',
+	'enh.stock.supply.military': 'Militärgebäude',
+	'enh.stock.supply.sites': 'Baustellen',
 	'enh.stock.view.perRow': 'Einträge je Zeile',
 	'enh.stock.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
 	'enh.place.corner': 'Position',

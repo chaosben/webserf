@@ -17,7 +17,14 @@ import {
   type StockSelection,
 } from './stock-overview.js';
 import { GOOD_ORDER } from './ui-icons.js';
-import type { GameState, Inventory, Player, Serf } from '../core/engine/state.js';
+import type { Building, GameState, Inventory, Player, Serf } from '../core/engine/state.js';
+import { fillLadderIcon } from '../core/stats-popup.js';
+import {
+  SUPPLY_FOOD_MASK,
+  SUPPLY_INDUSTRY_MASK,
+  SUPPLY_POINTERS,
+  supplyIcon,
+} from './supply-pointers.js';
 
 function player(slot = 0, fields: Partial<Player> = {}): Player {
   return { slot, heldPlanks: 0, heldStone: 0, ...fields } as unknown as Player;
@@ -40,7 +47,11 @@ function gameState(serfs: (Serf | null)[], inventories: (Inventory | null)[]): G
 const sel = (fields: Partial<StockSelection> = {}): StockSelection => ({
   goods: 0,
   serfs: 0,
+  supply: 0,
   mode: 'idle',
+  hideUnusedGoods: false,
+  hideUnusedSerfs: false,
+  hideUnusedSupply: false,
   ...fields,
 });
 
@@ -133,6 +144,14 @@ describe('buildStockView — goods', () => {
     const state = gameState([], [inventory(0, { 7: 10 })]);
     expect(buildStockView(state, player(0), sel()).goods).toEqual([]);
   });
+
+  it('leaves out what there is none of, but only when asked to', () => {
+    const state = gameState([], [inventory(0, { 7: 10 })]);
+    const chosen = maskOf([0, 7]); // fish: none in store, planks: ten
+    expect(buildStockView(state, player(0), sel({ goods: chosen })).goods).toHaveLength(2);
+    const hidden = buildStockView(state, player(0), sel({ goods: chosen, hideUnusedGoods: true }));
+    expect(hidden.goods.map((r) => r.type)).toEqual([7]);
+  });
 });
 
 describe('buildStockView — serfs', () => {
@@ -149,6 +168,14 @@ describe('buildStockView — serfs', () => {
     const view = buildStockView(state, player(0), sel({ serfs: maskOf([3]) }));
     expect(view.goods).toEqual([]);
     expect(view.serfs).toEqual([{ kind: 'serf', type: 3, icon: 0x0c, value: 1 }]);
+  });
+
+  it('leaves out professions nobody is, but only when asked to', () => {
+    const state = gameState([serf(0, 3, 1)], []);
+    const chosen = maskOf([3, 9]); // one builder resting, no miner anywhere
+    expect(buildStockView(state, player(0), sel({ serfs: chosen })).serfs).toHaveLength(2);
+    const hidden = buildStockView(state, player(0), sel({ serfs: chosen, hideUnusedSerfs: true }));
+    expect(hidden.serfs.map((r) => r.type)).toEqual([3]);
   });
 
   /**
@@ -175,6 +202,138 @@ describe('buildStockView — serfs', () => {
       },
     } as unknown as GameState;
     expect(() => buildStockView(state, player(0), sel({ goods: maskOf([7]) }))).not.toThrow();
+  });
+});
+
+describe('supply pointers in the view', () => {
+  /** A state whose building walk is counted: `collectFillLevels` reads `header` once per run. */
+  function countingState(buildings: (Building | null)[] = []): {
+    state: GameState;
+    runs: () => number;
+  } {
+    let runs = 0;
+    const header = { maxBuildingIndex: buildings.length };
+    const state = {
+      serfs: [],
+      inventories: [],
+      buildings,
+      get header() {
+        runs += 1;
+        return header;
+      },
+    } as unknown as GameState;
+    return { state, runs: () => runs };
+  }
+
+  it('collects nothing when no pointer is selected', () => {
+    const { state, runs } = countingState();
+    expect(buildStockView(state, player(0), sel({ goods: 0 })).supply).toEqual([]);
+    expect(runs()).toBe(0);
+  });
+
+  /**
+   * The two chains are separate runs over all buildings. Selecting one must not pay for the other —
+   * that is the whole reason `SUPPLY_FOOD_MASK` exists.
+   */
+  it('walks only the chain a selected pointer belongs to', () => {
+    const foodOnly = countingState();
+    buildStockView(foodOnly.state, player(0), sel({ supply: SUPPLY_FOOD_MASK }));
+    expect(foodOnly.runs()).toBe(1);
+
+    const industryOnly = countingState();
+    buildStockView(industryOnly.state, player(0), sel({ supply: SUPPLY_INDUSTRY_MASK }));
+    expect(industryOnly.runs()).toBe(1);
+
+    const both = countingState();
+    buildStockView(both.state, player(0), sel({ supply: 1 | (1 << 20) }));
+    expect(both.runs()).toBe(2);
+  });
+
+  it('shows the needle the statistics screen would show', () => {
+    // A mill (type 15) with 3 waiting and 1 booked: the bucket the miller's pointer reads.
+    const mill = {
+      type: 15,
+      owner: 0,
+      burning: false,
+      constructing: false,
+      holder: true,
+      progress: 0,
+      stock: [
+        { available: 3, requested: 1 },
+        { available: 0, requested: 0 },
+      ],
+      stockMaximum: null,
+    } as unknown as Building;
+    const { state } = countingState([mill]);
+    const view = buildStockView(state, player(0), sel({ supply: maskOf([0]) }));
+    expect(view.supply.length).toBe(1);
+    const p = SUPPLY_POINTERS[0]!;
+    expect(view.supply[0]).toEqual({
+      index: 0,
+      toIcon: supplyIcon(p.to),
+      goodIcon: supplyIcon(p.good),
+      // (0x31 & 0xf) + ((0x31 & 0xf0) >> 3) = 7, one contributing building.
+      pointerIcon: fillLadderIcon(p.ladder, 7, 1),
+    });
+  });
+
+  /**
+   * The sharp case of "hide unused", and the reason the filter hangs off `count` rather than off the
+   * fill level — the two are one keystroke apart and mean opposite things:
+   *
+   * - A mill that is there and gets nothing: `count` 1, `sum` 0. That row is the whole point of the
+   *   statistic and has to stay.
+   * - No mill at all: `count` 0. The row is then about a building the player does not have.
+   *
+   * The original separates them too, with a sprite of its own — which is why the two expectations
+   * below are different icons, and why a filter written on the picture would have hit both.
+   */
+  it('keeps a starving receiver and drops one that does not exist', () => {
+    const starving = {
+      type: 15, // mill — pointer 0 of the food chain
+      owner: 0,
+      burning: false,
+      constructing: false,
+      holder: true,
+      progress: 0,
+      stock: [
+        { available: 0, requested: 0 },
+        { available: 0, requested: 0 },
+      ],
+      stockMaximum: null,
+    } as unknown as Building;
+
+    const withMill = buildStockView(
+      countingState([starving]).state,
+      player(0),
+      sel({ supply: maskOf([0]), hideUnusedSupply: true }),
+    );
+    expect(withMill.supply.map((r) => r.index)).toEqual([0]);
+    expect(withMill.supply[0]!.pointerIcon).toBe(fillLadderIcon('down', 0, 1));
+    expect(fillLadderIcon('down', 0, 1)).not.toBe(fillLadderIcon('down', 0, 0));
+
+    const withoutMill = buildStockView(
+      countingState().state,
+      player(0),
+      sel({ supply: maskOf([0]), hideUnusedSupply: true }),
+    );
+    expect(withoutMill.supply).toEqual([]);
+  });
+
+  /** Hiding is a filter on the result, never a reason to skip a walk — that cannot be known first. */
+  it('walks the chain even when everything would be hidden', () => {
+    const { state, runs } = countingState();
+    buildStockView(state, player(0), sel({ supply: SUPPLY_FOOD_MASK, hideUnusedSupply: true }));
+    expect(runs()).toBe(1);
+  });
+
+  it('an empty bucket shows the empty needle of its own ladder', () => {
+    const { state } = countingState();
+    const view = buildStockView(state, player(0), sel({ supply: maskOf([0, 4]) }));
+    expect(view.supply.map((r) => r.pointerIcon)).toEqual([
+      fillLadderIcon('down', 0, 0), // miller — workload ladder
+      fillLadderIcon('up', 0, 0), //   gold mine — supply ladder
+    ]);
   });
 });
 

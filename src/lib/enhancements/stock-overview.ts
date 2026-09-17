@@ -13,12 +13,27 @@
 import { RESOURCE_TYPE_NAMES, SERF_TYPE_NAMES } from '../core/save-parser.js';
 import type { GameState, Player } from '../core/engine/state.js';
 import {
+  FILL_SLOT_BYTES,
   PROFESSION_IDLE_STATE,
   PROFESSION_BUFFER_LENGTH,
+  collectFillLevels,
   professionAvailability,
   stockTotals,
 } from '../core/engine/stats.js';
+import {
+  FILL_RULES_FOOD,
+  FILL_RULES_INDUSTRY,
+  FILL_SLOTS_FOOD,
+  FILL_SLOTS_INDUSTRY,
+  fillLadderIcon,
+} from '../core/stats-popup.js';
 import { GOOD_ORDER, SERF_ORDER, goodIcon, serfIcon } from './ui-icons.js';
+import {
+  SUPPLY_FOOD_MASK,
+  SUPPLY_INDUSTRY_MASK,
+  SUPPLY_POINTERS,
+  supplyIcon,
+} from './supply-pointers.js';
 
 /** Selectable goods: resource types 0..25. */
 export const GOOD_SLOTS = RESOURCE_TYPE_NAMES.length;
@@ -105,13 +120,23 @@ export const maskToggled = (mask: number, index: number): number => mask ^ (1 <<
  */
 export const STOCK_GOODS_DEFAULT = 0;
 export const STOCK_SERFS_DEFAULT = 0;
+export const STOCK_SUPPLY_DEFAULT = 0;
 
 // --- the view ---------------------------------------------------------------------------------
 
 export interface StockSelection {
   readonly goods: number;
   readonly serfs: number;
+  readonly supply: number;
   readonly mode: StockSerfMode;
+  /**
+   * Leave out the rows that currently say nothing. One flag per group, because the question is a
+   * different one in each — a good nobody has, a profession nobody is, a pointer whose building
+   * does not exist — and each switch therefore carries its own wording.
+   */
+  readonly hideUnusedGoods: boolean;
+  readonly hideUnusedSerfs: boolean;
+  readonly hideUnusedSupply: boolean;
 }
 
 export interface StockRow {
@@ -127,9 +152,23 @@ export interface StockRow {
   readonly value: number;
 }
 
+/**
+ * One supply pointer. Three pictures instead of a number: who is waiting, for what, and how full
+ * the bucket is — the last one being the original's own needle, so the row says the same thing the
+ * chain diagram says.
+ */
+export interface SupplyRow {
+  /** Index into {@link SUPPLY_POINTERS} — the key of the row and the bit of the selection. */
+  readonly index: number;
+  readonly toIcon: number;
+  readonly goodIcon: number;
+  readonly pointerIcon: number;
+}
+
 export interface StockView {
   readonly goods: readonly StockRow[];
   readonly serfs: readonly StockRow[];
+  readonly supply: readonly SupplyRow[];
 }
 
 function rowsOf(
@@ -138,13 +177,16 @@ function rowsOf(
   mask: number,
   counts: readonly number[],
   icon: (index: number) => number | null,
+  hideUnused: boolean,
 ): StockRow[] {
   const rows: StockRow[] = [];
   for (const index of order) {
     if (!maskHas(mask, index)) continue;
+    const value = counts[index] ?? 0;
+    if (hideUnused && value === 0) continue;
     const pic = icon(index);
     if (pic === null) continue;
-    rows.push({ kind, type: index, icon: pic, value: counts[index] ?? 0 });
+    rows.push({ kind, type: index, icon: pic, value });
   }
   return rows;
 }
@@ -165,16 +207,74 @@ export function idleInStock(state: GameState, player: Player): number[] {
 }
 
 /**
+ * The selected supply pointers.
+ *
+ * The two chains are collected SEPARATELY and only when one of their bits is set. Each run walks
+ * every building of the player, so an unselected chain must not cost one — and the two runs are not
+ * merged into one either: they differ in their type mask (0x7c against 0xfc) and in whether they
+ * demand a finished building, so a shared walk would be an invention rather than a port.
+ */
+function supplyRows(
+  state: GameState,
+  player: Player,
+  mask: number,
+  hideUnused: boolean,
+): SupplyRow[] {
+  const food =
+    (mask & SUPPLY_FOOD_MASK) === 0
+      ? null
+      : collectFillLevels(state, player, FILL_RULES_FOOD, FILL_SLOTS_FOOD, true);
+  const industry =
+    (mask & SUPPLY_INDUSTRY_MASK) === 0
+      ? null
+      : collectFillLevels(state, player, FILL_RULES_INDUSTRY, FILL_SLOTS_INDUSTRY, false);
+
+  const rows: SupplyRow[] = [];
+  SUPPLY_POINTERS.forEach((p, index) => {
+    if (!maskHas(mask, index)) return;
+    const slots = p.chain === 'food' ? food : industry;
+    if (slots === null) return;
+    const slot = slots[p.byteSlot / FILL_SLOT_BYTES] ?? { sum: 0, count: 0 };
+    // Left out on `count`, NOT on the fill level. A bucket with contributors that stands at zero is
+    // the most important row there is — the buildings are there and they are getting nothing. Only
+    // `count === 0` says the receiver does not exist at all, and then the row is about a building
+    // the player does not have. (The original tells the two apart as well: its ladder carries a
+    // twelfth sprite for "nothing contributes", next to the one for "contributes nothing".)
+    if (hideUnused && slot.count === 0) return;
+    const toIcon = supplyIcon(p.to);
+    const goodIc = supplyIcon(p.good);
+    if (toIcon === null || goodIc === null) return;
+    rows.push({
+      index,
+      toIcon,
+      goodIcon: goodIc,
+      pointerIcon: fillLadderIcon(p.ladder, slot.sum, slot.count),
+    });
+  });
+  return rows;
+}
+
+/**
  * The rows to show, in the original's display order.
  *
- * An empty half costs NOTHING: neither counting function is called for it. That matters for the
- * serfs, which walk the whole serf table.
+ * An empty group costs NOTHING: no counting function is called for it. That matters for the serfs,
+ * which walk the whole serf table, and for the pointers, which walk all buildings twice.
+ *
+ * Hiding unused rows does NOT save a walk, and must not be turned into one: whether anything would
+ * be left over is not knowable without counting first.
  */
 export function buildStockView(state: GameState, player: Player, sel: StockSelection): StockView {
   const goods =
     sel.goods === 0
       ? []
-      : rowsOf('good', GOOD_ORDER, sel.goods, stockTotals(state, player), goodIcon);
+      : rowsOf(
+          'good',
+          GOOD_ORDER,
+          sel.goods,
+          stockTotals(state, player),
+          goodIcon,
+          sel.hideUnusedGoods,
+        );
   const serfs =
     sel.serfs === 0
       ? []
@@ -186,6 +286,9 @@ export function buildStockView(state: GameState, player: Player, sel: StockSelec
             ? professionAvailability(state, player)
             : idleInStock(state, player),
           serfIcon,
+          sel.hideUnusedSerfs,
         );
-  return { goods, serfs };
+  const supply =
+    sel.supply === 0 ? [] : supplyRows(state, player, sel.supply, sel.hideUnusedSupply);
+  return { goods, serfs, supply };
 }

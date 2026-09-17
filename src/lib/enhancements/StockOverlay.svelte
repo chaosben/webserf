@@ -12,8 +12,9 @@
    */
   import { iconImage } from './icon-images.svelte.js';
   import { goodName, serfName } from './entity-names.js';
+  import { supplyName } from './supply-pointers.js';
   import { st } from '../shell/i18n.js';
-  import type { StockRow, StockView } from './stock-overview.js';
+  import type { StockRow, StockView, SupplyRow } from './stock-overview.js';
 
   let {
     view,
@@ -50,6 +51,17 @@
   });
 
   /**
+   * The supply pointers stand in a list of their own rather than in `groups`: their cell has three
+   * pictures and no number, and squeezing both shapes through one loop would buy the shared markup
+   * with a union to narrow on every line.
+   *
+   * THE ORDER OF THE THREE PICTURES IS THE SENTENCE: what is delivered, who waits for it, how it
+   * stands — the direction of the original's own arrow, and the same direction {@link supplyName}
+   * spells out. Swap one of the two and the tooltip contradicts the row.
+   */
+  const supply = $derived<readonly SupplyRow[]>(view?.supply ?? []);
+
+  /**
    * The picture comes at step 1 and gets its size here, rounded to WHOLE pixels.
    *
    * That is what makes the readout stepless: `spriteCanvas` can only blit whole factors, so a
@@ -68,7 +80,7 @@
   };
 </script>
 
-{#if groups.length > 0}
+{#if groups.length > 0 || supply.length > 0}
   <!-- No `aria-live`: a region that changes several times a second is a barrage for a screen
        reader. Findable in the tree, but not announced. -->
   <section
@@ -94,6 +106,26 @@
         {/each}
       </ul>
     {/each}
+
+    {#if supply.length > 0}
+      <ul>
+        {#each supply as row (row.index)}
+          {@const good = sized(row.goodIcon)}
+          {@const to = sized(row.toIcon)}
+          {@const needle = sized(row.pointerIcon)}
+          {@const name = supplyName(row.index)}
+          <li title={name}>
+            {#if good === null || to === null || needle === null}
+              <span class="name">{name}</span>
+            {:else}
+              <img src={good.url} alt={name} width={good.w} height={good.h} />
+              <img src={to.url} alt="" width={to.w} height={to.h} />
+              <img src={needle.url} alt="" width={needle.w} height={needle.h} />
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </section>
 {/if}
 

@@ -36,8 +36,10 @@ import {
 	STOCK_PER_ROW_MIN,
 	STOCK_SERFS_DEFAULT,
 	STOCK_SERF_MODES,
+	STOCK_SUPPLY_DEFAULT,
 	type StockSerfMode
 } from '../enhancements/stock-overview.js';
+import { SUPPLY_SLOTS } from '../enhancements/supply-pointers.js';
 import {
 	OVERLAY_CORNERS,
 	OVERLAY_OPACITY_DEFAULT,
@@ -88,6 +90,20 @@ export interface SettingsShape {
 	stockGoods: number;
 	/** Which professions it lists — bit i = serf type i. */
 	stockSerfs: number;
+	/**
+	 * Which supply pointers it lists — bit i = entry i of `SUPPLY_POINTERS`. A mask for the same
+	 * reason as {@link stockGoods}: that order is not ours either, it is the order of the two
+	 * display tables of statistics screens 0x10/0x11 and cannot move.
+	 */
+	stockSupply: number;
+	/**
+	 * Leave out rows that currently say nothing — one switch per group, because each asks a
+	 * different question (see `stock-overview.ts`). Off by default: for goods and settlers a zero is
+	 * an honest answer, and only at the pointers is an empty row actually misleading.
+	 */
+	stockGoodsHideUnused: boolean;
+	stockSerfsHideUnused: boolean;
+	stockSupplyHideUnused: boolean;
 	/** Which corner of the game surface it sits in. */
 	stockCorner: OverlayCorner;
 	/** What the serf numbers mean: resting in a store, or what could be made of the unemployed. */
@@ -140,6 +156,10 @@ const DEFAULTS: SettingsShape = {
 	viewOptions: [VIEW_OPTIONS_DEFAULT, VIEW_OPTIONS_DEFAULT],
 	stockGoods: STOCK_GOODS_DEFAULT,
 	stockSerfs: STOCK_SERFS_DEFAULT,
+	stockSupply: STOCK_SUPPLY_DEFAULT,
+	stockGoodsHideUnused: false,
+	stockSerfsHideUnused: false,
+	stockSupplyHideUnused: false,
 	stockCorner: 'tl',
 	stockSerfMode: 'idle',
 	stockOpacity: OVERLAY_OPACITY_DEFAULT,
@@ -187,6 +207,10 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	viewOptions: (v): v is [number, number] => Array.isArray(v) && v.length === 2 && v.every(isByte),
 	stockGoods: (v): v is number => isMask(v, GOOD_SLOTS),
 	stockSerfs: (v): v is number => isMask(v, SERF_SLOTS),
+	stockSupply: (v): v is number => isMask(v, SUPPLY_SLOTS),
+	stockGoodsHideUnused: (v): v is boolean => typeof v === 'boolean',
+	stockSerfsHideUnused: (v): v is boolean => typeof v === 'boolean',
+	stockSupplyHideUnused: (v): v is boolean => typeof v === 'boolean',
 	stockCorner: (v): v is OverlayCorner => isOneOf(v, OVERLAY_CORNERS),
 	stockSerfMode: (v): v is StockSerfMode => isOneOf(v, STOCK_SERF_MODES),
 	stockOpacity: (v): v is number =>

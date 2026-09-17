@@ -206,13 +206,32 @@ describe('stats-popup — fill levels (0x10/0x11)', () => {
 
   it('military gold has fixed caps 2/4/8 per building kind', () => {
     const gold = FILL_RULES_INDUSTRY.filter((r) => r.kind.startsWith('gold'));
-    expect(gold.map((r) => [r.codedType, r.kind])).toEqual([
+    expect(gold.map((r) => [r.match, r.kind])).toEqual([
       [0x2c, 'gold2'], // guard hut
       [0x54, 'gold4'], // watchtower
       [0x58, 'gold8'], // fortress
     ]);
     // All three pay into the same pot.
     expect(new Set(gold.map((r) => r.byteSlot)).size).toBe(1);
+  });
+
+  it('only screen 0x11 has a construction-site branch, and only for planks and stones', () => {
+    // Screen 0x10 ends at its last type comparison — no sign branch, hence no non-numeric match.
+    expect(FILL_RULES_FOOD.every((r) => typeof r.match === 'number')).toBe(true);
+
+    const sites = FILL_RULES_INDUSTRY.filter((r) => r.match === 'constructionSite');
+    expect(sites.map((r) => [r.byteSlot, r.kind])).toEqual([
+      [0x42, 'norm8'], // planks
+      [0x48, 'norm9'], // stones
+    ]);
+  });
+
+  it('the two `norm` kinds belong to the construction branch alone', () => {
+    // `norm8`/`norm9` divide by `2 * stockMaximum`, and that is zero on a finished building: a
+    // numeric match carrying them would be a bucket that can never be filled.
+    for (const r of [...FILL_RULES_FOOD, ...FILL_RULES_INDUSTRY]) {
+      if (r.kind === 'norm8' || r.kind === 'norm9') expect(r.match).toBe('constructionSite');
+    }
   });
 });
 

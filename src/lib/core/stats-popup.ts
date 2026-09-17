@@ -329,14 +329,14 @@ export interface FillDisplay {
 
 /** Type chain of screen 0x10 (`@0x40167`..): eight food/ore consumers, each `bld+8`. */
 export const FILL_RULES_FOOD: readonly FillRule[] = [
-  { codedType: 0x3c, byteSlot: 0x00, kind: 'stock8' }, // mill
-  { codedType: 0x40, byteSlot: 0x06, kind: 'stock8' }, // baker
-  { codedType: 0x38, byteSlot: 0x0c, kind: 'stock8' }, // pig farm
-  { codedType: 0x34, byteSlot: 0x12, kind: 'stock8' }, // butcher
-  { codedType: 0x20, byteSlot: 0x18, kind: 'stock8' }, // gold mine
-  { codedType: 0x18, byteSlot: 0x1e, kind: 'stock8' }, // coal mine
-  { codedType: 0x1c, byteSlot: 0x24, kind: 'stock8' }, // iron mine
-  { codedType: 0x14, byteSlot: 0x2a, kind: 'stock8' }, // stone mine
+  { match: 0x3c, byteSlot: 0x00, kind: 'stock8' }, // mill
+  { match: 0x40, byteSlot: 0x06, kind: 'stock8' }, // baker
+  { match: 0x38, byteSlot: 0x0c, kind: 'stock8' }, // pig farm
+  { match: 0x34, byteSlot: 0x12, kind: 'stock8' }, // butcher
+  { match: 0x20, byteSlot: 0x18, kind: 'stock8' }, // gold mine
+  { match: 0x18, byteSlot: 0x1e, kind: 'stock8' }, // coal mine
+  { match: 0x1c, byteSlot: 0x24, kind: 'stock8' }, // iron mine
+  { match: 0x14, byteSlot: 0x2a, kind: 'stock8' }, // stone mine
 ];
 export const FILL_SLOTS_FOOD = 12;
 export const FILL_DISPLAY_FOOD: readonly FillDisplay[] = [
@@ -352,21 +352,24 @@ export const FILL_DISPLAY_FOOD: readonly FillDisplay[] = [
 
 /** Type chain of screen 0x11: smelters, smithies, sawmill, boat builder and military gold. */
 export const FILL_RULES_INDUSTRY: readonly FillRule[] = [
-  { codedType: 0x5c, byteSlot: 0x00, kind: 'stock9' }, // gold smelter: gold ore
-  { codedType: 0x5c, byteSlot: 0x06, kind: 'stock8' }, // gold smelter: coal
-  { codedType: 0x48, byteSlot: 0x0c, kind: 'stock8' }, // steel smelter: coal
-  { codedType: 0x48, byteSlot: 0x12, kind: 'stock9' }, // steel smelter: iron ore
-  { codedType: 0x44, byteSlot: 0x18, kind: 'stock9' }, // sawmill: logs
-  { codedType: 0x2c, byteSlot: 0x1e, kind: 'gold2' }, // hut: gold
-  { codedType: 0x54, byteSlot: 0x1e, kind: 'gold4' }, // tower: gold
-  { codedType: 0x58, byteSlot: 0x1e, kind: 'gold8' }, // fortress: gold
-  { codedType: 0x50, byteSlot: 0x24, kind: 'stock8' }, // weaponsmith: coal
-  { codedType: 0x50, byteSlot: 0x2a, kind: 'stock9' }, // weaponsmith: steel
-  { codedType: 0x4c, byteSlot: 0x30, kind: 'stock9' }, // toolmaker: steel
-  { codedType: 0x4c, byteSlot: 0x36, kind: 'stock8' }, // toolmaker: planks
-  { codedType: 0x0c, byteSlot: 0x3c, kind: 'stock8' }, // boat builder: planks
-  { codedType: 0x0c, byteSlot: 0x42, kind: 'norm8' },
-  { codedType: 0x0c, byteSlot: 0x48, kind: 'norm9' },
+  { match: 0x5c, byteSlot: 0x00, kind: 'stock9' }, // gold smelter: gold ore
+  { match: 0x5c, byteSlot: 0x06, kind: 'stock8' }, // gold smelter: coal
+  { match: 0x48, byteSlot: 0x0c, kind: 'stock8' }, // steel smelter: coal
+  { match: 0x48, byteSlot: 0x12, kind: 'stock9' }, // steel smelter: iron ore
+  { match: 0x44, byteSlot: 0x18, kind: 'stock9' }, // sawmill: logs
+  { match: 0x2c, byteSlot: 0x1e, kind: 'gold2' }, // hut: gold
+  { match: 0x54, byteSlot: 0x1e, kind: 'gold4' }, // tower: gold
+  { match: 0x58, byteSlot: 0x1e, kind: 'gold8' }, // fortress: gold
+  { match: 0x50, byteSlot: 0x24, kind: 'stock8' }, // weaponsmith: coal
+  { match: 0x50, byteSlot: 0x2a, kind: 'stock9' }, // weaponsmith: steel
+  { match: 0x4c, byteSlot: 0x30, kind: 'stock9' }, // toolmaker: steel
+  { match: 0x4c, byteSlot: 0x36, kind: 'stock8' }, // toolmaker: planks
+  { match: 0x0c, byteSlot: 0x3c, kind: 'stock8' }, // boat builder: planks
+  // Every construction site that has begun, whatever its type: planks (`bld+8`) and stones (`bld+9`)
+  // against the site's own `stockMaximum` — which is why these two are the only `norm*` rules. Not a
+  // boat builder entry: the original reaches them through the sign branch after the type chain.
+  { match: 'constructionSite', byteSlot: 0x42, kind: 'norm8' },
+  { match: 'constructionSite', byteSlot: 0x48, kind: 'norm9' },
 ];
 export const FILL_SLOTS_INDUSTRY = 20;
 export const FILL_DISPLAY_INDUSTRY: readonly FillDisplay[] = [

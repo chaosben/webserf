@@ -1,6 +1,7 @@
 <script lang="ts">
   /** Which settlers the stock overview lists — and what its numbers mean. */
   import IconPicker from './IconPicker.svelte';
+  import HideUnusedToggle from './HideUnusedToggle.svelte';
   import { SERF_ORDER, serfIcon } from './ui-icons.js';
   import { STOCK_SERF_MODES, type StockSerfMode } from './stock-overview.js';
   import { serfName } from './entity-names.js';
@@ -21,6 +22,11 @@
     icon={serfIcon}
     name={serfName}
     onchange={(mask) => settings.set('stockSerfs', mask)}
+  />
+  <HideUnusedToggle
+    label="enh.stock.serfs.hideUnused"
+    checked={settings.value.stockSerfsHideUnused}
+    onchange={(on) => settings.set('stockSerfsHideUnused', on)}
   />
 </section>
 

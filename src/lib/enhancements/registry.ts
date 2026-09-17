@@ -22,6 +22,7 @@ import type { OverlayTab } from '../shell/drawer.js';
 import type { ShellKey } from '../shell/i18n.js';
 import StockGoodsTab from './StockGoodsTab.svelte';
 import StockSerfsTab from './StockSerfsTab.svelte';
+import StockSupplyTab from './StockSupplyTab.svelte';
 import StockDisplayTab from './StockDisplayTab.svelte';
 import HacksTab from './HacksTab.svelte';
 import HacksDisplayTab from './HacksDisplayTab.svelte';
@@ -45,6 +46,7 @@ export const ENHANCEMENTS: readonly Enhancement[] = [
     tabs: [
       { id: 'stock.goods', labelKey: 'enh.stock.tab.goods', panel: StockGoodsTab },
       { id: 'stock.serfs', labelKey: 'enh.stock.tab.serfs', panel: StockSerfsTab },
+      { id: 'stock.supply', labelKey: 'enh.stock.tab.supply', panel: StockSupplyTab },
       { id: 'stock.view', labelKey: 'enh.stock.tab.view', panel: StockDisplayTab },
     ],
   },

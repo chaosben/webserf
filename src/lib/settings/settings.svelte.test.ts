@@ -107,6 +107,13 @@ describe('settings store', () => {
 		['a fractional goods mask', { stockGoods: 1.5 }, 'stockGoods'],
 		['a goods mask past the last good', { stockGoods: 2 ** 26 }, 'stockGoods'],
 		['a serf mask past the last profession', { stockSerfs: 2 ** 27 }, 'stockSerfs'],
+		['a supply mask past the last pointer', { stockSupply: 2 ** 21 }, 'stockSupply'],
+		['a supply mask as a string of bits', { stockSupply: '101' }, 'stockSupply'],
+		// The three "hide unused" switches are booleans and nothing else — a truthy string must not
+		// switch one on, the same trap as the hack switches below.
+		['a hide switch set with a string', { stockGoodsHideUnused: 'yes' }, 'stockGoodsHideUnused'],
+		['a hide switch set with a number', { stockSerfsHideUnused: 1 }, 'stockSerfsHideUnused'],
+		['a hide switch set with null', { stockSupplyHideUnused: null }, 'stockSupplyHideUnused'],
 		['a corner that does not exist', { stockCorner: 'middle' }, 'stockCorner'],
 		['an unknown serf mode', { stockSerfMode: 'total' }, 'stockSerfMode'],
 		['an opacity outside 0.2..1', { stockOpacity: 5 }, 'stockOpacity'],

@@ -15,6 +15,7 @@
     order,
     mask,
     icon,
+    icon2,
     name,
     onchange
   }: {
@@ -22,17 +23,20 @@
     order: readonly number[];
     mask: number;
     icon: (index: number) => number | null;
+    /**
+     * A SECOND picture, for entries only a pair tells apart — a supply pointer names both the
+     * receiver and the good it waits for. Left out, a box carries one picture as before.
+     */
+    icon2?: (index: number) => number | null;
     name: (index: number) => string;
     onchange: (mask: number) => void;
   } = $props();
 
+  const urlOf = (pic: number | null): string | null =>
+    pic === null ? null : iconUrl(pic, PICKER_ICON_SCALE);
+
   const chosen = $derived(order.filter((i) => maskHas(mask, i)).length);
-  const anyIcon = $derived(
-    order.some((i) => {
-      const pic = icon(i);
-      return pic !== null && iconUrl(pic, PICKER_ICON_SCALE) !== null;
-    })
-  );
+  const anyIcon = $derived(order.some((i) => urlOf(icon(i)) !== null));
 
   const allOn = (): void => onchange(order.reduce((m, i) => m | (1 << i), mask));
   const allOff = (): void => onchange(order.reduce((m, i) => m & ~(1 << i), mask));
@@ -50,8 +54,8 @@
 
 <ul>
   {#each order as index (index)}
-    {@const pic = icon(index)}
-    {@const url = pic === null ? null : iconUrl(pic, PICKER_ICON_SCALE)}
+    {@const first = urlOf(icon(index))}
+    {@const second = urlOf(icon2?.(index) ?? null)}
     <li>
       <label>
         <input
@@ -59,8 +63,11 @@
           checked={maskHas(mask, index)}
           onchange={() => onchange(maskToggled(mask, index))}
         />
-        {#if url !== null}
-          <img src={url} alt="" />
+        {#if first !== null}
+          <img src={first} alt="" />
+        {/if}
+        {#if second !== null}
+          <img src={second} alt="" />
         {/if}
         <span>{name(index)}</span>
       </label>

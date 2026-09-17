@@ -83,12 +83,23 @@ export function serfCensusTotal(player: Player): number {
 export type FillKind = 'stock8' | 'stock9' | 'norm8' | 'norm9' | 'gold2' | 'gold4' | 'gold8';
 
 /**
- * One entry of a fill-level screen's type chain: encoded type -> bucket + kind of computation.
+ * What a rule matches: a coded building type, or **any construction site that has begun**.
+ *
+ * The second form exists because screen 0x11 does not end its `cmpw` chain at the last type. The
+ * fall-through branch @0x40743 tests the sign of the coded type (`jns` @0x40748 — only a building
+ * with the construction bit set gets past it) and then the progress word `bld+0xc` (`je` @0x40754 —
+ * a site that has not begun pays nothing in). Screen 0x10 has no such branch: `andw $0x7c` @0x4021d,
+ * eight `cmpw` @0x40222..@0x402d0, then the loop foot.
+ */
+export type FillMatch = number | 'constructionSite';
+
+/**
+ * One entry of a fill-level screen's type chain: what it matches -> bucket + kind of computation.
  * `byteSlot` is the **original byte offset** in the scratch buffer; a bucket is 6 bytes there
  * (u32 sum + u16 count), so `bucket = byteSlot / 6`.
  */
 export interface FillRule {
-  readonly codedType: number;
+  readonly match: FillMatch;
   readonly byteSlot: number;
   readonly kind: FillKind;
 }
@@ -143,8 +154,8 @@ function contribute(slot: FillSlot, kind: FillKind, bld: Building): void {
  * Both original loops run over the occupancy bitmap up to `maxBuildingIndex`, skip **burning**
  * buildings (`bld+5` bit 5) and test `owner == player`. Screen 0x10 masks the type with `0x7c` and
  * additionally requires the building to be **finished** (`bld[4]` as `char` >= 0, i.e. construction
- * bit clear); screen 0x11 masks with `0xfc` — there the construction bit is already part of the
- * comparison value, so construction sites drop out by themselves.
+ * bit clear); screen 0x11 masks with `0xfc`, so a construction site matches none of its type
+ * comparisons — it is caught by the {@link FillMatch} branch at the end of that chain instead.
  */
 export function collectFillLevels(
   state: GameState,
@@ -163,7 +174,11 @@ export function collectFillLevels(
     if (requireComplete && bld.constructing) continue;
     const coded = ((bld.type << 2) | (bld.constructing ? 0x80 : 0)) & mask;
     for (const rule of rules) {
-      if (rule.codedType !== coded) continue;
+      const hit =
+        rule.match === 'constructionSite'
+          ? bld.constructing && bld.progress !== 0
+          : rule.match === coded;
+      if (!hit) continue;
       const slot = slots[rule.byteSlot / FILL_SLOT_BYTES];
       if (slot) contribute(slot, rule.kind, bld);
     }

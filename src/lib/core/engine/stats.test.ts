@@ -33,6 +33,7 @@ function building(fields: Partial<Building> & { type: number }): Building {
     burning: false,
     constructing: false,
     holder: true,
+    progress: 0,
     stock: [
       { available: 0, requested: 0 },
       { available: 0, requested: 0 },
@@ -161,6 +162,76 @@ describe('stats — fill levels (screens 0x10/0x11)', () => {
     const slots = collectFillLevels(state, player(), FILL_RULES_INDUSTRY, FILL_SLOTS_INDUSTRY, false);
     expect(slots[0x0c / 6]).toEqual({ sum: 4, count: 1 }); // (0x20 & 0xf) + (0x20 >> 3) = 0 + 4
     expect(slots[0x12 / 6]).toEqual({ sum: 11, count: 1 }); // (0x51 & 0xf) + (0x50 >> 3) = 1 + 10
+  });
+
+  // The last two buckets of screen 0x11 belong to no building type: they collect every construction
+  // site, which is what makes `stockMaximum` (set on sites only) a usable divisor.
+  const site = (fields: Partial<Building> = {}) =>
+    building({
+      type: 11, // any type — the branch does not look at it
+      constructing: true,
+      progress: 0x100,
+      stockMaximum: [4, 2],
+      stock: [
+        { available: 2, requested: 0 },
+        { available: 1, requested: 0 },
+      ],
+      ...fields,
+    });
+  const SITE_PLANKS = { sum: 8, count: 1 }; // ((0x20 >> 3) << 4) / (2 * 4)
+  const SITE_STONES = { sum: 8, count: 1 }; // ((0x10 >> 3) << 4) / (2 * 2)
+
+  it('a construction site that has begun pays into the planks and stones buckets', () => {
+    const state = gameState([site()], []);
+    const slots = collectFillLevels(state, player(), FILL_RULES_INDUSTRY, FILL_SLOTS_INDUSTRY, false);
+    expect(slots[0x42 / 6]).toEqual(SITE_PLANKS);
+    expect(slots[0x48 / 6]).toEqual(SITE_STONES);
+  });
+
+  it('a site without progress pays nothing in, not even into the count', () => {
+    const state = gameState([site({ progress: 0 })], []);
+    const slots = collectFillLevels(state, player(), FILL_RULES_INDUSTRY, FILL_SLOTS_INDUSTRY, false);
+    expect(slots[0x42 / 6]).toEqual({ sum: 0, count: 0 });
+    expect(slots[0x48 / 6]).toEqual({ sum: 0, count: 0 });
+  });
+
+  it('burning and foreign sites are skipped like any other building', () => {
+    for (const fields of [{ burning: true }, { owner: 1 }]) {
+      const slots = collectFillLevels(
+        gameState([site(fields)], []),
+        player(),
+        FILL_RULES_INDUSTRY,
+        FILL_SLOTS_INDUSTRY,
+        false,
+      );
+      expect(slots[0x42 / 6]!.count).toBe(0);
+    }
+  });
+
+  it('a FINISHED boat builder fills only its own bucket, never the site ones', () => {
+    const boats = building({
+      type: 3,
+      stock: [
+        { available: 2, requested: 0 },
+        { available: 0, requested: 0 },
+      ],
+      stockMaximum: [4, 2], // even if the bytes were set, a finished building is not a site
+    });
+    const slots = collectFillLevels(
+      gameState([boats], []),
+      player(),
+      FILL_RULES_INDUSTRY,
+      FILL_SLOTS_INDUSTRY,
+      false,
+    );
+    expect(slots[0x3c / 6]).toEqual({ sum: 4, count: 1 }); // (0x20 & 0xf) + (0x20 >> 3)
+    expect(slots[0x42 / 6]).toEqual({ sum: 0, count: 0 });
+    expect(slots[0x48 / 6]).toEqual({ sum: 0, count: 0 });
+  });
+
+  it('screen 0x10 has no construction branch at all', () => {
+    const slots = collectFillLevels(gameState([site()], []), player(), FILL_RULES_FOOD, 12, true);
+    for (const slot of slots) expect(slot).toEqual({ sum: 0, count: 0 });
   });
 });
 

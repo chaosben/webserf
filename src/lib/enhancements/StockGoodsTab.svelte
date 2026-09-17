@@ -1,6 +1,7 @@
 <script lang="ts">
   /** Which goods the stock overview lists. */
   import IconPicker from './IconPicker.svelte';
+  import HideUnusedToggle from './HideUnusedToggle.svelte';
   import { GOOD_ORDER, goodIcon } from './ui-icons.js';
   import { goodName } from './entity-names.js';
   import { settings } from '../settings/settings.svelte.js';
@@ -17,6 +18,11 @@
     onchange={(mask) => settings.set('stockGoods', mask)}
   />
   <p class="note">{st('enh.stock.goods.note')}</p>
+  <HideUnusedToggle
+    label="enh.stock.goods.hideUnused"
+    checked={settings.value.stockGoodsHideUnused}
+    onchange={(on) => settings.set('stockGoodsHideUnused', on)}
+  />
 </section>
 
 <style>
