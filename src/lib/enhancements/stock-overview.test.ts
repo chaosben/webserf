@@ -10,9 +10,13 @@ import {
   maskHas,
   maskOf,
   maskToggled,
+  STOCK_CELL_SPAN,
   STOCK_PER_ROW_DEFAULT,
   STOCK_PER_ROW_MAX,
   STOCK_PER_ROW_MIN,
+  SUPPLY_CELL_SPAN,
+  gridColumnCount,
+  supplyColumnSpan,
   stockRefreshDue,
   type StockSelection,
 } from './stock-overview.js';
@@ -103,6 +107,24 @@ describe('layout bounds', () => {
     expect(STOCK_PER_ROW_MAX).toBeGreaterThan(STOCK_PER_ROW_MIN);
     expect(STOCK_PER_ROW_DEFAULT).toBeGreaterThanOrEqual(STOCK_PER_ROW_MIN);
     expect(STOCK_PER_ROW_DEFAULT).toBeLessThanOrEqual(STOCK_PER_ROW_MAX);
+  });
+
+  /**
+   * The clamp, and nothing beyond it: that a pointer cell is one and a half goods wide is geometry
+   * of the archive, checked where the archive lies, and what it looks like is checked by eye.
+   */
+  it('never lets a pointer cell reach past the grid', () => {
+    for (let perRow = STOCK_PER_ROW_MIN; perRow <= STOCK_PER_ROW_MAX; perRow++) {
+      const span = supplyColumnSpan(perRow);
+      expect(span).toBeLessThanOrEqual(gridColumnCount(perRow));
+      expect(span).toBeGreaterThanOrEqual(STOCK_CELL_SPAN);
+      expect(span).toBe(perRow === 1 ? STOCK_CELL_SPAN : SUPPLY_CELL_SPAN);
+    }
+  });
+
+  /** A pointer is wider than a good — half places exist for that reason alone. */
+  it('gives a pointer more room than a good', () => {
+    expect(SUPPLY_CELL_SPAN).toBeGreaterThan(STOCK_CELL_SPAN);
   });
 });
 

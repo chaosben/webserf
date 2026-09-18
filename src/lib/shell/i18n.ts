@@ -264,7 +264,8 @@ const EN = {
 	'enh.stock.supply.military': 'Military buildings',
 	'enh.stock.supply.sites': 'Construction sites',
 	'enh.stock.view.perRow': 'Entries per row',
-	'enh.stock.view.perRowNote': 'One makes a narrow column, twelve a wide strip.',
+	'enh.stock.view.perRowNote':
+		'One makes a narrow column, twelve a wide strip. A supply pointer is one and a half entries wide.',
 	// Shared by every overlay of ours — see `enhancements/overlay-place.ts`.
 	'enh.place.corner': 'Position',
 	'enh.place.opacity': 'Opacity',
@@ -501,7 +502,8 @@ const DE: Record<ShellKey, string> = {
 	'enh.stock.supply.military': 'Militärgebäude',
 	'enh.stock.supply.sites': 'Baustellen',
 	'enh.stock.view.perRow': 'Einträge je Zeile',
-	'enh.stock.view.perRowNote': 'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen.',
+	'enh.stock.view.perRowNote':
+		'Eins ergibt eine schmale Säule, zwölf einen breiten Streifen. Ein Versorgungs-Zeiger ist anderthalb Einträge breit.',
 	'enh.place.corner': 'Position',
 	'enh.place.opacity': 'Deckkraft',
 	'enh.corner.tl': 'Oben links',

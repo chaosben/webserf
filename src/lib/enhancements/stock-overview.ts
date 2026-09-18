@@ -62,6 +62,34 @@ export const STOCK_PER_ROW_MAX = 12;
 export const STOCK_PER_ROW_DEFAULT = 1;
 
 /**
+ * How wide the two cell shapes are, in HALF places — the grid counts halves so that both fit it.
+ *
+ * All the icons involved are 16 by 16, so the widths are arithmetic: a good or a profession is
+ * picture + gap + a two-digit number and comes to about 35 units of scale, a pointer is three
+ * pictures with two gaps and comes to about 54. That is 1 : 1.55, and 2 : 3 is the closest whole
+ * ratio to it — near enough that a pointer cell stands all but full, and that the row a pointer
+ * shares with nothing else leaves at most one good's worth of space.
+ *
+ * Whole places (1 : 2) would leave a third of every pointer cell empty, and every odd setting would
+ * end its pointer rows one place short.
+ */
+export const STOCK_CELL_SPAN = 2;
+export const SUPPLY_CELL_SPAN = 3;
+
+/** Grid columns for a chosen row width. `repeat()` takes no `calc()`, so this comes from here. */
+export const gridColumnCount = (perRow: number): number => perRow * STOCK_CELL_SPAN;
+
+/**
+ * Half places a pointer cell takes, CLAMPED to the grid.
+ *
+ * At the narrowest setting the grid has two columns, and a `span 3` would grow an implicit third
+ * one — widening the very plate this is meant to keep narrow. One place wide the plate is a column
+ * and as wide as its widest cell either way.
+ */
+export const supplyColumnSpan = (perRow: number): number =>
+  Math.min(SUPPLY_CELL_SPAN, gridColumnCount(perRow));
+
+/**
  * THE SIZE IS NOT A SETTING. The readout takes the scale of the control bar below — `uiScaleFor`,
  * a plain `min(zoom, …)` without rounding — so it grows and shrinks with the map exactly as the bar
  * does, steplessly and without anyone choosing anything.

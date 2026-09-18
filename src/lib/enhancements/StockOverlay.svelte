@@ -14,7 +14,14 @@
   import { goodName, serfName } from './entity-names.js';
   import { supplyName } from './supply-pointers.js';
   import { st } from '../shell/i18n.js';
-  import type { StockRow, StockView, SupplyRow } from './stock-overview.js';
+  import {
+    STOCK_CELL_SPAN,
+    gridColumnCount,
+    supplyColumnSpan,
+    type StockRow,
+    type StockView,
+    type SupplyRow
+  } from './stock-overview.js';
 
   let {
     view,
@@ -25,7 +32,10 @@
     /** `null` = nothing selected, or no player to show. */
     view: StockView | null;
     opacity: number;
-    /** How many entries stand side by side before the list wraps. */
+    /**
+     * How many entries stand side by side before the list wraps — goods and professions, that is.
+     * The grid is counted in half places, so a supply pointer takes one and a half of them.
+     */
     perRow: number;
     /**
      * The control bar's own scale (`uiScaleFor`), passed straight through: the readout is sized
@@ -51,9 +61,10 @@
   });
 
   /**
-   * The supply pointers stand in a list of their own rather than in `groups`: their cell has three
-   * pictures and no number, and squeezing both shapes through one loop would buy the shared markup
-   * with a union to narrow on every line.
+   * The supply pointers get a loop of their own rather than a place in `groups`: their cell has
+   * three pictures and no number, and squeezing both shapes through one loop would buy the shared
+   * markup with a union to narrow on every line. They share the GRID with the others all the same —
+   * two loops under one parent cost nothing, and that shared grid is what keeps the rows one width.
    *
    * THE ORDER OF THE THREE PICTURES IS THE SENTENCE: what is delivered, who waits for it, how it
    * stands — the direction of the original's own arrow, and the same direction {@link supplyName}
@@ -86,12 +97,17 @@
   <section
     class="overview game-overlay"
     style:--plate-opacity={opacity}
-    style:--per-row={perRow}
+    style:--cols={gridColumnCount(perRow)}
+    style:--cell-span={STOCK_CELL_SPAN}
+    style:--supply-span={supplyColumnSpan(perRow)}
     style:--overlay-scale={scale}
     aria-label={st('enh.stock.aria')}
   >
-    {#each groups as group (group.key)}
-      <ul>
+    <ul>
+      {#each groups as group, i (group.key)}
+        {#if i > 0}
+          <li class="rule" aria-hidden="true"></li>
+        {/if}
         {#each group.rows as row (row.icon)}
           {@const pic = sized(row.icon)}
           {@const name = nameOf(row)}
@@ -104,17 +120,18 @@
             <span class="value">{row.value}</span>
           </li>
         {/each}
-      </ul>
-    {/each}
+      {/each}
 
-    {#if supply.length > 0}
-      <ul>
+      {#if supply.length > 0}
+        {#if groups.length > 0}
+          <li class="rule" aria-hidden="true"></li>
+        {/if}
         {#each supply as row (row.index)}
           {@const good = sized(row.goodIcon)}
           {@const to = sized(row.toIcon)}
           {@const needle = sized(row.pointerIcon)}
           {@const name = supplyName(row.index)}
-          <li title={name}>
+          <li class="supply" title={name}>
             {#if good === null || to === null || needle === null}
               <span class="name">{name}</span>
             {:else}
@@ -124,8 +141,8 @@
             {/if}
           </li>
         {/each}
-      </ul>
-    {/if}
+      {/if}
+    </ul>
   </section>
 {/if}
 
@@ -140,9 +157,6 @@
    * than as icons drifting apart inside a frame that stays put.
    */
   .overview {
-    display: flex;
-    flex-direction: column;
-    gap: calc(0.4rem * var(--overlay-scale));
     max-width: 100%;
     padding: calc(0.35rem * var(--overlay-scale)) calc(0.45rem * var(--overlay-scale));
     background: color-mix(in srgb, var(--bg-sunken) calc(var(--plate-opacity) * 100%), transparent);
@@ -153,27 +167,40 @@
   }
 
   /*
-   * `max-content` and not `1fr`: the columns become as wide as their content, so the plate stays as
-   * narrow as the chosen row width allows.
+   * ONE grid for all three groups, counted in HALF places: a good or a profession takes two, a
+   * supply pointer three. Three separate grids would each be as wide as its own cells, and since
+   * the plate takes the widest of them, a row of goods then ends in a third of a row of blank —
+   * the pointer cell is one and a half goods wide.
+   *
+   * `max-content` and not `1fr`: a column becomes as wide as the widest thing spanning it, so the
+   * plate stays as narrow as the chosen row width allows, and the two shapes settle against each
+   * other without anyone measuring a pixel.
    */
   ul {
     display: grid;
-    grid-template-columns: repeat(var(--per-row), max-content);
+    grid-template-columns: repeat(var(--cols), max-content);
     gap: calc(0.15rem * var(--overlay-scale)) calc(0.6rem * var(--overlay-scale));
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  ul + ul {
-    padding-top: calc(0.35rem * var(--overlay-scale));
-    border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
-  }
-
   li {
     display: flex;
+    grid-column: span var(--cell-span);
     align-items: center;
     gap: calc(0.2rem * var(--overlay-scale));
+  }
+
+  li.supply {
+    grid-column: span var(--supply-span);
+  }
+
+  /* The line between two groups is a row of its own now that they share the grid. */
+  li.rule {
+    grid-column: 1 / -1;
+    margin: calc(0.25rem * var(--overlay-scale)) 0;
+    border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
   }
 
   /*
