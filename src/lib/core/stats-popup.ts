@@ -389,32 +389,53 @@ export const FILL_DISPLAY_INDUSTRY: readonly FillDisplay[] = [
 ];
 
 /**
- * Thresholds of the icon ladder. Both drawers (`FUN_00040bfb` upwards, `FUN_00040cd1` downwards) use
- * the same ten values, only in opposite direction; the step is a constant 0x17.
+ * Thresholds of the icon ladder, ten values a constant 0x17 apart. Held as the largest value that
+ * is still *below* a step, because the port compares with `<=` where the original compares against
+ * `t + 1` with `jb`/`jae`.
+ *
+ * The two drawers walk this table in **opposite directions**, and that is the whole trick:
+ * `FUN_00040bfb` starts at `0xbc` and walks the thresholds upwards, adding 1 per hit; `FUN_00040cd1`
+ * starts at `0xd2` and walks them **downwards**, subtracting 1 per miss (`subw $0x1,0x8(%edi)`
+ * @0x40d25, guarded by `jae` @0x40d23 against 0xe6 first). With `k = #{t : q > t}` that works out to
+ * `0xbc + k` and `0xd2 - (10 - k) = 0xc8 + k` — so **both ladders move the needle the same way**:
+ * an empty bucket sits at the first icon of its bank, a full one at the last. Reading only the
+ * `addw`/`subw` and mirroring the second ladder puts every workload needle on the wrong end.
  */
 export const FILL_LADDER_THRESHOLDS: readonly number[] = [
   0x16, 0x2d, 0x44, 0x5b, 0x72, 0x89, 0xa0, 0xb7, 0xce, 0xe5,
 ];
-/** Base icon and empty icon of the two ladders. */
+/** Base icon and empty icon of the two ladders, as the two drawers load them. */
 export const FILL_LADDER_UP_BASE = 0xbc;
 export const FILL_LADDER_UP_EMPTY = 0xbc + 0xb;
 export const FILL_LADDER_DOWN_BASE = 0xd2;
 export const FILL_LADDER_DOWN_EMPTY = 0xd2 + 1;
+/** Icon of the `down` bank at an empty bucket — the far end its drawer reaches, `0xd2 - 10`. */
+export const FILL_LADDER_DOWN_LOW = FILL_LADDER_DOWN_BASE - FILL_LADDER_THRESHOLDS.length;
 
 /**
  * Icon of one fill-level slot. Without a contributing building (`count == 0`) the empty icon; else
- * `q = (sum << 4) / count` run through the ladder - `up` counts up from the base icon, `down` counts
- * down from it.
+ * `q = (sum << 4) / count` run through the ladder.
+ *
+ * Kept in the shape of the two original drawers rather than as the shorter `bank + k`: the
+ * equivalence of the two forms is what the guard proves, so it must not be what the code assumes.
  */
 export function fillLadderIcon(ladder: 'up' | 'down', sum: number, count: number): number {
   if (count === 0) return ladder === 'up' ? FILL_LADDER_UP_EMPTY : FILL_LADDER_DOWN_EMPTY;
   const q = Math.floor((sum << 4) / count);
-  let steps = 0;
-  for (const t of FILL_LADDER_THRESHOLDS) {
-    if (q <= t) break;
-    steps += 1;
+  if (ladder === 'up') {
+    let icon = FILL_LADDER_UP_BASE;
+    for (const t of FILL_LADDER_THRESHOLDS) {
+      if (q <= t) break;
+      icon += 1;
+    }
+    return icon;
   }
-  return ladder === 'up' ? FILL_LADDER_UP_BASE + steps : FILL_LADDER_DOWN_BASE - steps;
+  let icon = FILL_LADDER_DOWN_BASE;
+  for (let i = FILL_LADDER_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (q > FILL_LADDER_THRESHOLDS[i]!) break;
+    icon -= 1;
+  }
+  return icon;
 }
 
 /** Icon table of screen 0x10 (`@0x403f5`): the diagram of arrows and goods icons. */

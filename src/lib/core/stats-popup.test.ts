@@ -12,6 +12,7 @@ import {
   FILL_DISPLAY_INDUSTRY,
   FILL_LADDER_DOWN_BASE,
   FILL_LADDER_DOWN_EMPTY,
+  FILL_LADDER_DOWN_LOW,
   FILL_LADDER_THRESHOLDS,
   FILL_LADDER_UP_BASE,
   FILL_LADDER_UP_EMPTY,
@@ -185,17 +186,34 @@ describe('stats-popup — fill levels (0x10/0x11)', () => {
   it('ladder: without a building the empty icon, otherwise one step per threshold', () => {
     expect(fillLadderIcon('up', 0, 0)).toBe(FILL_LADDER_UP_EMPTY);
     expect(fillLadderIcon('down', 0, 0)).toBe(FILL_LADDER_DOWN_EMPTY);
-    // q = (sum << 4) / count; below the first threshold it stays the base icon.
+    // q = (sum << 4) / count; below the first threshold both stay at the low end of their bank.
     expect(fillLadderIcon('up', 1, 1)).toBe(FILL_LADDER_UP_BASE); // q = 16 ≤ 0x16
-    expect(fillLadderIcon('down', 1, 1)).toBe(FILL_LADDER_DOWN_BASE);
+    expect(fillLadderIcon('down', 1, 1)).toBe(FILL_LADDER_DOWN_LOW);
     // Exactly one threshold crossed.
     expect(fillLadderIcon('up', 2, 1)).toBe(FILL_LADDER_UP_BASE + 1); // q = 32 > 0x16
-    expect(fillLadderIcon('down', 2, 1)).toBe(FILL_LADDER_DOWN_BASE - 1);
-    // Above the last threshold the highest step (ten steps).
+    expect(fillLadderIcon('down', 2, 1)).toBe(FILL_LADDER_DOWN_LOW + 1);
+    // Above the last threshold the highest step (ten steps) — for `down` that is its loaded base.
     expect(fillLadderIcon('up', 100, 1)).toBe(FILL_LADDER_UP_BASE + FILL_LADDER_THRESHOLDS.length);
-    expect(fillLadderIcon('down', 100, 1)).toBe(
-      FILL_LADDER_DOWN_BASE - FILL_LADDER_THRESHOLDS.length,
-    );
+    expect(fillLadderIcon('down', 100, 1)).toBe(FILL_LADDER_DOWN_BASE);
+  });
+
+  it('both ladders move the same way: a fuller bucket is a higher icon in its own bank', () => {
+    // The point of the test, and the defect it is here to stop: the `down` drawer subtracts, but it
+    // also walks the thresholds backwards, so the needle travels in the SAME direction as `up`.
+    // Stated as an offset against each bank's low end so that it cannot be satisfied by mirroring
+    // one ladder and adjusting the constant to match.
+    let lastUp = -1;
+    let lastDown = -1;
+    for (let sum = 0; sum <= 20; sum++) {
+      const up = fillLadderIcon('up', sum, 1) - FILL_LADDER_UP_BASE;
+      const down = fillLadderIcon('down', sum, 1) - FILL_LADDER_DOWN_LOW;
+      expect(down).toBe(up);
+      expect(up).toBeGreaterThanOrEqual(lastUp);
+      expect(down).toBeGreaterThanOrEqual(lastDown);
+      lastUp = up;
+      lastDown = down;
+    }
+    expect(lastUp).toBe(FILL_LADDER_THRESHOLDS.length);
   });
 
   it('the thresholds are equidistant (step 0x17)', () => {

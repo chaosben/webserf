@@ -59,6 +59,11 @@ export interface SupplyPointer extends SupplyMeaning {
    *
    * That is why a row shows the original's needle instead of a percentage: one number cannot say
    * which of the two scales it belongs to.
+   *
+   * Both ladders run the **same** way even though their two drawers add and subtract: an empty
+   * bucket sits at the first icon of its bank, a full one at the last. On the workload needle that
+   * means empty is the RED stop and full the yellow one — mirroring that ladder makes every idle
+   * building look overloaded.
    */
   readonly ladder: 'up' | 'down';
 }
