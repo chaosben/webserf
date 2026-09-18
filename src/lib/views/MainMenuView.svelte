@@ -790,28 +790,21 @@
    * interactive element is the canvas inside it, and a two-finger zoom has no keyboard counterpart
    * that a role would promise.
    *
-   * The `gesture*` trio in the same place, for a second reason: **WebKit ignores `touch-action` for
-   * the pinch.** There the page would keep zooming although the handlers work fine, and the counter
-   * is `preventDefault` on those non-standard events (`passive: false`, absent from the typings).
-   * Its limit, plainly: where `touch-action` is honoured they never fire, so there this is dead
-   * weight — and on WebKit it cannot be checked from here.
+   * What WebKit needs on top — it ignores `touch-action` for the pinch — hangs on the shell, where
+   * one listener covers every view (`shell/page-zoom.ts`).
    */
   $effect(() => {
     const el = viewEl;
     if (el === null) return;
-    const stop = (ev: Event) => ev.preventDefault();
-    const gestures = ['gesturestart', 'gesturechange', 'gestureend'];
     el.addEventListener('pointerdown', onPointerDown);
     el.addEventListener('pointermove', onPointerMove);
     el.addEventListener('pointerup', onPointerUp);
     el.addEventListener('pointercancel', onPointerUp);
-    for (const name of gestures) el.addEventListener(name, stop, { passive: false });
     return () => {
       el.removeEventListener('pointerdown', onPointerDown);
       el.removeEventListener('pointermove', onPointerMove);
       el.removeEventListener('pointerup', onPointerUp);
       el.removeEventListener('pointercancel', onPointerUp);
-      for (const name of gestures) el.removeEventListener(name, stop);
     };
   });
 
@@ -1006,8 +999,9 @@
   /* Full area: the menu surface sits centred on the stage, without frame and without control bar.
      Zooming is by mouse wheel (`handleWheel`) or two fingers (`onPointerMove`) — there is
      deliberately no control for it.
-     `touch-action: none` is not decoration: with Pointer Events it is the ONLY lever against the
-     browser's own pinch zoom, and `preventDefault` on a pointer event is none. */
+     `touch-action: none` is not decoration: it is what makes the pinch THIS view's gesture rather
+     than the browser's, and with Pointer Events it is the only lever for that — `preventDefault` on
+     a pointer event is none. The shell sets `pan-y`, which this overrides. */
   .menu-view {
     position: relative;
     height: 100%;

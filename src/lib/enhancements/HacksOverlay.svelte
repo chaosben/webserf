@@ -125,9 +125,9 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: calc(0.25rem * var(--overlay-scale));
+    gap: 0.25em;
     max-width: 100%;
-    padding: calc(0.35rem * var(--overlay-scale));
+    padding: 0.35em;
     background: color-mix(in srgb, var(--bg-sunken) calc(var(--plate-opacity) * 100%), transparent);
     border: 1px solid color-mix(in srgb, var(--line) calc(var(--plate-opacity) * 100%), transparent);
     pointer-events: auto;
@@ -143,8 +143,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: calc(0.25rem * var(--overlay-scale));
-    padding: calc(0.25rem * var(--overlay-scale)) calc(0.4rem * var(--overlay-scale));
+    gap: 0.25em;
+    padding: 0.25em 0.4em;
     white-space: nowrap;
   }
 

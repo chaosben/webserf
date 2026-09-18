@@ -166,6 +166,10 @@ const EN = {
 	'set.speed': 'Speed',
 	'set.speedNote':
 		'Only how many logic ticks run per second of real time changes — the simulation itself keeps counting in ticks, so a game stays reproducible at any speed.',
+	'set.interface': 'Interface',
+	'set.size': 'Size',
+	'set.sizeNote':
+		'Applies to this shell — the rail and these panels. The game screen keeps its own size: it follows the control bar, as in the original. The page itself does not zoom, because over the map a pinch means zooming the map.',
 	'set.rest': 'Everything else',
 	'set.restNote':
 		'Sound, music and the control options live on the original “EXTRA OPTION” screen — reachable from the main menu and from the game; this browser remembers whatever you set there.',
@@ -416,6 +420,10 @@ const DE: Record<ShellKey, string> = {
 	'set.speed': 'Geschwindigkeit',
 	'set.speedNote':
 		'Es ändert sich nur, wie viele Logik-Ticks je Sekunde wirklicher Zeit laufen — gerechnet wird weiter in Ticks, ein Spiel bleibt also bei jeder Geschwindigkeit reproduzierbar.',
+	'set.interface': 'Oberfläche',
+	'set.size': 'Größe',
+	'set.sizeNote':
+		'Gilt für diese Shell — die Leiste und diese Fenster. Die Spielfläche behält ihre eigene Größe: sie folgt der Kontrollleiste, wie im Original. Die Seite selbst zoomt nicht, weil ein Pinch über der Karte „Karte zoomen“ bedeutet.',
 	'set.rest': 'Alles andere',
 	'set.restNote':
 		'Klang, Musik und die Bedien-Optionen liegen auf dem Original-Bildschirm „EXTRA OPTION“ — erreichbar aus dem Hauptmenü und aus dem Spiel; dieser Browser merkt sich, was Sie dort einstellen.',

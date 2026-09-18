@@ -70,6 +70,18 @@ const VERSION = 6;
  */
 export const SPEED_FACTORS: readonly number[] = [0.25, 0.5, 1, 2, 4, 8];
 
+/**
+ * Sizes of the shell interface, as a multiple of the base size.
+ *
+ * This is where the size of the interface is chosen, because the page itself does not zoom: a pinch
+ * means "zoom the map" over the game view, and a page zoom would push the icon rail and the control
+ * bar out of reach (see `app.html`). Steps rather than a slider, for the same reason as the speed —
+ * the useful range is small, and a step is one press instead of a drag on a phone.
+ *
+ * The base the steps multiply is not fixed: `--ui-base` is larger wherever the pointer is a finger.
+ */
+export const UI_SCALES: readonly number[] = [0.85, 1, 1.15, 1.3, 1.5];
+
 export interface SettingsShape {
 	/** Multiple of the original tick rate; one of {@link SPEED_FACTORS}. */
 	speedFactor: number;
@@ -81,6 +93,12 @@ export interface SettingsShape {
 	volume: number;
 	/** Per-screen-half control options (`.DS`@72/73) as the starting value of a new game. */
 	viewOptions: [number, number];
+
+	/**
+	 * Size of the shell interface — one of {@link UI_SCALES}. Ours alone: it moves the rail, the
+	 * panels and their text, and NOT the game screen, which is sized by the control bar (`uiScaleFor`).
+	 */
+	uiScale: number;
 
 	// -- Stock overview. Our own addition; the original has no permanent readout of this kind. ----
 	/**
@@ -150,6 +168,7 @@ export type HackSettingKey = Extract<keyof SettingsShape, `hack${string}`>;
 
 const DEFAULTS: SettingsShape = {
 	speedFactor: 1,
+	uiScale: 1,
 	music: MUSIC_DEFAULT,
 	sfx: SFX_DEFAULT,
 	volume: VOLUME_DEFAULT,
@@ -200,6 +219,7 @@ const isOneOf = <T extends string>(v: unknown, values: readonly T[]): v is T =>
  */
 const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K] } = {
 	speedFactor: (v): v is number => typeof v === 'number' && SPEED_FACTORS.includes(v),
+	uiScale: (v): v is number => typeof v === 'number' && UI_SCALES.includes(v),
 	music: (v): v is boolean => typeof v === 'boolean',
 	sfx: (v): v is boolean => typeof v === 'boolean',
 	volume: (v): v is number =>

@@ -153,12 +153,15 @@
    *
    * WHERE it sits is not decided here — `GameOverlays` stacks the plates of one corner.
    *
-   * Padding and gaps are in the same factor as the pictures, so the plate grows as ONE piece rather
-   * than as icons drifting apart inside a frame that stays put.
+   * Padding and gaps are in `em`, so they are the same factor as the pictures and the plate grows as
+   * ONE piece rather than as icons drifting apart inside a frame that stays put. `em` and not `rem`:
+   * the font size here is already the control bar's scale times the game's pixel base
+   * (`.game-overlay`), while `rem` is the SHELL's size and would pull the plate along with the
+   * settings that have nothing to do with the game surface.
    */
   .overview {
     max-width: 100%;
-    padding: calc(0.35rem * var(--overlay-scale)) calc(0.45rem * var(--overlay-scale));
+    padding: 0.35em 0.45em;
     background: color-mix(in srgb, var(--bg-sunken) calc(var(--plate-opacity) * 100%), transparent);
     border: 1px solid color-mix(in srgb, var(--line) calc(var(--plate-opacity) * 100%), transparent);
     pointer-events: none;
@@ -179,7 +182,7 @@
   ul {
     display: grid;
     grid-template-columns: repeat(var(--cols), max-content);
-    gap: calc(0.15rem * var(--overlay-scale)) calc(0.6rem * var(--overlay-scale));
+    gap: 0.15em 0.6em;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -189,7 +192,7 @@
     display: flex;
     grid-column: span var(--cell-span);
     align-items: center;
-    gap: calc(0.2rem * var(--overlay-scale));
+    gap: 0.2em;
   }
 
   li.supply {
@@ -199,7 +202,7 @@
   /* The line between two groups is a row of its own now that they share the grid. */
   li.rule {
     grid-column: 1 / -1;
-    margin: calc(0.25rem * var(--overlay-scale)) 0;
+    margin: 0.25em 0;
     border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
   }
 

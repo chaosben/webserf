@@ -349,18 +349,22 @@
 		gap: 0.25rem;
 	}
 
-	/* Square and narrow — the row should leave its space to the name column. */
+	/*
+	 * Square, and the row leaves the rest of its space to the name column. The size is a hit area
+	 * before it is a picture: these three sit side by side, one of them deletes, and a finger is
+	 * about 9 mm wide — hence the box is larger than the glyph inside it.
+	 */
 	.icon {
 		display: grid;
 		place-items: center;
-		width: 1.7rem;
-		height: 1.7rem;
+		width: 2.2rem;
+		height: 2.2rem;
 		padding: 0;
 	}
 
 	.icon :global(svg) {
-		width: 1.1rem;
-		height: 1.1rem;
+		width: 1.3rem;
+		height: 1.3rem;
 	}
 
 	.row {

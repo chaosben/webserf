@@ -36,13 +36,18 @@ export interface OriginBounds {
 /**
  * Scale of the original screen inside the window.
  *
- * It follows the zoom so the interface grows with the map, but never below 1x (a bar at 0.5x would
- * be unreadable) and never wider than the window — the bar is the widest part, so it sets the upper
- * bound. When the window is narrower than the bar, the upper bound wins and the bar is clipped
- * rather than shrunk.
+ * Never below 1x, never wider than the window — and the window wins. It follows the zoom so the
+ * interface grows with the map; the 1x floor keeps icons readable and buttons hittable while the map
+ * is zoomed out; the bar is the widest part, so its width against the window is the ceiling.
+ *
+ * THE ORDER OF THE TWO BOUNDS IS THE POINT. A window narrower than the bar's 352 px is a phone, not
+ * an edge case, and there the floor and the ceiling contradict each other. Letting the floor win
+ * means the bar sticks out of a window with `overflow: hidden` — its outer buttons are then not
+ * merely small but unreachable. So the ceiling wins and the bar is fitted instead: below 1x its
+ * pixels are resampled, which costs sharpness, while the alternative costs the buttons.
  */
 export function uiScaleFor(zoom: number, viewportW: number): number {
-  return Math.max(1, Math.min(zoom, viewportW / CONTROL_PANEL_BOUNDS.width));
+  return Math.min(viewportW / CONTROL_PANEL_BOUNDS.width, Math.max(1, zoom));
 }
 
 /**

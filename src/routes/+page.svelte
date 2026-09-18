@@ -14,6 +14,8 @@
 	import MapView from '$lib/views/MapView.svelte';
 	import Dropzone from '$lib/shell/Dropzone.svelte';
 	import DrawerRail from '$lib/shell/DrawerRail.svelte';
+	import { blockPageZoom } from '$lib/shell/page-zoom.js';
+	import { followVisualViewport, visualViewportEnv } from '$lib/shell/visual-viewport.js';
 	import type { DrawerGroup, DrawerMark, OverlayTab } from '$lib/shell/drawer.js';
 	import OverlayPanel from '$lib/shell/OverlayPanel.svelte';
 	import SettingsPanel from '$lib/shell/SettingsPanel.svelte';
@@ -534,9 +536,43 @@
 	// browser had the archive in its cache and took the other branch.
 	void boot();
 	void openSaves();
+
+	/** The shell element itself — the two effects below are about the window, not about a view. */
+	let shellEl: HTMLDivElement | undefined = $state();
+
+	/*
+		ONE MEANING FOR A PINCH, across the whole application. `touch-action` below settles it wherever
+		it is honoured; this covers WebKit, which ignores it for the pinch. It hangs here rather than
+		on each view because the events bubble — the game view and the main menu are both inside.
+	*/
+	$effect(() => {
+		const el = shellEl;
+		if (el === undefined) return;
+		return blockPageZoom(el);
+	});
+
+	/*
+		THE SHELL IS LAID ON THE PART OF THE WINDOW THAT IS VISIBLE, not on the layout viewport that
+		`100dvh` measures. The on-screen keyboard shrinks the one and not the other, and so does a
+		pinch on the engines where neither line above bites — either way the rail and the control bar
+		would end up off-screen, and there is no way back: nothing here scrolls, and over the map the
+		gesture belongs to the map.
+
+		Without the API nothing is written and the CSS below stands on its own.
+	*/
+	$effect(() => {
+		const el = shellEl;
+		const env = visualViewportEnv();
+		if (el === undefined || env === null) return;
+		return followVisualViewport((box) => {
+			el.style.width = `${box.w}px`;
+			el.style.height = `${box.h}px`;
+			el.style.transform = `translate(${box.x}px, ${box.y}px)`;
+		}, env);
+	});
 </script>
 
-<div class="shell">
+<div class="shell" bind:this={shellEl}>
 	<DrawerRail
 		groups={GROUPS}
 		active={activeGroup}
@@ -682,11 +718,28 @@
 </div>
 
 <style>
+	/*
+		`fixed` and not just a block in the flow: the effect above moves the shell onto the visible
+		part of the window, and `offsetLeft`/`offsetTop` count from the layout viewport — which is
+		exactly where a `fixed` element without a transformed ancestor sits. The values here are what
+		holds while nothing has shrunk the visible area, and where the API is missing they are all
+		there is.
+
+		`touch-action: pan-y` is the page zoom, turned off. `none` would be wrong: the effective value
+		is the INTERSECTION down the ancestor chain, so a `none` here could not be taken back below and
+		the panels (`overflow: auto`) would lose their scrolling. `pan-y` keeps that and drops pinch
+		and double-tap zoom. The game view sets `none` for itself, which wins over this.
+	*/
 	.shell {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100dvh;
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);
-		height: 100dvh;
 		overflow: hidden;
+		touch-action: pan-y;
 	}
 
 	/* Reference frame for the overlays — and the surface the views measure themselves against. */

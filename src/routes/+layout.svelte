@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from "$app/paths";
 	import { updates } from "$lib/shell/update.svelte.js";
+	import { settings } from "$lib/settings/settings.svelte.js";
 
 	let { children } = $props();
 
@@ -9,6 +10,19 @@
 		the page, and here it exists exactly once no matter what the page shows.
 	*/
 	$effect(() => updates.watch());
+
+	/*
+		The chosen size of the shell, as one property on the document root — every `rem` below hangs
+		off it. Here for the same reason as the worker above: the layout exists exactly once, whatever
+		the page shows.
+
+		It is the replacement for a page zoom, which `app.html` turns off: over the game view a pinch
+		means "zoom the map", so a zoomed page could only push the rail and the control bar out of
+		reach.
+	*/
+	$effect(() => {
+		document.documentElement.style.setProperty("--ui-scale", String(settings.value.uiScale));
+	});
 </script>
 
 <svelte:head>
@@ -58,7 +72,31 @@
 		background: var(--bg);
 		color: var(--fg);
 		font-family: ui-monospace, "DejaVu Sans Mono", "Courier New", monospace;
-		font-size: 13px;
+
+		/*
+			TWO SIZES, and keeping them apart is the point.
+
+			`font-size` is the shell's — rail, panels, their text — and it is meant to move: `--ui-base`
+			is larger where the pointer is a finger, `--ui-scale` is what the settings offer.
+
+			`--game-px` is the game's and stands still. What our own plates over the game surface show
+			are 16-pixel sprites at their true size, so their text and padding are measured against a
+			fixed pixel base and against the control bar's scale — never against the shell, which would
+			let them drift apart from the pictures beside them.
+		*/
+		--game-px: 13px;
+		font-size: calc(var(--ui-base, 13px) * var(--ui-scale, 1));
+	}
+
+	/*
+		A finger needs more than a mouse: bigger type, and with it bigger hit areas, since the rail and
+		the buttons are measured in `rem`. Deliberately not a width condition — the reason is the
+		pointer, not the window.
+	*/
+	@media (pointer: coarse) {
+		:global(:root) {
+			--ui-base: 15px;
+		}
 	}
 
 	/* Pixels stay pixels — this holds for every canvas of the game surface. */
@@ -75,7 +113,7 @@
 	 * pick it up through `font: inherit` below, which is why a switch is the size of a readout.
 	 */
 	:global(.game-overlay) {
-		font-size: calc(1rem * var(--overlay-scale, 1));
+		font-size: calc(var(--game-px) * var(--overlay-scale, 1));
 	}
 
 	:global(button) {

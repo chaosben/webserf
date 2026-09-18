@@ -2,7 +2,25 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--
+			NO PAGE ZOOM. The application is one non-scrolling surface, and a pinch means "zoom the map"
+			over the game view — so a page zoom can only ever push part of the surface out of reach, and
+			the very gesture that would undo it is the one the map claims. The replacement is in the
+			application: a size for the shell in the settings (`--ui-scale`), and a larger step by default
+			wherever the pointer is a finger.
+
+			Two things this line does NOT settle. iOS Safari ignores `user-scalable`/`maximum-scale`; there
+			only `shell/page-zoom.ts` bites. And whatever else shrinks the visible area — the on-screen
+			keyboard above all — is caught by `shell/visual-viewport.svelte.ts`.
+
+			`interactive-widget=resizes-content` is the cheap half of the keyboard case: Chromium then
+			shrinks the LAYOUT viewport when the keyboard opens, so `100dvh` shrinks with it and the
+			control bar stays in view without a line of script.
+		-->
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content"
+		/>
 		<meta name="text-scale" content="scale" />
 
 		<!--

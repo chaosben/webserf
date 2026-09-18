@@ -3381,16 +3381,17 @@
    * - **1× downwards** — the UI never gets smaller than its original pixel size, so icons stay
    *   readable and buttons hittable while zooming the map out.
    * - **the window width upwards** — a wider bar would stick out of the window (`overflow: hidden`)
-   *   and its outer buttons would no longer be clickable. If the window itself is narrower than the
-   *   bar (< 352 px), the lower bound wins.
+   *   and its outer buttons would no longer be clickable. This one wins where the two disagree,
+   *   which is any window narrower than the bar's 352 px; see `uiScaleFor`.
    */
   const uiScale = $derived(uiScaleFor(zoom, viewportW));
 
   /**
-   * Scale of the pointer — the same factor as the bar ({@link uiScale}, so never below 1×), but
-   * rounded to WHOLE steps: a cursor image is scaled hard by the system, fractional factors would
-   * blur the 16×16 pixels. {@link CURSOR_MAX_SCALE} clamps upwards (128×128 is the browser limit for
-   * cursor images).
+   * Scale of the pointer — the bar's factor ({@link uiScale}), rounded to WHOLE steps: a cursor image
+   * is scaled hard by the system, fractional factors would blur the 16×16 pixels. Clamped to at least
+   * 1×, which matters in a window narrower than the bar: there the bar itself goes below its original
+   * size, and a pointer rounded to 0 would have none. {@link CURSOR_MAX_SCALE} clamps upwards (128×128
+   * is the browser limit for cursor images).
    *
    * A derived value of its own so the (expensive) PNG encoding runs only on a STEP change and not on
    * every wheel tick.
@@ -4184,25 +4185,6 @@
     return () => el.removeEventListener('click', onClick);
   });
 
-  /**
-   * **WebKit ignores `touch-action` for the pinch.** There the page would keep zooming although our
-   * own pointer handlers work fine; the counter is `preventDefault` on the non-standard `gesture*`
-   * events. They are absent from the DOM typings, hence imperatively and with `passive: false`.
-   *
-   * Its limit, plainly: on engines that honour `touch-action` these events never fire, so there this
-   * is dead weight — and on WebKit it cannot be checked from here.
-   */
-  $effect(() => {
-    const el = viewportEl;
-    if (el === null) return;
-    const stop = (ev: Event) => ev.preventDefault();
-    const names = ['gesturestart', 'gesturechange', 'gestureend'];
-    for (const name of names) el.addEventListener(name, stop, { passive: false });
-    return () => {
-      for (const name of names) el.removeEventListener(name, stop);
-    };
-  });
-
   /** A pending long press must not fire into a component that is already gone. */
   $effect(() => () => clearHold());
 
@@ -4567,6 +4549,8 @@
     overflow: hidden;
     background: #0c0c0c;
     cursor: grab;
+    /* Every touch here is the game's: pan, pinch and the long press. The shell allows `pan-y`
+       so its panels can scroll; this is stricter and wins over it. */
     touch-action: none;
   }
   .viewport:active {

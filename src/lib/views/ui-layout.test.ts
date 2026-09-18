@@ -35,8 +35,20 @@ describe('uiScaleFor', () => {
     expect(uiScaleFor(4, 500)).toBeCloseTo(500 / CONTROL_PANEL_BOUNDS.width, 10);
   });
 
-  it('lets the lower bound win when the window is narrower than the bar', () => {
-    expect(uiScaleFor(4, 200)).toBe(1);
+  it('fits the bar into a window narrower than the bar, rather than clipping it', () => {
+    // A phone: 200 px of room for 352 px of bar. Going below 1x costs sharpness, keeping 1x would
+    // cost the outer buttons — they would sit outside a window with `overflow: hidden`.
+    expect(uiScaleFor(4, 200)).toBeCloseTo(200 / CONTROL_PANEL_BOUNDS.width, 10);
+    expect(uiScaleFor(0.08, 200)).toBeCloseTo(200 / CONTROL_PANEL_BOUNDS.width, 10);
+  });
+
+  it('puts the whole bar in the window and nothing beside it', () => {
+    // The consequence that matters, stated where it can be measured: at the ceiling the bar starts
+    // at the left edge and is exactly as wide as the window, so every button is reachable.
+    const vw = 324; // 360 px phone minus the icon rail
+    const box = originBoxRect(CONTROL_PANEL_BOUNDS, uiScaleFor(1, vw), vw, 640);
+    expect(box.x).toBe(0);
+    expect(box.w).toBe(vw);
   });
 });
 

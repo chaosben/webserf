@@ -98,6 +98,8 @@ describe('settings store', () => {
 		['volume outside 0..99', { volume: 1000 }, 'volume'],
 		['volume not an integer', { volume: 7.5 }, 'volume'],
 		['unknown speed', { speedFactor: 3 }, 'speedFactor'],
+		['an interface size that is not offered', { uiScale: 2 }, 'uiScale'],
+		['an interface size as a string', { uiScale: '1.15' }, 'uiScale'],
 		['viewOptions as an object', { viewOptions: { 0: 1, 1: 2 } }, 'viewOptions'],
 		['viewOptions too short', { viewOptions: [0x39] }, 'viewOptions'],
 		['viewOptions not a byte', { viewOptions: [0x39, 300] }, 'viewOptions'],
@@ -145,6 +147,7 @@ describe('settings store', () => {
 			data: { volume: 12, stockCorner: 'br', stockPerRow: 4 }
 		});
 		expect(settings.value.stockSerfMode).toBe(defaults.stockSerfMode);
+		expect(settings.value.uiScale).toBe(defaults.uiScale);
 		expect(settings.value.volume).toBe(12);
 		expect(settings.value.stockCorner).toBe('br');
 		expect(settings.value.stockPerRow).toBe(4);

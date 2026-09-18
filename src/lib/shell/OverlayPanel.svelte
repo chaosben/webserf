@@ -229,4 +229,28 @@
 	.main.split .stack {
 		min-width: 0;
 	}
+
+	/*
+	 * Phone width. Two things have to give, and both are about how little room is left over: the
+	 * generous frame around the panel, which on a 360 px screen costs a sixth of it, and the
+	 * navigation column, which beside a body has nowhere near enough space to be read.
+	 *
+	 * The threshold measures the WINDOW while the panel lives in the stage, which is the window minus
+	 * the rail — so it is deliberately generous. A container query would be exact; this code base has
+	 * none, and introducing the first one to gain forty pixels is a poor trade.
+	 */
+	@media (max-width: 30rem) {
+		.overlay {
+			padding: 0.5rem 0.25rem;
+		}
+
+		.main.split {
+			grid-template-columns: 1fr;
+		}
+
+		.main.split .nav {
+			border-right: none;
+			border-bottom: 1px solid var(--line);
+		}
+	}
 </style>

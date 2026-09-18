@@ -2,22 +2,33 @@
 	/**
 	 * Settings overlay.
 	 *
-	 * What lives here is what the browser adds — game speed and pause. The sound and control
+	 * What lives here is what the browser adds — game speed, pause, and the size of this shell. The
+	 * sound and control
 	 * options (music, effects, volume, fast build click, message level) belong to the ORIGINAL
 	 * screen "EXTRA OPTION" (0x25), reachable from the main menu as well as in game; they are
 	 * deliberately not offered a second time here. They are remembered nonetheless — that is what
 	 * the settings store is for, and both screens read from it.
 	 *
 	 * Speed and pause have NO counterpart in the original (it runs at 100 ticks/s while a game is
-	 * open) — they are an explicit extension.
+	 * open) — they are an explicit extension. So is the size: the page itself does not zoom, because
+	 * over the map a pinch means zooming the map (`app.html`).
 	 */
-	import { settings, SPEED_FACTORS, ticksPerSecondOf } from '../settings/settings.svelte.js';
+	import {
+		settings,
+		SPEED_FACTORS,
+		ticksPerSecondOf,
+		UI_SCALES
+	} from '../settings/settings.svelte.js';
 	import { simulation } from './simulation.svelte.js';
 	import { st } from './i18n.js';
 
 	const speed = $derived(settings.value.speedFactor);
 	/** Short form without a trailing zero: 0.25 -> "0.25x", 1 -> "1x". */
 	const label = (f: number): string => `${String(f).replace('.', ',')}×`;
+
+	const uiScale = $derived(settings.value.uiScale);
+	/** The size reads as a percentage: a factor says nothing next to a speed that is also a factor. */
+	const percent = (f: number): string => `${Math.round(f * 100)} %`;
 </script>
 
 <section>
@@ -49,7 +60,7 @@
 
 	<div class="row">
 		<span id="speed-label">{st('set.speed')}</span>
-		<div class="speeds" role="group" aria-labelledby="speed-label">
+		<div class="steps" role="group" aria-labelledby="speed-label">
 			{#each SPEED_FACTORS as factor (factor)}
 				<button
 					type="button"
@@ -63,6 +74,26 @@
 		</div>
 	</div>
 	<p class="note">{st('set.speedNote')}</p>
+</section>
+
+<section>
+	<h3>{st('set.interface')}</h3>
+	<div class="row">
+		<span id="ui-size-label">{st('set.size')}</span>
+		<div class="steps" role="group" aria-labelledby="ui-size-label">
+			{#each UI_SCALES as factor (factor)}
+				<button
+					type="button"
+					class:on={factor === uiScale}
+					aria-pressed={factor === uiScale}
+					onclick={() => settings.set('uiScale', factor)}
+				>
+					{percent(factor)}
+				</button>
+			{/each}
+		</div>
+	</div>
+	<p class="note">{st('set.sizeNote')}</p>
 </section>
 
 <section>
@@ -88,18 +119,22 @@
 		letter-spacing: 0.06em;
 	}
 
+	/* Wrapping, because the rows are longer than a phone is wide. */
 	.row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.6rem;
 	}
 
-	.speeds {
+	/* A row of small toggles — the speeds and the sizes are laid out alike. */
+	.steps {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.25rem;
 	}
 
-	.speeds button.on {
+	.steps button.on {
 		border-color: var(--accent);
 		color: var(--accent);
 	}

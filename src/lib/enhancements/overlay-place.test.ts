@@ -69,6 +69,51 @@ describe('the map click and our plates', () => {
   });
 });
 
+/**
+ * THE SIZE OF A PLATE IS THE CONTROL BAR'S AND NOTHING ELSE — the sentence at the top of
+ * `overlay-place.ts`, checked where it can rot.
+ *
+ * The chain: `:root` carries `--game-px`, the game's fixed pixel base; `.game-overlay` turns it with
+ * the bar's factor into a font size; every measurement inside a plate is `em` and therefore that same
+ * factor. `rem` is a different quantity — the size of the SHELL, which the settings move — and a
+ * single `rem` inside a plate would pull it along with a setting that has nothing to do with the game
+ * surface, away from the 16-pixel sprites beside it. An own `font-size` would break the chain in the
+ * other direction, by giving the `em` below it a different base.
+ */
+describe('the size of our plates over the game surface', () => {
+  const layout = readFileSync(join(HERE, '../../routes/+layout.svelte'), 'utf8');
+  const plates = ['StockOverlay.svelte', 'HacksOverlay.svelte'];
+
+  it('measures the game in its own pixel base, not in the shell size', () => {
+    expect(layout).toContain('--game-px:');
+    const rule = layout.split(':global(.game-overlay)')[1]!.split('}')[0];
+    expect(rule).toContain('var(--game-px)');
+    expect(rule).toContain('var(--overlay-scale');
+    expect(rule, 'the plate would follow the shell size').not.toContain('rem');
+  });
+
+  it('leaves the shell size to the shell', () => {
+    expect(layout).toContain('var(--ui-scale');
+    // The two are separate quantities; sharing one would be the whole mistake.
+    expect(layout.split('--game-px:')[1]!.split(';')[0]).not.toContain('--ui-');
+  });
+
+  for (const name of plates) {
+    it(`${name} measures in em and sets no font size of its own`, () => {
+      const css = readFileSync(join(HERE, name), 'utf8');
+      const style = css.slice(css.indexOf('<style>'));
+      const code = style
+        .replace(/\/\*[\s\S]*?\*\//g, '') // comments may name either unit while explaining
+        .replace(/<!--[\s\S]*?-->/g, '');
+      expect(code, 'a rem here follows the shell, not the control bar').not.toMatch(/\d\s*rem/);
+      expect(code, 'an own font size breaks the base the em values rest on').not.toContain(
+        'font-size',
+      );
+      expect(code, 'nothing is measured against the bar any more').toMatch(/\dem/);
+    });
+  }
+});
+
 describe('overlay opacity', () => {
   it('never reaches zero', () => {
     // An invisible plate that still swallows clicks looks like a broken game, not like a setting.
