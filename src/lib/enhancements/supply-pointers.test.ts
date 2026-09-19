@@ -9,6 +9,8 @@ import {
   SUPPLY_SLOTS,
   supplyIcon,
   supplyName,
+  supplyToKey,
+  supplyToName,
   type SupplyPointer,
 } from './supply-pointers.js';
 import {
@@ -132,6 +134,82 @@ describe('supply pointers — the delivered good matches the bucket it is read f
   });
 });
 
+/**
+ * The overview draws the pointers of one receiver as a group with the receiver's picture at its
+ * head. That is only ever a GATHERING and never a re-sort, and these two tests are why: the
+ * original's own tables already put such pointers side by side, and they fill both buckets from one
+ * building test. Should either ever stop being true, the plate would quietly start showing an order
+ * — or a half group — that no statistics screen has.
+ */
+describe('supply pointers — grouping by receiver', () => {
+  const keys = SUPPLY_ORDER.map(supplyToKey);
+
+  it('tells receivers apart even where two entries are written out twice', () => {
+    // Five receivers take two goods. Three of them (weaponsmith, toolmaker, sites) are separate
+    // literals with equal values, so comparing the objects would find only the two smelters.
+    const groups = new Map<string, number[]>();
+    keys.forEach((k, i) => groups.set(k, [...(groups.get(k) ?? []), i]));
+    expect([...groups.values()].filter((g) => g.length > 1)).toEqual([
+      [8, 9], // gold smelter
+      [10, 11], // steel smelter
+      [14, 15], // weaponsmith
+      [16, 17], // toolmaker
+      [19, 20], // construction sites
+    ]);
+    expect(groups.size).toBe(16);
+  });
+
+  it('lists every receiver in one unbroken run', () => {
+    // The same statement without naming an index: a key that comes back after a different one has
+    // intervened would make grouping a re-sort.
+    const seen = new Set<string>();
+    let previous: string | null = null;
+    for (const k of keys) {
+      if (k !== previous) {
+        expect(seen.has(k), `receiver ${k} is interrupted`).toBe(false);
+        seen.add(k);
+        previous = k;
+      }
+    }
+  });
+
+  it('fills both buckets of a receiver from the same building test', () => {
+    // Why hiding can never take half a group: `count` counts contributing BUILDINGS, and the two
+    // rules of a receiver share their `match`. Only the `kind` differs — which stock byte is read.
+    for (const [a, b] of [
+      [8, 9],
+      [10, 11],
+      [14, 15],
+      [16, 17],
+      [19, 20],
+    ]) {
+      const of = (i: number) => {
+        const p = SUPPLY_POINTERS[i]!;
+        return rulesOf(p.chain).filter((r) => r.byteSlot === p.byteSlot);
+      };
+      const [ra, rb] = [of(a!), of(b!)];
+      expect(ra.length, `pointer ${a} has no rule of its own`).toBe(1);
+      expect(rb.length).toBe(1);
+      expect(ra[0]!.match).toBe(rb[0]!.match);
+      expect(ra[0]!.kind).not.toBe(rb[0]!.kind);
+    }
+  });
+
+  it('names the receiver on its own, for the heading', () => {
+    const before = SHELL_LANGUAGES[0];
+    try {
+      setShellLanguage('de');
+      expect(supplyToName(0)).toBe('Müller');
+      // A heading is the second half of the sentence, which is what keeps the two from drifting.
+      for (const i of SUPPLY_ORDER) {
+        expect(supplyName(i).endsWith(supplyToName(i))).toBe(true);
+      }
+    } finally {
+      setShellLanguage(before);
+    }
+  });
+});
+
 describe('supply pointers — labels', () => {
   it('reads in both languages, and every entry differently', () => {
     const before = SHELL_LANGUAGES[0];
@@ -153,13 +231,21 @@ describe('supply pointers — labels', () => {
 });
 
 /**
- * A row is a sentence and it runs left to right: what is delivered, who waits for it, how it
- * stands. That is the direction of the original's own arrow — the manual reads its diagram along it
- * ("the farmer delivers grain to the miller", ch. 4.3.3).
+ * A pointer is a sentence and it runs left to right: what is delivered, then who waits for it. That
+ * is the direction of the original's own arrow — the manual reads its diagram along it ("the farmer
+ * delivers grain to the miller", ch. 4.3.3).
  *
- * The label and the pictures say the same thing twice, in two different places. Turn one of them
- * around without the other and the tooltip contradicts the row it belongs to — with no error
- * anywhere, which is what the two tests below are for.
+ * The label and the pictures say the same thing twice, in two different places, and turning one
+ * around without the other makes the tooltip contradict what it hangs on — with no error anywhere,
+ * which is what the tests below are for. WHERE each half is drawn differs by place, and that is the
+ * one thing to keep straight:
+ *
+ * - the picker lists pointers one by one, so a line there is the whole sentence: good, receiver.
+ * - the overview gathers pointers under their receiver, so the receiver is the HEADING of a group
+ *   and the sentence sits on the good-and-needle pair beneath it — still good first.
+ *
+ * What must never happen is the receiver ending up inside the pair, which would put it back in the
+ * middle of a sentence it no longer leads.
  */
 describe('supply pointers — reading direction', () => {
   const HERE = new URL('.', import.meta.url).pathname;
@@ -190,16 +276,31 @@ describe('supply pointers — reading direction', () => {
    * A SOURCE scan, because the tree has no component tests: it catches the relapse, not a new way
    * of getting it wrong.
    */
-  it('draws the pictures in that same order, in the overlay and in the picker', () => {
+  it('draws the receiver as a heading and the sentence on the pair', () => {
     const overlay = read('StockOverlay.svelte');
-    const good = overlay.indexOf('src={good.url}');
-    const to = overlay.indexOf('src={to.url}');
-    const needle = overlay.indexOf('src={needle.url}');
-    expect(Math.min(good, to, needle), 'the three pictures of a row have moved').toBeGreaterThan(0);
-    expect(good).toBeLessThan(to);
-    expect(to).toBeLessThan(needle);
-    // The row's accessible name sits on the FIRST picture — a reader walks them in document order.
-    expect(overlay.slice(good, to)).toContain('alt={name}');
+    const at = (needle_: string): number => {
+      const first = overlay.indexOf(needle_);
+      // ONCE, not merely somewhere: the receiver drawn a second time inside the loop would be
+      // painted per pair again, and a scan that only looks at the first hit would see nothing.
+      expect(overlay.indexOf(needle_, first + 1), `${needle_} is drawn twice`).toBe(-1);
+      return first;
+    };
+    const to = at('src={to.url}');
+    const loop = at('{#each target.entries');
+    const good = at('src={good.url}');
+    const needle = at('src={needle.url}');
+    expect(Math.min(to, loop, good, needle), 'the pointer cell has moved').toBeGreaterThan(0);
+    // The receiver stands BEFORE the loop over the pairs — that is what makes it a heading rather
+    // than the tail of one of them.
+    expect(to).toBeLessThan(loop);
+    expect(loop).toBeLessThan(good);
+    expect(good).toBeLessThan(needle);
+    // Each half names itself: the heading the receiver alone, the pair the whole sentence. A reader
+    // walks them in document order and would otherwise hear the receiver twice, or not at all.
+    expect(overlay.slice(to, loop)).toContain('alt={toName}');
+    expect(overlay.slice(good, needle)).toContain('alt={name}');
+    expect(overlay.slice(loop, good)).toContain('title={name}');
+    expect(overlay).toContain('supplyToName(target.first)');
 
     const picker = read('StockSupplyTab.svelte');
     const first = picker.match(/\n\s*icon=\{\(index\) => sideIcon\(index, '(\w+)'\)\}/);

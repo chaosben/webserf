@@ -4,7 +4,12 @@
    *
    * Two pictures per entry, because neither half is unique on its own: the gold smelter appears
    * twice and coal three times — see `supply-pointers.ts`. Delivered good first, receiver second,
-   * as in the overlay and in the label: one reading direction for all three.
+   * the direction of the label beside it and of the original's own arrow.
+   *
+   * A line here is ONE pointer, so it carries the whole sentence. The overview gathers pointers
+   * under their receiver and draws that receiver as a heading instead; the sentence sits on the
+   * pair beneath it there, good first all the same. Both places read good first — they differ only
+   * in whether the receiver leads a group or ends a line.
    */
   import IconPicker from './IconPicker.svelte';
   import HideUnusedToggle from './HideUnusedToggle.svelte';

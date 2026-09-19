@@ -8,6 +8,11 @@
  * smelter appears twice (ore and coal) and coal appears three times (gold smelter, steel smelter,
  * weaponsmith).
  *
+ * Five receivers take two goods, and their pointers stand SIDE BY SIDE in the tables below — which
+ * is why the overview can put the receiver's picture at the head of a group without reordering
+ * anything. {@link supplyToKey} is what tells two entries of one group apart from two of different
+ * ones; a shared constant is not enough, because three of the five are written out twice.
+ *
  * NOTHING HERE IS A HAND-WRITTEN ICON NUMBER. Every entry names a good or a profession, and both
  * the picture and the label fall out of it — through {@link goodIcon}/{@link serfIcon} and the
  * manual legends in `entity-names.ts`. Where a receiver has no legend name of its own (a mine, a
@@ -170,16 +175,37 @@ export function supplyIcon(side: SupplySide): number | null {
   return 'good' in side ? goodIcon(side.good) : serfIcon(side.serf);
 }
 
+/**
+ * Which pointers share a receiver. Two entries belong together exactly when this matches.
+ *
+ * Comparing the `to` objects would find only three of the five pairs: the two smelters share one
+ * constant, but the weaponsmith, the toolmaker and the construction sites are each written out
+ * twice, as equal values in separate literals. The word of our own belongs in the key as well —
+ * without it the four mines, which are told apart by their product alone, would still be four
+ * groups, but a receiver that later took a second label would silently become one.
+ */
+export function supplyToKey(index: number): string {
+  const p = SUPPLY_POINTERS[index];
+  if (p === undefined) return `#${index}`;
+  const s = p.to;
+  return ('good' in s ? `g${s.good}` : `s${s.serf}`) + `:${s.key ?? ''}`;
+}
+
 function sideName(side: SupplySide): string {
   if (side.key !== undefined) return st(side.key);
   return 'good' in side ? goodName(side.good) : serfName(side.serf);
 }
 
 /**
- * What is delivered on the left, who waits for it on the right — so a row reads as a sentence, in
- * the direction of the original's own arrow: "the farmer delivers grain to the miller" (manual
+ * What is delivered on the left, who waits for it on the right — so a pointer reads as a sentence,
+ * in the direction of the original's own arrow: "the farmer delivers grain to the miller" (manual
  * ch. 4.3.3, "the goods are delivered from one profession to another IN THE DIRECTION OF THE
- * ARROW"). The pictures of a cell stand in the same order, and the two must not drift apart.
+ * ARROW").
+ *
+ * The sentence belongs to ONE pointer, not to a layout. Where the overview groups by receiver, the
+ * receiver's picture is the head of the group and no longer the tail of a sentence; the sentence
+ * then sits on the good-and-needle pair, which is still read good first. The picker, which lists
+ * pointers one by one, keeps both halves in this order.
  */
 const SUPPLY_ARROW = ' → ';
 
@@ -188,4 +214,11 @@ export function supplyName(index: number): string {
   const p = SUPPLY_POINTERS[index];
   if (p === undefined) return `#${index}`;
   return sideName(p.good) + SUPPLY_ARROW + sideName(p.to);
+}
+
+/** Name of the receiver alone — the heading of a group, where the overview draws one. */
+export function supplyToName(index: number): string {
+  const p = SUPPLY_POINTERS[index];
+  if (p === undefined) return `#${index}`;
+  return sideName(p.to);
 }

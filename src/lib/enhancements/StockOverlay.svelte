@@ -12,7 +12,7 @@
    */
   import { iconImage } from './icon-images.svelte.js';
   import { goodName, serfName } from './entity-names.js';
-  import { supplyName } from './supply-pointers.js';
+  import { supplyName, supplyToName } from './supply-pointers.js';
   import { st } from '../shell/i18n.js';
   import {
     STOCK_CELL_SPAN,
@@ -20,7 +20,7 @@
     supplyColumnSpan,
     type StockRow,
     type StockView,
-    type SupplyRow
+    type SupplyGroup
   } from './stock-overview.js';
 
   let {
@@ -61,16 +61,19 @@
   });
 
   /**
-   * The supply pointers get a loop of their own rather than a place in `groups`: their cell has
-   * three pictures and no number, and squeezing both shapes through one loop would buy the shared
-   * markup with a union to narrow on every line. They share the GRID with the others all the same —
-   * two loops under one parent cost nothing, and that shared grid is what keeps the rows one width.
+   * The supply pointers get a loop of their own rather than a place in `groups`: their cell holds a
+   * receiver and a list of pairs instead of a picture and a number, and squeezing both shapes
+   * through one loop would buy the shared markup with a union to narrow on every line. They share
+   * the GRID with the others all the same — two loops under one parent cost nothing, and that
+   * shared grid is what keeps the rows one width.
    *
-   * THE ORDER OF THE THREE PICTURES IS THE SENTENCE: what is delivered, who waits for it, how it
-   * stands — the direction of the original's own arrow, and the same direction {@link supplyName}
-   * spells out. Swap one of the two and the tooltip contradicts the row.
+   * THE RECEIVER IS A HEADING, NOT THE END OF A SENTENCE. It stands once, to the left of its pairs,
+   * because five receivers take two goods and two copies of their picture say nothing about the two
+   * belonging together. The sentence of the original's arrow — what is delivered, to whom — belongs
+   * to one pointer, so it sits on the PAIR, as {@link supplyName} spells it out, good first. Move it
+   * onto the group and the tooltip starts claiming the heading is its subject.
    */
-  const supply = $derived<readonly SupplyRow[]>(view?.supply ?? []);
+  const supply = $derived<readonly SupplyGroup[]>(view?.supply ?? []);
 
   /**
    * The picture comes at step 1 and gets its size here, rounded to WHOLE pixels.
@@ -126,19 +129,30 @@
         {#if groups.length > 0}
           <li class="rule" aria-hidden="true"></li>
         {/if}
-        {#each supply as row (row.index)}
-          {@const good = sized(row.goodIcon)}
-          {@const to = sized(row.toIcon)}
-          {@const needle = sized(row.pointerIcon)}
-          {@const name = supplyName(row.index)}
-          <li class="supply" title={name}>
-            {#if good === null || to === null || needle === null}
-              <span class="name">{name}</span>
+        {#each supply as target (target.first)}
+          {@const to = sized(target.toIcon)}
+          {@const toName = supplyToName(target.first)}
+          <li class="supply">
+            {#if to === null}
+              <span class="name">{toName}</span>
             {:else}
-              <img src={good.url} alt={name} width={good.w} height={good.h} />
-              <img src={to.url} alt="" width={to.w} height={to.h} />
-              <img src={needle.url} alt="" width={needle.w} height={needle.h} />
+              <img src={to.url} alt={toName} title={toName} width={to.w} height={to.h} />
             {/if}
+            <ul class="pairs">
+              {#each target.entries as entry (entry.index)}
+                {@const good = sized(entry.goodIcon)}
+                {@const needle = sized(entry.pointerIcon)}
+                {@const name = supplyName(entry.index)}
+                <li title={name}>
+                  {#if good === null || needle === null}
+                    <span class="name">{name}</span>
+                  {:else}
+                    <img src={good.url} alt={name} width={good.w} height={good.h} />
+                    <img src={needle.url} alt="" width={needle.w} height={needle.h} />
+                  {/if}
+                </li>
+              {/each}
+            </ul>
           </li>
         {/each}
       {/if}
@@ -171,15 +185,15 @@
 
   /*
    * ONE grid for all three groups, counted in HALF places: a good or a profession takes two, a
-   * supply pointer three. Three separate grids would each be as wide as its own cells, and since
-   * the plate takes the widest of them, a row of goods then ends in a third of a row of blank —
-   * the pointer cell is one and a half goods wide.
+   * pointer group three whether it holds one pair or two. Three separate grids would each be as
+   * wide as its own cells, and since the plate takes the widest of them, a row of goods then ends
+   * in a third of a row of blank — the pointer cell is one and a half goods wide.
    *
    * `max-content` and not `1fr`: a column becomes as wide as the widest thing spanning it, so the
    * plate stays as narrow as the chosen row width allows, and the two shapes settle against each
    * other without anyone measuring a pixel.
    */
-  ul {
+  .overview > ul {
     display: grid;
     grid-template-columns: repeat(var(--cols), max-content);
     gap: 0.15em 0.6em;
@@ -190,17 +204,42 @@
 
   li {
     display: flex;
-    grid-column: span var(--cell-span);
     align-items: center;
     gap: 0.2em;
   }
 
-  li.supply {
+  .overview > ul > li {
+    grid-column: span var(--cell-span);
+  }
+
+  /*
+   * A pointer group is as wide as three pictures whether it holds one pair or two — the second pair
+   * goes under the first rather than beside it. `align-items: center` on the cell is what makes the
+   * receiver a heading: with two pairs its picture sits between their lines, and that is the whole
+   * bracket, drawn with no line at all.
+   */
+  .overview > ul > li.supply {
     grid-column: span var(--supply-span);
   }
 
+  /*
+   * The pairs of one receiver, stacked. A column and not a grid of its own: every icon is 16 wide,
+   * so good and needle line up across the lines of a group without a column being declared — and a
+   * grid would have to make each pair `display: contents` to reach its two pictures, which takes
+   * the tooltip away with the box it hangs on.
+   */
+  .pairs {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 0.15em;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   /* The line between two groups is a row of its own now that they share the grid. */
-  li.rule {
+  .overview > ul > li.rule {
     grid-column: 1 / -1;
     margin: 0.25em 0;
     border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);

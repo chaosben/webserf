@@ -19,6 +19,7 @@ import {
   supplyColumnSpan,
   stockRefreshDue,
   type StockSelection,
+  type StockView,
 } from './stock-overview.js';
 import { GOOD_ORDER } from './ui-icons.js';
 import type { Building, GameState, Inventory, Player, Serf } from '../core/engine/state.js';
@@ -26,8 +27,10 @@ import { fillLadderIcon } from '../core/stats-popup.js';
 import {
   SUPPLY_FOOD_MASK,
   SUPPLY_INDUSTRY_MASK,
+  SUPPLY_ORDER,
   SUPPLY_POINTERS,
   supplyIcon,
+  supplyToKey,
 } from './supply-pointers.js';
 
 function player(slot = 0, fields: Partial<Player> = {}): Player {
@@ -228,6 +231,14 @@ describe('buildStockView — serfs', () => {
 });
 
 describe('supply pointers in the view', () => {
+  /**
+   * The pointers without their grouping — one entry per selected pointer, in the order they are
+   * drawn. It keeps an expectation about a single needle about that needle, rather than about the
+   * group it happens to sit in.
+   */
+  const flat = (view: StockView): { index: number; toIcon: number; pointerIcon: number }[] =>
+    view.supply.flatMap((g) => g.entries.map((e) => ({ ...e, toIcon: g.toIcon })));
+
   /** A state whose building walk is counted: `collectFillLevels` reads `header` once per run. */
   function countingState(buildings: (Building | null)[] = []): {
     state: GameState;
@@ -291,11 +302,16 @@ describe('supply pointers in the view', () => {
     expect(view.supply.length).toBe(1);
     const p = SUPPLY_POINTERS[0]!;
     expect(view.supply[0]).toEqual({
-      index: 0,
+      first: 0,
       toIcon: supplyIcon(p.to),
-      goodIcon: supplyIcon(p.good),
-      // (0x31 & 0xf) + ((0x31 & 0xf0) >> 3) = 7, one contributing building.
-      pointerIcon: fillLadderIcon(p.ladder, 7, 1),
+      entries: [
+        {
+          index: 0,
+          goodIcon: supplyIcon(p.good),
+          // (0x31 & 0xf) + ((0x31 & 0xf0) >> 3) = 7, one contributing building.
+          pointerIcon: fillLadderIcon(p.ladder, 7, 1),
+        },
+      ],
     });
   });
 
@@ -330,8 +346,8 @@ describe('supply pointers in the view', () => {
       player(0),
       sel({ supply: maskOf([0]), hideUnusedSupply: true }),
     );
-    expect(withMill.supply.map((r) => r.index)).toEqual([0]);
-    expect(withMill.supply[0]!.pointerIcon).toBe(fillLadderIcon('down', 0, 1));
+    expect(flat(withMill).map((r) => r.index)).toEqual([0]);
+    expect(flat(withMill)[0]!.pointerIcon).toBe(fillLadderIcon('down', 0, 1));
     expect(fillLadderIcon('down', 0, 1)).not.toBe(fillLadderIcon('down', 0, 0));
 
     const withoutMill = buildStockView(
@@ -349,10 +365,80 @@ describe('supply pointers in the view', () => {
     expect(runs()).toBe(1);
   });
 
+  /**
+   * The whole point of the grouping, and its one risk: a receiver that stands twice must not be
+   * drawn twice, and two receivers that merely follow each other must not be run together.
+   */
+  it('gathers the pointers of one receiver and separates two receivers', () => {
+    const { state } = countingState();
+    // 8/9 are the gold smelter (ore and coal), 10/11 the steel smelter (coal and ore).
+    const view = buildStockView(state, player(0), sel({ supply: maskOf([8, 9, 10, 11]) }));
+    expect(view.supply.map((g) => g.entries.map((e) => e.index))).toEqual([
+      [8, 9],
+      [10, 11],
+    ]);
+    expect(view.supply.map((g) => g.first)).toEqual([8, 10]);
+    expect(view.supply[0]!.toIcon).not.toBe(view.supply[1]!.toIcon);
+  });
+
+  /**
+   * Grouping is a GATHERING of what stands next to each other, never a re-sort: the original's own
+   * display tables put the two pointers of a receiver side by side, so both readings have to give
+   * the same list. Were that ever untrue the plate would show its rows in an order the statistics
+   * screens do not have — and nothing else in the tree would notice.
+   */
+  it('leaves the order exactly as the original lists it', () => {
+    const { state } = countingState();
+    const all = buildStockView(state, player(0), sel({ supply: maskOf([...SUPPLY_ORDER]) }));
+    expect(flat(all).map((r) => r.index)).toEqual([...SUPPLY_ORDER]);
+
+    // ... and a group is never split, which is the same statement seen from the other side.
+    const keys = all.supply.map((g) => supplyToKey(g.first));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  /**
+   * Hiding takes a group WHOLE or not at all, and that is not a rule this file enforces — it falls
+   * out of the original's own chain. The two buckets of a receiver are filled by the same building
+   * test (the gold smelter's `match` is 0x5c for both, the weaponsmith's 0x50, and so on down the
+   * five), and `count` counts contributing buildings, not their contents. So the two halves of a
+   * group are hidden together or not at all, and a heading with one lonely pair under it is a shape
+   * that cannot arise. Worth pinning, because the code handles it anyway and a reader will wonder.
+   */
+  it('hides a receiver whole, never half of one', () => {
+    const smelter = {
+      type: 23, // gold smelter — pointers 8 (gold ore) and 9 (coal)
+      owner: 0,
+      burning: false,
+      constructing: false,
+      holder: true,
+      progress: 0,
+      stock: [
+        { available: 2, requested: 0 }, // coal has arrived
+        { available: 0, requested: 0 }, // gold ore has not — and the line stays all the same
+      ],
+      stockMaximum: null,
+    } as unknown as Building;
+
+    const withSmelter = buildStockView(
+      countingState([smelter]).state,
+      player(0),
+      sel({ supply: maskOf([8, 9]), hideUnusedSupply: true }),
+    );
+    expect(withSmelter.supply.map((g) => g.entries.map((e) => e.index))).toEqual([[8, 9]]);
+
+    const without = buildStockView(
+      countingState().state,
+      player(0),
+      sel({ supply: maskOf([8, 9]), hideUnusedSupply: true }),
+    );
+    expect(without.supply).toEqual([]);
+  });
+
   it('an empty bucket shows the empty needle of its own ladder', () => {
     const { state } = countingState();
     const view = buildStockView(state, player(0), sel({ supply: maskOf([0, 4]) }));
-    expect(view.supply.map((r) => r.pointerIcon)).toEqual([
+    expect(flat(view).map((r) => r.pointerIcon)).toEqual([
       fillLadderIcon('down', 0, 0), // miller — workload ladder
       fillLadderIcon('up', 0, 0), //   gold mine — supply ladder
     ]);

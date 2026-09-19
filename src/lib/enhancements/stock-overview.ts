@@ -33,6 +33,7 @@ import {
   SUPPLY_INDUSTRY_MASK,
   SUPPLY_POINTERS,
   supplyIcon,
+  supplyToKey,
 } from './supply-pointers.js';
 
 /** Selectable goods: resource types 0..25. */
@@ -65,10 +66,16 @@ export const STOCK_PER_ROW_DEFAULT = 1;
  * How wide the two cell shapes are, in HALF places — the grid counts halves so that both fit it.
  *
  * All the icons involved are 16 by 16, so the widths are arithmetic: a good or a profession is
- * picture + gap + a two-digit number and comes to about 35 units of scale, a pointer is three
- * pictures with two gaps and comes to about 54. That is 1 : 1.55, and 2 : 3 is the closest whole
- * ratio to it — near enough that a pointer cell stands all but full, and that the row a pointer
- * shares with nothing else leaves at most one good's worth of space.
+ * picture + gap + a two-digit number and comes to about 35 units of scale, a pointer group is the
+ * receiver's picture plus one good-and-needle pair beside it — three pictures with two gaps, about
+ * 54. That is 1 : 1.55, and 2 : 3 is the closest whole ratio to it — near enough that a pointer
+ * cell stands all but full, and that the row a pointer shares with nothing else leaves at most one
+ * good's worth of space.
+ *
+ * A group with two goods is no wider than one with a single good: its second pair goes UNDER the
+ * first, so the width stays those three pictures and the height is one line per pointer. Laying the
+ * pairs side by side instead would make the cell five pictures wide, and at the narrowest row width
+ * the widest cell drags the whole plate with it — the rows of goods included.
  *
  * Whole places (1 : 2) would leave a third of every pointer cell empty, and every odd setting would
  * end its pointer rows one place short.
@@ -181,22 +188,36 @@ export interface StockRow {
 }
 
 /**
- * One supply pointer. Three pictures instead of a number: who is waiting, for what, and how full
- * the bucket is — the last one being the original's own needle, so the row says the same thing the
- * chain diagram says.
+ * One supply pointer, without its receiver: what is delivered and how full the bucket is — the
+ * second picture being the original's own needle, so the line says the same thing the chain diagram
+ * says.
  */
-export interface SupplyRow {
-  /** Index into {@link SUPPLY_POINTERS} — the key of the row and the bit of the selection. */
+export interface SupplyEntry {
+  /** Index into {@link SUPPLY_POINTERS} — the key of the line and the bit of the selection. */
   readonly index: number;
-  readonly toIcon: number;
   readonly goodIcon: number;
   readonly pointerIcon: number;
+}
+
+/**
+ * The pointers of ONE receiver. Five receivers take two goods, and listing each with its own copy
+ * of the receiver's picture says nothing about the two belonging together.
+ */
+export interface SupplyGroup {
+  /**
+   * Index of the group's FIRST pointer — its key in the list and where its heading name comes
+   * from. A field of its own rather than `entries[0].index`, because a group is never empty and
+   * that is worth saying in the type instead of asserting it at every use.
+   */
+  readonly first: number;
+  readonly toIcon: number;
+  readonly entries: readonly SupplyEntry[];
 }
 
 export interface StockView {
   readonly goods: readonly StockRow[];
   readonly serfs: readonly StockRow[];
-  readonly supply: readonly SupplyRow[];
+  readonly supply: readonly SupplyGroup[];
 }
 
 function rowsOf(
@@ -235,19 +256,24 @@ export function idleInStock(state: GameState, player: Player): number[] {
 }
 
 /**
- * The selected supply pointers.
+ * The selected supply pointers, gathered under their receivers.
  *
  * The two chains are collected SEPARATELY and only when one of their bits is set. Each run walks
  * every building of the player, so an unselected chain must not cost one — and the two runs are not
  * merged into one either: they differ in their type mask (0x7c against 0xfc) and in whether they
  * demand a finished building, so a shared walk would be an invention rather than a port.
+ *
+ * Only ADJACENT entries are gathered, never the list re-sorted. In the original's tables the two
+ * pointers of a receiver already stand side by side, so grouping and the original's order are not a
+ * compromise between two things but the same thing — and a shown list keeps that property, because
+ * the only entries a filter can drop lie outside such a pair, never between its two halves.
  */
-function supplyRows(
+function supplyGroups(
   state: GameState,
   player: Player,
   mask: number,
   hideUnused: boolean,
-): SupplyRow[] {
+): SupplyGroup[] {
   const food =
     (mask & SUPPLY_FOOD_MASK) === 0
       ? null
@@ -257,29 +283,37 @@ function supplyRows(
       ? null
       : collectFillLevels(state, player, FILL_RULES_INDUSTRY, FILL_SLOTS_INDUSTRY, false);
 
-  const rows: SupplyRow[] = [];
+  const groups: { first: number; toIcon: number; entries: SupplyEntry[] }[] = [];
+  let openKey: string | null = null;
   SUPPLY_POINTERS.forEach((p, index) => {
     if (!maskHas(mask, index)) return;
     const slots = p.chain === 'food' ? food : industry;
     if (slots === null) return;
     const slot = slots[p.byteSlot / FILL_SLOT_BYTES] ?? { sum: 0, count: 0 };
     // Left out on `count`, NOT on the fill level. A bucket with contributors that stands at zero is
-    // the most important row there is — the buildings are there and they are getting nothing. Only
-    // `count === 0` says the receiver does not exist at all, and then the row is about a building
+    // the most important line there is — the buildings are there and they are getting nothing. Only
+    // `count === 0` says the receiver does not exist at all, and then the line is about a building
     // the player does not have. (The original tells the two apart as well: its ladder carries a
     // twelfth sprite for "nothing contributes", next to the one for "contributes nothing".)
     if (hideUnused && slot.count === 0) return;
     const toIcon = supplyIcon(p.to);
     const goodIc = supplyIcon(p.good);
     if (toIcon === null || goodIc === null) return;
-    rows.push({
+    const entry: SupplyEntry = {
       index,
-      toIcon,
       goodIcon: goodIc,
       pointerIcon: fillLadderIcon(p.ladder, slot.sum, slot.count),
-    });
+    };
+    const key = supplyToKey(index);
+    const open = key === openKey ? groups[groups.length - 1] : undefined;
+    if (open === undefined) {
+      groups.push({ first: index, toIcon, entries: [entry] });
+      openKey = key;
+    } else {
+      open.entries.push(entry);
+    }
   });
-  return rows;
+  return groups;
 }
 
 /**
@@ -317,6 +351,6 @@ export function buildStockView(state: GameState, player: Player, sel: StockSelec
           sel.hideUnusedSerfs,
         );
   const supply =
-    sel.supply === 0 ? [] : supplyRows(state, player, sel.supply, sel.hideUnusedSupply);
+    sel.supply === 0 ? [] : supplyGroups(state, player, sel.supply, sel.hideUnusedSupply);
   return { goods, serfs, supply };
 }
