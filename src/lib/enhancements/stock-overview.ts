@@ -212,6 +212,15 @@ export interface SupplyGroup {
   readonly first: number;
   readonly toIcon: number;
   readonly entries: readonly SupplyEntry[];
+  /**
+   * Begin a fresh grid row at this group — it is the first of its size.
+   *
+   * Sorting alone does not keep a two-line group out of a one-line row: three one-line groups
+   * followed by a two-line one, at two places per row, still puts the third beside the fourth. The
+   * flag is what the layout hangs the break on, and after the sort it is set on exactly one group
+   * besides the first.
+   */
+  readonly startsRow: boolean;
 }
 
 export interface StockView {
@@ -263,10 +272,9 @@ export function idleInStock(state: GameState, player: Player): number[] {
  * merged into one either: they differ in their type mask (0x7c against 0xfc) and in whether they
  * demand a finished building, so a shared walk would be an invention rather than a port.
  *
- * Only ADJACENT entries are gathered, never the list re-sorted. In the original's tables the two
- * pointers of a receiver already stand side by side, so grouping and the original's order are not a
- * compromise between two things but the same thing — and a shown list keeps that property, because
- * the only entries a filter can drop lie outside such a pair, never between its two halves.
+ * Only ADJACENT entries are GATHERED, never reordered on the way in: in the original's tables the
+ * two pointers of a receiver already stand side by side, so a group is always one unbroken run. The
+ * finished groups are then brought into size order for the layout — see below.
  */
 function supplyGroups(
   state: GameState,
@@ -313,7 +321,24 @@ function supplyGroups(
       open.entries.push(entry);
     }
   });
-  return groups;
+
+  /*
+   * One-line groups first, two-line ones after them.
+   *
+   * A group is as tall as it has pairs, and where two of them stand side by side the shorter one
+   * leaves a line of blank under it. Sorting by height puts that seam in ONE place instead of five.
+   *
+   * The sort is what keeps the original's order as well: it is STABLE (guaranteed since ES2019), so
+   * within a size the groups stay in the order of the two display tables — the plate reorders by
+   * shape, never by content.
+   */
+  groups.sort((a, b) => a.entries.length - b.entries.length);
+
+  // AFTER the sort, or it would mark the seams of the order the sort just replaced.
+  return groups.map((g, i) => ({
+    ...g,
+    startsRow: i === 0 || g.entries.length !== groups[i - 1]!.entries.length,
+  }));
 }
 
 /**

@@ -132,7 +132,7 @@
         {#each supply as target (target.first)}
           {@const to = sized(target.toIcon)}
           {@const toName = supplyToName(target.first)}
-          <li class="supply">
+          <li class="supply" class:row-start={target.startsRow}>
             {#if to === null}
               <span class="name">{toName}</span>
             {:else}
@@ -217,9 +217,21 @@
    * goes under the first rather than beside it. `align-items: center` on the cell is what makes the
    * receiver a heading: with two pairs its picture sits between their lines, and that is the whole
    * bracket, drawn with no line at all.
+   *
+   * A group is as TALL as it has pairs, though, and a short one beside a tall one leaves a line of
+   * blank. `row-start` marks the first group of each height and sends it to column 1, which the
+   * grid can only honour by moving it down — so a row never mixes the two. Written long rather
+   * than as `span n`: the one-value shorthand fills the START edge, and setting the start line
+   * afterwards would drop the span with it.
+   *
+   * Below three entries per row this does nothing: one group fills the row either way.
    */
   .overview > ul > li.supply {
-    grid-column: span var(--supply-span);
+    grid-column: auto / span var(--supply-span);
+  }
+
+  .overview > ul > li.supply.row-start {
+    grid-column: 1 / span var(--supply-span);
   }
 
   /*

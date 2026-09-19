@@ -303,6 +303,7 @@ describe('supply pointers in the view', () => {
     const p = SUPPLY_POINTERS[0]!;
     expect(view.supply[0]).toEqual({
       first: 0,
+      startsRow: true,
       toIcon: supplyIcon(p.to),
       entries: [
         {
@@ -382,19 +383,66 @@ describe('supply pointers in the view', () => {
   });
 
   /**
-   * Grouping is a GATHERING of what stands next to each other, never a re-sort: the original's own
-   * display tables put the two pointers of a receiver side by side, so both readings have to give
-   * the same list. Were that ever untrue the plate would show its rows in an order the statistics
-   * screens do not have — and nothing else in the tree would notice.
+   * The plate reorders by SHAPE and never by content: one-line groups first, two-line ones after
+   * them, and inside each size the order of the original's own display tables.
+   *
+   * The sort is stable, so "inside each size" is not an extra rule but what falls out of it — and
+   * that is the half worth pinning: were it lost, the rows would stand in an order no statistics
+   * screen has, and nothing else in the tree would notice.
    */
-  it('leaves the order exactly as the original lists it', () => {
+  it('sorts by height and keeps the original order inside each height', () => {
     const { state } = countingState();
     const all = buildStockView(state, player(0), sel({ supply: maskOf([...SUPPLY_ORDER]) }));
-    expect(flat(all).map((r) => r.index)).toEqual([...SUPPLY_ORDER]);
+
+    const sizes = all.supply.map((g) => g.entries.length);
+    expect(sizes).toEqual([...sizes].sort((a, b) => a - b));
+    expect(new Set(sizes)).toEqual(new Set([1, 2])); // the shapes this is actually about
+
+    for (const size of [1, 2]) {
+      const firsts = all.supply.filter((g) => g.entries.length === size).map((g) => g.first);
+      expect(firsts).toEqual([...firsts].sort((a, b) => a - b));
+    }
+
+    // Nothing lost and nothing duplicated by the reordering.
+    expect(flat(all).map((r) => r.index).sort((a, b) => a - b)).toEqual([...SUPPLY_ORDER]);
 
     // ... and a group is never split, which is the same statement seen from the other side.
     const keys = all.supply.map((g) => supplyToKey(g.first));
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  /**
+   * Why the sort is not enough on its own, and the whole point of `startsRow`.
+   *
+   * Sorting puts the seam between the two heights in one place; it does not stop the row from
+   * straddling it. Three one-line groups followed by a two-line one, at two places per row, still
+   * puts the fourth beside the third — and the blank line under the third is exactly what this is
+   * meant to remove. The flag marks the first group of each size, the layout sends it to column 1,
+   * and the grid can only honour that by starting a row.
+   */
+  it('marks the first group of each height, and only those', () => {
+    const { state } = countingState();
+    const all = buildStockView(state, player(0), sel({ supply: maskOf([...SUPPLY_ORDER]) }));
+
+    const marked = all.supply.map((g) => g.startsRow);
+    expect(marked[0]).toBe(true);
+    for (let i = 1; i < all.supply.length; i += 1) {
+      const changed = all.supply[i]!.entries.length !== all.supply[i - 1]!.entries.length;
+      expect([i, marked[i]]).toEqual([i, changed]);
+    }
+    // Two sizes, so exactly two marks — the seam sits in ONE place, not five.
+    expect(marked.filter(Boolean).length).toBe(2);
+
+    // The sharp case: an odd number of one-line groups before the first two-line one, which is
+    // where sorting alone leaves the two beside each other.
+    const odd = buildStockView(state, player(0), sel({ supply: maskOf([0, 1, 12, 8, 9, 14, 15]) }));
+    expect(odd.supply.map((g) => [g.entries.length, g.startsRow])).toEqual([
+      [1, true],
+      [1, false],
+      [1, false],
+      [2, true],
+      [2, false],
+    ]);
   });
 
   /**

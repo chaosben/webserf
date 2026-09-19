@@ -307,6 +307,22 @@ describe('supply pointers — reading direction', () => {
     expect(first, 'the picker no longer binds its first picture that way').not.toBeNull();
     expect(first![1]).toBe('good');
   });
+
+  /**
+   * `startsRow` needs BOTH halves to do anything: the class on the cell and the rule that sends a
+   * marked cell to column 1. Either one alone leaves a flag that is computed, tested and without
+   * effect — and since the tree has no component tests, nothing else would say so.
+   */
+  it('hangs the row break on the flag, in markup and in style', () => {
+    const overlay = read('StockOverlay.svelte');
+    expect(overlay, 'the cell no longer takes the flag').toContain(
+      'class:row-start={target.startsRow}',
+    );
+    // Long form on purpose: the one-value shorthand fills the START edge, so `grid-column: span n`
+    // here would be silently dropped by the line below it.
+    expect(overlay).toContain('grid-column: auto / span var(--supply-span)');
+    expect(overlay).toMatch(/\.row-start\s*\{\s*grid-column:\s*1\s*\/\s*span/);
+  });
 });
 
 describe('supply pointers — selection bits', () => {
