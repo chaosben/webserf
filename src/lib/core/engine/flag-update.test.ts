@@ -365,7 +365,7 @@ describe('updateFlags — resource scheduler', () => {
       connections: [null, conn(2), null, null, null, null],
       transporters: [false, true, false, false, false, false], // demand BFS == `flag[5]`, @0x4bd66
     });
- // Flag #2: its building requests Coal (bldFlags bit 2 = 0x04), priority 4 (even, as phase B delivers).
+ // Flag #2: its building requests Coal (bldFlags bit 2 = 0x04), priority 4 (even, so the booking drops it straight to 0).
  // UpLeft (dir 4) is the building link, so flagBuilding finds the building for requested++.
     const bconn = (i: number) => ({ kind: 'building' as const, index: i });
     const demand = flag({ index: 2, bldFlags: 0x04, stockPriority: [4, 0], connections: [null, null, null, null, bconn(2), null] });
@@ -405,6 +405,89 @@ describe('updateFlags — resource scheduler', () => {
     const inv = flag({ index: 7, acceptsResources: true });
     updateFlags(stateWithBld([null, f, null, null, null, null, null, inv], [null]));
     expect(f.slotDest[0]).toBe(7); // no demand bit set -> inventory
+  });
+
+  /**
+   * The bar rises with distance (`shrb $0x2` @0x4c090 … `jae` @0x4c09e): after every level that
+   * already holds a candidate, `bar += (bar >> 2) + 1`, and the search stops once that overflows a
+   * byte. A chain 1 -> 2 -> 3 -> 4 puts one demanding building per level.
+   */
+  const chainLink = (index: number, to: number | null, demand: { prio: number } | null): Flag =>
+    flag({
+      index,
+      bldFlags: demand ? 0x04 : 0,
+      stockPriority: demand ? [demand.prio, 0] : [0, 0],
+      connections: [null, to === null ? null : conn(to), null, null, demand ? { kind: 'building' as const, index } : null, null],
+      transporters: [false, to !== null, false, false, false, false],
+    });
+
+  const chainSource = (): Flag =>
+    flag({
+      index: 1,
+      hasResources: true,
+      resourceSlots: [12, -1, -1, -1, -1, -1, -1, -1],
+      slotDest: [0, 0, 0, 0, 0, 0, 0, 0],
+      connections: [null, conn(2), null, null, null, null],
+      transporters: [false, true, false, false, false, false],
+    });
+
+  it('the rising bar keeps a NEARER, weaker building: priority 9 one level further loses to 8', () => {
+ // level 1 holds 8, so level 2 has to beat 8 + (8>>2) + 1 == 11.
+    const f = chainSource();
+    const near = chainLink(2, 3, { prio: 8 });
+    const far = chainLink(3, null, { prio: 9 });
+    updateFlags(stateWithBld([null, f, near, far], [null, null, bld(0), bld(0)]));
+    expect(f.slotDest[0]).toBe(2);
+  });
+
+  it('but a building just ABOVE the bar still wins from further away: 12 beats the near 8', () => {
+ // Same layout, only the far priority changes — without the bar this test could not tell the
+ // rule from "always take the nearest", and with a flat maximum the case above could not.
+    const f = chainSource();
+    const near = chainLink(2, 3, { prio: 8 });
+    const far = chainLink(3, null, { prio: 12 });
+    updateFlags(stateWithBld([null, f, near, far], [null, null, bld(0), bld(0)]));
+    expect(f.slotDest[0]).toBe(3);
+  });
+
+  it('the byte overflow ends the search: 255 is taken on level 2 but never seen on level 3', () => {
+ // 200 -> bar 251 after level 1; 251 + (251>>2) + 1 == 314 overflows, so level 3 is never walked.
+    const onLevel2 = chainSource();
+    updateFlags(
+      stateWithBld(
+        [null, onLevel2, chainLink(2, 3, { prio: 200 }), chainLink(3, null, { prio: 255 })],
+        [null, null, bld(0), bld(0)],
+      ),
+    );
+    expect(onLevel2.slotDest[0]).toBe(3); // 255 > 251 — reachable, so it wins
+
+    const onLevel3 = chainSource();
+    updateFlags(
+      stateWithBld(
+        [null, onLevel3, chainLink(2, 3, { prio: 200 }), chainLink(3, 4, null), chainLink(4, null, { prio: 255 })],
+        [null, null, bld(0), bld(0), bld(0)],
+      ),
+    );
+    expect(onLevel3.slotDest[0]).toBe(2); // one level further the search has already stopped
+  });
+
+  it('the starting flag is no candidate: its own demand falls through to the inventory', () => {
+ // The original stamps the start flag and queues it, but only ever tests neighbours
+ // (`ptr_c` from `ptr_b+0x38 .. +0x24`) — a resource can never pick the flag it rests on.
+    const f = flag({
+      index: 1,
+      hasResources: true,
+      resourceSlots: [12, -1, -1, -1, -1, -1, -1, -1],
+      slotDest: [0, 0, 0, 0, 0, 0, 0, 0],
+      bldFlags: 0x04,
+      stockPriority: [100, 0],
+      connections: [null, conn(7), null, null, { kind: 'building' as const, index: 1 }, null],
+      transporters: [false, true, false, false, false, false],
+    });
+    const inv = flag({ index: 7, acceptsResources: true });
+    updateFlags(stateWithBld([null, f, null, null, null, null, null, inv], [null, bld(0)]));
+    expect(f.slotDest[0]).toBe(7);
+    expect(f.stockPriority[0]).toBe(100); // untouched: nothing was booked against it
   });
 });
 

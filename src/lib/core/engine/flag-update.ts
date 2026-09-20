@@ -318,14 +318,30 @@ function flagBuilding(state: GameState, f: Flag): (typeof state.buildings)[numbe
   return state.buildings[c.index] ?? null;
 }
 
+/** Level cap of the demand BFS: `cmpw $0x3e2,0x4(%edi)` + `jns` @0x4c054 ends the level once 994
+ *  nodes have been added. `vreg1` counts from −1, so the level stops at 995 fresh flags. */
+const DEMAND_BFS_NODE_BUDGET = 995;
+
 /**
  * Routable demand BFS (`schedule_slot_to_unknown_dest`, routable branch @0x4b858 + `LAB_0004c0a4`):
- * searches the reachable flag network for the flag whose attached building demands the resource —
- * `flag[flagByte]` bit `reqBit` set AND maximal `flag[flagByte+1]` priority. The priority is set per
- * tick by `LAB_000132e2` phase B, the mask by the worker on entering. `flagByte` 0x42 selects stock
- * slot 0, 0x44 slot 1.
+ * searches the reachable flag network for a flag whose attached building demands the resource —
+ * `flag[flagByte]` bit `reqBit` set, priority in `flag[flagByte+1]`. Phase B (`LAB_000132e2`) writes
+ * the priority per tick, the worker sets the mask on entering. `flagByte` 0x42 selects stock slot 0,
+ * 0x44 slot 1.
+ *
+ * **It is not the maximum over the network — the bar RISES with distance.** Once a candidate is
+ * held, every further level raises the bar by `(bar >> 2) + 1` (`shrb $0x2` @0x4c090, `addb $0x1`
+ * @0x4c094, `add %al` @0x4c09b), and the search ends as soon as that overflows 8 bits (`jae`
+ * @0x4c09e falls through to the hit). A distant building must therefore be markedly better, and a
+ * strong near hit ends the search after a few levels: 127 → 159 → 199 → 249 → stop. Flattening this
+ * into "take the best priority anywhere" sends goods across the map where the original serves the
+ * neighbour — measurably so: up to 30 % of destinations change, by a median of 3–8 levels.
+ *
+ * The starting flag is **not** a candidate: the original stamps it and queues it (`flag[0] =
+ * searchNum`), but tests only neighbours (`ptr_c` from `ptr_b+0x38 .. +0x24`), so a resource can
+ * never pick the flag it already rests on.
  */
-function findDemandingBuilding(
+export function findDemandingBuilding(
   state: GameState,
   f: Flag,
   reqBit: number,
@@ -333,19 +349,11 @@ function findDemandingBuilding(
 ): { flag: Flag; slot: number } | null {
   const slot = flagByte === 0x42 ? 0 : 1;
   let best: Flag | null = null;
-  let bestPrio = 0; // vreg5 starts at 0, so priority must exceed it: phase B writes 0 for no demand
-  const consider = (fl: Flag): void => {
-    const mask = slot === 0 ? fl.bldFlags : fl.bld2Flags;
-    if (((mask >> reqBit) & 1) === 0) return;
-    const prio = fl.stockPriority[slot];
-    if (bestPrio < prio) {
-      bestPrio = prio;
-      best = fl;
-    }
-  };
+  // `vreg5`: both the best priority so far and the bar the next level has to beat. It starts at 0,
+  // so a priority of 0 (phase B's "no demand") can never win.
+  let bar = 0;
   const visited = new Set<number>([f.index]);
   let frontier: number[] = [f.index];
-  consider(f);
   while (frontier.length > 0) {
     const next: number[] = [];
     for (const fIdx of frontier) {
@@ -358,10 +366,23 @@ function findDemandingBuilding(
         if (!nbFlag) continue;
         visited.add(nb);
         next.push(nb);
-        consider(nbFlag);
+        const mask = slot === 0 ? nbFlag.bldFlags : nbFlag.bld2Flags;
+        if (((mask >> reqBit) & 1) === 0) continue;
+        const prio = nbFlag.stockPriority[slot];
+        if (bar < prio) {
+          bar = prio;
+          best = nbFlag;
+        }
       }
+      if (next.length >= DEMAND_BFS_NODE_BUDGET) break;
     }
     frontier = next;
+    if (frontier.length === 0) break; // `js` @0x4c07c — no fresh nodes, the network is exhausted
+    if (bar > 0) {
+      const raised = bar + ((bar >> 2) + 1);
+      if (raised > 0xff) break; // carry @0x4c09e: the held candidate wins, no further level
+      bar = raised;
+    }
   }
   return best ? { flag: best, slot } : null;
 }
@@ -398,9 +419,10 @@ function scheduleUnknownDest(
     const hit = findDemandingBuilding(state, f, demand.reqBit, demand.flagByte);
     if (hit !== null) {
       const destFlag = hit.flag;
-      // Consume the priority (`LAB_0004c0a4`): `prio >> 1`, but 0 when bit 0 was clear. Phase B sets
-      // the priority with bit 0 cleared, so after routing the slot priority drops to 0 — one resource
-      // per priority tick, until `LAB_000132e2` sets it again next tick.
+      // Consume the priority (`LAB_0004c0a4` @0x4c0ab): `prio >> 1`, but 0 when bit 0 was clear.
+      // Phase B does NOT clear bit 0 — none of the original's 61 priority stores masks it — so a
+      // default slider survives seven bookings (127 → 63 → … → 1 → 0), not one. Halving is exactly
+      // `(slider>>8) >> fill` recomputed for `fill + 1`, which is why both may stand side by side.
       const oldPrio = destFlag.stockPriority[hit.slot];
       destFlag.stockPriority[hit.slot] = (oldPrio & 1) !== 0 ? oldPrio >> 1 : 0;
       // add_requested_resource: raise the `requested` nibble of the target stock, which is what
