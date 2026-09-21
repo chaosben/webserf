@@ -754,7 +754,32 @@ function mergeRoads(
 }
 
 /**
- * @0x4980e — remove a flag from the world. Same case distinction as the original:
+ * @0x498b5..@0x49925 — the serf standing ON the flag tile, handled before any road is touched. The
+ * original reads `game[pos].serf` and decides purely by state:
+ * - 74 / 7 / 5 (inside a building, ready to leave, leaving) -> `field_0xf = 25`, so he turns Lost once
+ *   he is out;
+ * - 2 (Walking) with no path bits left on the tile -> Lost straight away;
+ * - anything else stays as it is.
+ *
+ * The tile's serf cell is only READ here. `tile.paths` already carries the masked `& 0x3f` of the
+ * original's test, and the bits must still be set, which is why this runs before the merge/dead-end
+ * branch.
+ */
+function loseSerfOnFlagTile(state: GameState, pos: number): void {
+  const si = state.mapTiles[pos].serfIndex;
+  if (si <= 0) return;
+  const serf = state.serfs[si];
+  if (!serf) return;
+  if (serf.state === 74 || serf.state === 7 || serf.state === 5) {
+    serf.stateData[4] = 25; // field_0xf @0x49922
+    return;
+  }
+  if (serf.state === 2 && state.mapTiles[pos].paths === 0) serf.state = 25; // Lost @0x49916
+}
+
+/**
+ * @0x4980e — remove a flag from the world. Same order as the original: first the serf standing on the
+ * flag tile ({@link loseSerfOnFlagTile}), then the case distinction over the roads:
  * - two or more roads -> {@link mergeRoads}: a through flag, the two roads merge and the road tiles stay.
  * - one road -> {@link walkRoad}: a dead end, clear the remaining road.
  * - no road -> just remove it.
@@ -770,6 +795,8 @@ export function demolishFlag(state: GameState, flagIdx: number, col: number, row
   if (!flag) return;
   const pos = posOf(col, row, state.geo);
   const tile = state.mapTiles[pos];
+
+  loseSerfOnFlagTile(state, pos);
 
   const roadDirs: Direction[] = [];
   for (let d = 0; d < 6; d++) if (flag.paths[d]) roadDirs.push(d as Direction);
@@ -787,10 +814,13 @@ export function demolishFlag(state: GameState, flagIdx: number, col: number, row
 
   cancelSerfsToFlag(state, flagIdx);
 
- // Clear the map object — the path bits STAY (on a merge the tile becomes through road).
+ // Clear the map object — the path bits STAY (on a merge the tile becomes through road). The tile's
+ // SERF cell is deliberately untouched: it is the occupancy, and clearing it for a serf who is still
+ // standing there both hides him from the renderer and hands his tile to the next one. The original
+ // only ever reads that cell here (@0x498bb); its two u16 stores go to offset 0 of the game tuple
+ // (@0x49fcb, @0x4a0f4), which is `objIndex`.
   tile.object = 0; // object byte &= 0x80
   tile.objIndex = 0;
-  tile.serfIndex = 0;
 
   freeFlagSlot(state, flagIdx);
 }
