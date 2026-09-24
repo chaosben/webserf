@@ -26,6 +26,8 @@ import StockSupplyTab from './StockSupplyTab.svelte';
 import StockDisplayTab from './StockDisplayTab.svelte';
 import HacksTab from './HacksTab.svelte';
 import HacksDisplayTab from './HacksDisplayTab.svelte';
+import AssistTab from './AssistTab.svelte';
+import AssistDisplayTab from './AssistDisplayTab.svelte';
 
 /** A tab of the enhancements panel, plus the body it shows. */
 export interface EnhancementTab extends OverlayTab {
@@ -56,6 +58,14 @@ export const ENHANCEMENTS: readonly Enhancement[] = [
     tabs: [
       { id: 'hacks.list', labelKey: 'enh.hacks.tab.list', panel: HacksTab },
       { id: 'hacks.view', labelKey: 'enh.hacks.tab.view', panel: HacksDisplayTab },
+    ],
+  },
+  {
+    id: 'assist',
+    labelKey: 'enh.assist.name',
+    tabs: [
+      { id: 'assist.list', labelKey: 'enh.assist.tab.list', panel: AssistTab },
+      { id: 'assist.view', labelKey: 'enh.assist.tab.view', panel: AssistDisplayTab },
     ],
   },
 ];

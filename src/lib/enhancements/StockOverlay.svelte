@@ -176,8 +176,8 @@
   .overview {
     max-width: 100%;
     padding: 0.35em 0.45em;
-    background: color-mix(in srgb, var(--bg-sunken) calc(var(--plate-opacity) * 100%), transparent);
-    border: 1px solid color-mix(in srgb, var(--line) calc(var(--plate-opacity) * 100%), transparent);
+    background: var(--bg-sunken);
+    border: 1px solid var(--line);
     pointer-events: none;
     user-select: none;
     overflow: hidden;

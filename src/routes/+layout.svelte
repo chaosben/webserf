@@ -114,6 +114,9 @@
 	 */
 	:global(.game-overlay) {
 		font-size: calc(var(--game-px) * var(--overlay-scale, 1));
+		/* The WHOLE plate fades, content included — a see-through backing behind fully opaque
+		   pictures and numbers would still cover the map where it matters. */
+		opacity: var(--plate-opacity, 1);
 	}
 
 	:global(button) {

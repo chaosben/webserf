@@ -153,6 +153,13 @@ export interface SettingsShape {
 	hackShowMinerals: boolean;
 	/** Signs on every tile carrying a deposit. */
 	hackMinerals: boolean;
+
+	// -- Assistants. Only a `show` field each: an assistant acts when asked and has nothing to
+	// switch on — see `enhancements/assistants.ts`. Additive, so no version bump.
+	assistCorner: OverlayCorner;
+	assistOpacity: number;
+	/** The road assistant has a plate over the game view. */
+	assistShowRoad: boolean;
 }
 
 /**
@@ -165,6 +172,9 @@ export interface SettingsShape {
  * enhancement's own, not a hack's.
  */
 export type HackSettingKey = Extract<keyof SettingsShape, `hack${string}`>;
+
+/** The settings fields that list an assistant — `assistShow<Id>`, see `enhancements/assistants.ts`. */
+export type AssistSettingKey = Extract<keyof SettingsShape, `assistShow${string}`>;
 
 const DEFAULTS: SettingsShape = {
 	speedFactor: 1,
@@ -191,7 +201,11 @@ const DEFAULTS: SettingsShape = {
 	// screen until someone asks for it. That holds for both halves: no switch in the overlay,
 	// and the switch itself off.
 	hackShowMinerals: false,
-	hackMinerals: false
+	hackMinerals: false,
+	// A corner neither of the two older plates takes by default.
+	assistCorner: 'bl',
+	assistOpacity: OVERLAY_OPACITY_DEFAULT,
+	assistShowRoad: false
 };
 
 /**
@@ -244,7 +258,11 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	hacksOpacity: (v): v is number =>
 		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
 	hackShowMinerals: (v): v is boolean => typeof v === 'boolean',
-	hackMinerals: (v): v is boolean => typeof v === 'boolean'
+	hackMinerals: (v): v is boolean => typeof v === 'boolean',
+	assistCorner: (v): v is OverlayCorner => isOneOf(v, OVERLAY_CORNERS),
+	assistOpacity: (v): v is number =>
+		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
+	assistShowRoad: (v): v is boolean => typeof v === 'boolean'
 };
 
 function read(): SettingsShape {

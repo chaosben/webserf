@@ -82,7 +82,7 @@ describe('the map click and our plates', () => {
  */
 describe('the size of our plates over the game surface', () => {
   const layout = readFileSync(join(HERE, '../../routes/+layout.svelte'), 'utf8');
-  const plates = ['StockOverlay.svelte', 'HacksOverlay.svelte'];
+  const plates = ['StockOverlay.svelte', 'HacksOverlay.svelte', 'RoadAssistantOverlay.svelte'];
 
   it('measures the game in its own pixel base, not in the shell size', () => {
     expect(layout).toContain('--game-px:');
@@ -115,6 +115,22 @@ describe('the size of our plates over the game surface', () => {
 });
 
 describe('overlay opacity', () => {
+  /**
+   * The setting fades the plate AND its content. Mixing it into the backing colour alone left the
+   * pictures and numbers fully opaque, so the map stayed covered where it matters.
+   */
+  it('fades the whole plate in the shared rule, not the backing of each plate', () => {
+    const layout = readFileSync(join(HERE, '../../routes/+layout.svelte'), 'utf8');
+    const rule = layout.split(':global(.game-overlay)')[1]!.split('}')[0];
+    expect(rule).toContain('opacity: var(--plate-opacity');
+    for (const name of ['StockOverlay.svelte', 'HacksOverlay.svelte', 'RoadAssistantOverlay.svelte']) {
+      const css = readFileSync(join(HERE, name), 'utf8');
+      const style = css.slice(css.indexOf('<style>')).replace(/\/\*[\s\S]*?\*\//g, '');
+      expect(style, name).not.toContain('--plate-opacity');
+      expect(css, `${name} must still hand the value to the rule`).toContain('style:--plate-opacity');
+    }
+  });
+
   it('never reaches zero', () => {
     // An invisible plate that still swallows clicks looks like a broken game, not like a setting.
     expect(OVERLAY_OPACITY_MIN).toBeGreaterThan(0);

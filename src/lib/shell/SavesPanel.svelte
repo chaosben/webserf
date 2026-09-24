@@ -39,6 +39,7 @@
 		slotNameFromFileName
 	} from '$lib/core/save-transfer.js';
 	import { log } from './log.js';
+	import { toasts } from './toasts.svelte.js';
 	import { st } from './i18n.js';
 	import IconDownload from '~icons/material-symbols-light/download';
 	import IconUpload from '~icons/material-symbols-light/upload';
@@ -61,8 +62,6 @@
 
 	let rows = $state<Row[]>([]);
 	let busy = $state(false);
-	let note = $state<string | null>(null);
-	let error = $state<string | null>(null);
 	/** Slot whose deletion is waiting for confirmation. */
 	let confirming = $state<number | null>(null);
 
@@ -104,16 +103,16 @@
 		const s = store;
 		if (s === null || busy) return;
 		busy = true;
-		note = null;
-		error = null;
 		confirming = null;
 		try {
-			note = await fn(s);
-			log.info('game', `${what}: ${note}`);
+			const done = await fn(s);
+			log.info('game', `${what}: ${done}`);
+			toasts.push(done, { tone: 'good' });
 			await refresh(s);
 		} catch (err) {
-			error = err instanceof Error ? err.message : String(err);
-			log.error('game', `${what} failed: ${error}`);
+			const why = err instanceof Error ? err.message : String(err);
+			log.error('game', `${what} failed: ${why}`);
+			toasts.push(why, { tone: 'error' });
 		} finally {
 			busy = false;
 		}
@@ -285,12 +284,6 @@
 			</button>
 		</div>
 
-		{#if error !== null}
-			<p class="note bad">{error}</p>
-		{:else if note !== null}
-			<p class="note good">{note}</p>
-		{/if}
-
 		<p class="note">
 			{st('saves.footnote')}
 			{folder === null ? st('saves.deleteLocal') : st('saves.deleteBoth', { folder })}
@@ -383,11 +376,4 @@
 		line-height: 1.5;
 	}
 
-	.note.good {
-		color: var(--accent);
-	}
-
-	.note.bad {
-		color: var(--danger);
-	}
 </style>

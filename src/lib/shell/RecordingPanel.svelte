@@ -21,11 +21,15 @@
 	import { recordings, recordingSupported } from './recording.svelte.js';
 	import { fileStreamingSupported } from '../views/screen-recorder.js';
 	import { log } from './log.js';
+	import { toasts } from './toasts.svelte.js';
 	import { st } from './i18n.js';
 
 	async function start(): Promise<void> {
 		// `new Date()` here rather than in the bus: the bus stays testable without a clock.
-		if (await recordings.start(new Date())) log.info('game', 'Recording started');
+		if (await recordings.start(new Date())) {
+			log.info('game', 'Recording started');
+			toasts.push(st('record.started'), { tone: 'info' });
+		}
 		else if (recordings.error !== null) log.warn('game', `Recording: ${recordings.error}`);
 	}
 
@@ -33,6 +37,9 @@
 		const result = await recordings.stop();
 		if (result === null) return;
 		log.info('game', `Recording stopped: ${result.frames} frames, ${kb(result.bytes)}`);
+		toasts.push(st('record.stopped', { frames: result.frames, size: kb(result.bytes) }), {
+			tone: 'good'
+		});
 		// Only the fallback hands data back — then it still has to reach the disk.
 		if (result.blob !== null) download(result.fileName, result.blob);
 	}

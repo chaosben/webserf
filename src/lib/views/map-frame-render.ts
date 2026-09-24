@@ -93,6 +93,11 @@ export interface MapFrameInput {
    * {@link cursorMarkers} applies.
    */
   readonly cursorRingSprites?: readonly number[];
+  /**
+   * The road assistant's preview as road bits per tile — ours, like {@link HackToggles}, and not
+   * part of the original's passes. `undefined` => nothing.
+   */
+  readonly plannedRoad?: ReadonlyMap<number, number>;
   readonly playerColors: readonly (readonly [number, number, number])[];
   /**
    * Sound sink. It hangs here because the original enqueues the effect sounds inside the drawing
@@ -244,6 +249,18 @@ export function renderMapFrame(input: MapFrameInput): boolean {
 
     // The sprite layers still compute in SCENE coordinates; the blitter scales down as it writes.
     const blitter = new IndexBlitter(target, surfaceScale);
+    // The assistant's planned road: the road layer once more, over the ground and under the
+    // entities, like a built road — on the window frame, where the camera path draws roads too.
+    const planned = input.plannedRoad;
+    if (planned !== undefined && roads !== null) {
+      drawRoadLayer(blitter, frame, {
+        tiles: rs.mapTiles,
+        geo,
+        heightUnit,
+        tile: roads,
+        paths: (pos) => planned.get(pos) ?? 0,
+      });
+    }
     metrics.begin('entities');
     const hitMarkers = drawEntityLayer(blitter, frame, {
       state: rs,

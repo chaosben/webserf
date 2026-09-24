@@ -70,6 +70,12 @@ export interface RoadLayerInput<Img extends DrawImage> {
    * segment.
    */
   readonly tile: (maskIndex: number, groundIndex: number) => Img | null;
+  /**
+   * Road bits to draw INSTEAD of `tiles[pos].paths` — for a road that does not exist yet (the road
+   * assistant's preview). Everything else still comes from the real tiles, so a planned segment
+   * gets exactly the mask, ground texture and position a built one would.
+   */
+  readonly paths?: (pos: number) => number;
 }
 
 /** Neighbour delta per "forward" direction: 0=Right, 1=DownRight, 2=Down. */
@@ -85,6 +91,7 @@ export function drawRoadLayer<Img extends DrawImage>(
   input: RoadLayerInput<Img>,
 ): void {
   const { tiles, geo, heightUnit } = input;
+  const override = input.paths;
   const at = (c: number, r: number): RoadTileData => tiles[posOf(c, r, geo)]!;
   const h = (c: number, r: number): number => at(c, r).height;
 
@@ -93,7 +100,7 @@ export function drawRoadLayer<Img extends DrawImage>(
     for (let k = 0; k < hr.tiles.length; k++) {
       const pos = hr.tiles[k]!;
       const t = tiles[pos]!;
-      const paths = t.paths & 0x3f;
+      const paths = (override === undefined ? t.paths : override(pos)) & 0x3f;
       if (paths === 0) continue;
       const col = pos % geo.cols;
       const row = (pos - col) / geo.cols;

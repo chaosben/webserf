@@ -97,6 +97,9 @@
   import { metrics } from './render-metrics.js';
   import { settings, ticksPerSecondOf } from '../settings/settings.svelte.js';
   import { activeHackIds, hackInForce } from '../enhancements/hacks.js';
+  import { roadAssistant, ROAD_REFUSAL_TEXT } from '../enhancements/road-assistant.svelte.js';
+  import { isOwnFlag, planRoad, roadPlanCommands, samePlan } from '../enhancements/road-planner.js';
+  import { plannedRoadPaths } from '../core/road-plan-layer.js';
   import { logicFrame, runTicks } from '../core/engine/tick.js';
   import { missionEndScreenDue, writeMissionEndPassword } from '../core/engine/economy.js';
   import {
@@ -124,6 +127,7 @@
     updateRoadMarkers,
     roadEdgeScroll,
     SOUND_EDGE_SCROLL,
+    SOUND_ROAD_DONE,
     ROAD_BAR_ICONS_ENTER,
     ROAD_BAR_ICONS_LEAVE,
     type RoadBuildingState,
@@ -595,6 +599,13 @@
    */
   // While this view is up, the shell has a clock to operate; it starts out running.
   $effect(() => (canPlay ? simulation.provide() : undefined));
+  // … and the road assistant has someone to build for.
+  $effect(() => (canPlay ? roadAssistant.provide(buildAssistRoad) : undefined));
+  // Unlisting the assistant takes away its plate, and with it the only way to cancel a pick — so
+  // the pick ends with it rather than keep swallowing map clicks.
+  $effect(() => {
+    if (!settings.value.assistShowRoad && roadAssistant.phase !== 'idle') roadAssistant.reset();
+  });
   // What actually becomes of it the view reports back — the original screens stop the clock by
   // themselves, and the overlay should show that instead of claiming it runs.
   $effect(() => {
@@ -715,7 +726,9 @@
    * needs sound, "road finished" and the segment count — the same effect as {@link runCommand}, see
    * `applyRoadBuildClick`.
    */
-  function runRoadClick(cmd: Extract<Command, { kind: 'roadBuildClick' }>): RoadClickResult {
+  function runRoadClick(
+    cmd: Extract<Command, { kind: 'roadBuildClick' }>,
+  ): RoadClickResult & { readonly applied: boolean } {
     const res = applyRoadBuildClick(engineState, cmd);
     recordAction(cmd, res.applied);
     return res;
@@ -3610,6 +3623,7 @@
       selected,
       cursorMarkers,
       cursorRingSprites: roadActive ? roadRingSprites : undefined,
+      plannedRoad,
       playerColors: PLAYER_COLORS,
       // Sound sink of the drawing passes (`vp+0x16..0x19` plus the clip frame `vp+0x3e`/`vp+0x40`).
       // The measurements are those of the DRAWN map field in scene pixels, i.e. after the zoom —
@@ -4272,6 +4286,12 @@
       heightAt,
       heightUnit,
     );
+    // The road assistant picks flags while it is active — before the map click, so the pick sets no
+    // cursor, sounds nothing and issues no command.
+    if (roadAssistant.phase !== 'idle') {
+      assistMapClick(t.col, t.row);
+      return;
+    }
     // The element pixels come along: the road-building edge scroll checks the click PIXELS against
     // the border of the map area, not the tile.
     mapClick(t.col, t.row, special, clientX - rect.left, clientY - rect.top);
@@ -4311,6 +4331,93 @@
     const cam = cameraCenteredOnTile(next.col, next.row, viewportW / zoom, viewportH / zoom);
     camX = cam.originX;
     camY = cam.originY;
+  }
+
+  /** The road assistant's preview, as the road bits it would set. */
+  const plannedRoad = $derived.by(() => {
+    const plan = roadAssistant.phase === 'preview' ? roadAssistant.plan : null;
+    return plan === null ? undefined : plannedRoadPaths(plan.from, plan.dirs, geo);
+  });
+
+  /**
+   * **A map click while the road assistant picks flags.** Reads the tile and plans; it changes
+   * nothing in the game state — the plan becomes a road only in {@link buildAssistRoad}.
+   *
+   * In the preview a click on another flag picks a new target, so trying a second destination does
+   * not mean starting over.
+   */
+  function assistMapClick(col: number, row: number): void {
+    const player = engineState.players[buildPlayer];
+    if (!player || !player.active) return;
+    if (!isOwnFlag(engineState, player, col, row)) {
+      roadAssistant.say('enh.assist.road.notOwnFlag', 'warn');
+      return;
+    }
+    if (roadAssistant.phase === 'pickStart') {
+      roadAssistant.start = { col, row };
+      roadAssistant.phase = 'pickTarget';
+      return;
+    }
+    const start = roadAssistant.start;
+    if (start === null) return;
+    const res = planRoad(engineState, player, start, { col, row });
+    if (!res.ok) {
+      roadAssistant.say(ROAD_REFUSAL_TEXT[res.reason], 'warn');
+      return;
+    }
+    roadAssistant.plan = res.plan;
+    roadAssistant.phase = 'preview';
+  }
+
+  /**
+   * **Build the proposed road — with the player's own clicks.** Start road building on the start
+   * flag, then one road-building click per step, through {@link runCommand}/{@link runRoadClick}:
+   * the engine sees nothing it would not see from a player, and the action log holds every step.
+   *
+   * It plans again first. Ticks ran since the preview, and a serf, a tree or a new road may have
+   * changed the route; a route that differs is shown again rather than built blind.
+   */
+  function buildAssistRoad(): void {
+    const plan = roadAssistant.plan;
+    const player = engineState.players[buildPlayer];
+    if (plan === null || !player || !player.active) return;
+    if (roadBuild().active) {
+      roadAssistant.say('enh.assist.road.busy', 'warn');
+      return;
+    }
+    const res = planRoad(engineState, player, plan.from, plan.to);
+    if (!res.ok) {
+      roadAssistant.say(ROAD_REFUSAL_TEXT[res.reason], 'warn');
+      return;
+    }
+    if (!samePlan(res.plan, plan)) {
+      roadAssistant.plan = res.plan;
+      roadAssistant.say('enh.assist.road.changed', 'info');
+      return;
+    }
+    const [begin, ...clicks] = roadPlanCommands(res.plan, buildPlayer);
+    // Entering road building clears the build helper, as the bar icon does (`btr $0x6` @0x28615).
+    buildHelper = false;
+    let finished = false;
+    if (runCommand(begin)) {
+      for (const click of clicks) {
+        const r = runRoadClick(click);
+        if (!r.applied) break;
+        finished = r.finished;
+      }
+      if (!finished && roadBuild().active) runCommand({ kind: 'cancelRoadBuilding', player: buildPlayer });
+    }
+    // One sound for the whole road, the one the finishing click makes.
+    if (finished) playUiSound(SOUND_ROAD_DONE);
+    barIcons = [barIcons[0], barIcons[1], ...ROAD_BAR_ICONS_LEAVE];
+    selected = { col: player.cursorCol, row: player.cursorRow };
+    syncRoadView();
+    refreshContextIcons(player.cursorCol, player.cursorRow);
+    markEngineMutated(true);
+    if (finished) {
+      roadAssistant.reset();
+      roadAssistant.say('enh.assist.road.built', 'good');
+    } else roadAssistant.say('enh.assist.road.failed', 'error');
   }
 
   /**

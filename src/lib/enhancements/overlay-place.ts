@@ -25,7 +25,8 @@ export const CORNER_LABEL = {
 } as const satisfies Record<OverlayCorner, ShellKey>;
 
 /**
- * How far the plate shows through.
+ * How far the plate shows through — the whole plate with everything on it, not just its backing
+ * (`opacity` in the shared `.game-overlay` rule).
  *
  * Not down to zero: an invisible overlay that still swallows nothing would be indistinguishable
  * from a broken one, and the hack plate takes the pointer, so it would swallow clicks unseen.

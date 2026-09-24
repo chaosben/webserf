@@ -172,8 +172,12 @@ export function updateRoadMarkers(
   rb.allowedMask = mask;
 }
 
-/** Steps 3..5 of the marker pass (@0x32ec1..@0x3313c) for one neighbour tile. */
-function neighbourAllowed(
+/**
+ * Steps 3..5 of the marker pass (@0x32ec1..@0x3313c) for one neighbour tile. Pure — it reads the
+ * tile and classifies, nothing more — which is what lets a planner ask the same question the marker
+ * pass asks without taking part in a road-building session.
+ */
+export function neighbourAllowed(
   state: GameState,
   player: Player,
   np: number,

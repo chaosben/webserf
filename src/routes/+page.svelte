@@ -35,6 +35,9 @@
 	import IconInfo from '~icons/material-symbols-light/info-outline';
 	import { recordings } from '$lib/shell/recording.svelte.js';
 	import { updates } from '$lib/shell/update.svelte.js';
+	import { toasts } from '$lib/shell/toasts.svelte.js';
+	import ToastStack from '$lib/shell/ToastStack.svelte';
+	import { untrack } from 'svelte';
 	import { log } from '$lib/shell/log.js';
 	import { st } from '$lib/shell/i18n.js';
 	import { settings } from '$lib/settings/settings.svelte.js';
@@ -159,6 +162,24 @@
 		// statement is the same either way, and it is the only one visible with the panel closed.
 		...(saveDirPending !== null ? FOLDER_MARKS : [])
 	]);
+	/**
+	 * A waiting version says so once, over the game — the rail mark alone is easy to miss. The full
+	 * text and the restart button stay in the info panel; a restart must never be one stray click
+	 * away on the map.
+	 */
+	$effect(() => {
+		if (updates.ready) untrack(() => toasts.push(st('toast.update'), { tone: 'info', ms: 12000 }));
+	});
+
+	/**
+	 * An archive problem. The drop zone shows it itself when it is up; otherwise — a replacement
+	 * archive from the import screen, while a game or the menu is showing — it has to come as a
+	 * message, or nobody sees it.
+	 */
+	function assetProblem(text: string, tone: 'warn' | 'error'): void {
+		assetError = text;
+		if (archive !== null) toasts.push(text, { tone });
+	}
 	/**
 	 * The open tab of the import/export screen. Deliberately NOT in the settings: on opening it
 	 * should sit where most of the work happens, not where someone removed the archive once three
@@ -414,8 +435,9 @@
 
 	async function onfile(file: File): Promise<void> {
 		if (!looksLikeArchive(file.name)) {
-			assetError = st('assets.badType', { file: file.name });
-			log.warn('assets', assetError);
+			const text = st('assets.badType', { file: file.name });
+			assetProblem(text, 'warn');
+			log.warn('assets', text);
 			return;
 		}
 		busy = true;
@@ -424,9 +446,11 @@
 			apply(PaArchive.parse(raw), file.name);
 			await cacheArchive(file.name, raw);
 			log.info('assets', `${file.name} stored in the browser.`);
+			toasts.push(st('assets.loaded', { file: file.name }), { tone: 'good' });
 		} catch (err) {
-			assetError = st('assets.unreadable', { why: err instanceof Error ? err.message : String(err) });
-			log.error('assets', assetError);
+			const text = st('assets.unreadable', { why: err instanceof Error ? err.message : String(err) });
+			assetProblem(text, 'error');
+			log.error('assets', text);
 		} finally {
 			busy = false;
 		}
@@ -714,6 +738,9 @@
 				<InfoPanel />
 			</OverlayPanel>
 		{/if}
+
+		<!-- Last in the stage, so a message stands over an open panel as well. -->
+		<ToastStack />
 	</div>
 </div>
 
