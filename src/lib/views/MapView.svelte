@@ -215,7 +215,9 @@
   import {
     OPTIONS_SCREENS,
     QUIT_POPUP_SCREEN,
+    QUIT_WARNING_SCREEN,
     clickOptionsPopup,
+    quitNeedsSaveWarning,
     type OptionsPopupView,
   } from '../core/options-popup.js';
   import { DEVICE_SCREEN, clickDevicePopup } from '../core/device-popup.js';
@@ -368,6 +370,8 @@
    * @0x3bd6c, mission end @0x3831d, disk menu @0x3ed98) — which is exactly why this is a derived
    * value and not a remembered one: they can be closed in many ways (`closePopups` has two dozen
    * callers), and a parked running state would get stuck on every one that does not put it back.
+   * The follow-up screen 0x23 does not pause itself; it is only reachable from 0x22, whose pause is
+   * still in force, so it stands in the list as well.
    *
    * `pause_game_clock` is a PAIR in the original: it parks the tick rate `gs+0x1fe` in `gs+0x1fa` and
    * zeroes it, `resume_game_clock` @0x3ecd7 fetches it back. Seven stopping and eight resuming sites
@@ -384,6 +388,7 @@
     () =>
       running &&
       menuScreen !== QUIT_POPUP_SCREEN &&
+      menuScreen !== QUIT_WARNING_SCREEN &&
       missionEndStep === null &&
       !diskMenuOpen &&
       // The fourth is its own: an open report window freezes the state it describes.
@@ -1344,7 +1349,7 @@
   }
 
   /**
-   * Click into the footer screens (0x25 "EXTRA OPTION", 0x22 "ENDE"). Action semantics as in the
+   * Click into the footer screens (0x25 "EXTRA OPTION", 0x22/0x23 "ENDE"). Action semantics as in the
    * original handlers, see `options-popup.ts`.
    */
   function applyOptionsClick(screen: number, x: number, y: number): void {
@@ -1396,23 +1401,36 @@
         closePopups();
         break;
       case 'quitConfirm':
-        // `action_quit_confirm` @0x2ebdb: sound 0x4c, then `gs+0x1c9` bit 2 — the bit at which
-        // `frame_loop` @0xbbdb leaves the loop. Here that is the return to the main menu.
-        //
-        // OFFEN @0x2ebea — if the 60-second counter `gs+0x186` stands at 0 (it runs down from the
-        // game start), the original silently opens screen 0x23 instead; the second end screen is not
-        // ported, so we leave the game immediately after the first minute as well.
-        //
-        // @0x2ec2b — the CAMPAIGN PROGRESS. In the original `gs+0x356`/`gs+0x358` are global and
-        // survive leaving by themselves; our menu is a component of its own, rebuilt on return, so
-        // the result travels with `onquit`. Computed on the RUNNING header, not on `save.header`:
-        // the winner is set only during play.
-        playUiSound(UI_SOUND_QUIT_CONFIRM);
-        closePopups();
-        onquit?.(advanceCampaignProgress(engineState.header));
+        // `action_quit_confirm` @0x2ebdb: with the save clock `gs+0x186` run down (more than 60 s
+        // since the last save) it only switches to the follow-up screen and returns (@0x2ebea..
+        // @0x2ebf8) — no sound beyond the zone sound above, the popup stays open.
+        if (quitNeedsSaveWarning(engineState.saveClocks.quitGrace)) {
+          menuScreen = QUIT_WARNING_SCREEN;
+          break;
+        }
+        leaveGame();
+        break;
+      case 'quitConfirmUnsaved':
+        // Yes on screen 0x23 (`0xab`) jumps straight into the leave body @0x2ebf9.
+        leaveGame();
         break;
     }
     frameVersion += 1;
+  }
+
+  /**
+   * The leave body @0x2ebf9 that both yes buttons reach: sound 0x4c, then `gs+0x1c9` bit 2 — the bit
+   * at which `frame_loop` @0xbbdb leaves the loop. Here that is the return to the main menu.
+   *
+   * @0x2ec2b — the CAMPAIGN PROGRESS. In the original `gs+0x356`/`gs+0x358` are global and survive
+   * leaving by themselves; our menu is a component of its own, rebuilt on return, so the result
+   * travels with `onquit`. Computed on the RUNNING header, not on `save.header`: the winner is set
+   * only during play.
+   */
+  function leaveGame(): void {
+    playUiSound(UI_SOUND_QUIT_CONFIRM);
+    closePopups();
+    onquit?.(advanceCampaignProgress(engineState.header));
   }
 
   /**
@@ -2740,8 +2758,7 @@
   function openMissionEndIfDue(): void {
     if (missionEndStep !== null) return;
     // `vp[0x72]` = the open popup screen. The lock list (0x17..0x1a disk, 0x22/0x23 end, 0x25 options
-    // footer) runs entirely through `menuScreen` here except for 0x23, which is not ported. `0` means
-    // "none", as in the original.
+    // footer) runs entirely through `menuScreen` here. `0` means "none", as in the original.
     const gate = { roadBuilding: roadBuild().active, currentScreen: menuScreen ?? 0 };
     if (!missionEndScreenDue(engineState, gate)) return;
     // The sink of the renderer that outlives the screen (@0x384f7): the password of the next level

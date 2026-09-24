@@ -24,7 +24,7 @@
     fillRect,
   } from '../core/ui-render.js';
   import {
-    OPTIONS_SCREENS,
+    OPTIONS_POPUP_SCREEN,
     clickMenuPopup,
     drawMenuPopup,
     type OptionsPopupView,
@@ -710,7 +710,7 @@
       else log.warn('menu', 'A40 — no loaded game is parked; nothing to resume.');
     }
     // A13 @0x4fceb — "EXTRA OPTION" opens screen 0x25.
-    if (result.effect.kind === 'options') popupScreen = OPTIONS_SCREENS[1] ?? 0x25;
+    if (result.effect.kind === 'options') popupScreen = OPTIONS_POPUP_SCREEN;
     if (result.effect.kind === 'load') void openDisk();
     // A39 @0x4fd1c — "LOAD": `vp[1]` btr 1, `vp[0x70] = 0x17`, `gs[0x1c8]` **btr 2** (i.e. load).
     // returns). The counterpart in the browser is a page reload — after which the opening credits

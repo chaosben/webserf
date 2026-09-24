@@ -19,7 +19,11 @@ import {
   OPTION_CHECKBOXES,
   QUIT_POPUP_HITBOXES,
   QUIT_POPUP_LABELS,
+  QUIT_WARNING_HITBOXES,
+  QUIT_WARNING_LABELS,
   clickMenuPopup,
+  drawOptionsScreen,
+  quitNeedsSaveWarning,
   clickOptionsPopup,
   optionsMessageLine,
   optionsPopupAction,
@@ -43,6 +47,7 @@ import type { DecodedSprite } from './types.js';
 
 /** Text colour as in the original (palette index 0x1f of the game palette). */
 const TEXT = [115, 179, 67] as const;
+const VIEW = { viewOptions: [0x39, 0x39] as [number, number], volume: 75, music: true, sfx: true };
 
 describe('screen 0x25 — layout against the click table', () => {
   it('covers every clickable element with a zone at its top-left corner', () => {
@@ -173,11 +178,68 @@ describe('screen 0x22 — QUIT', () => {
   });
 });
 
+describe('screen 0x23 — follow-up "game not saved"', () => {
+  /** Zone click in popup pixels (the zones are pixel rectangles, not character columns). */
+  const hit = (x: number, y: number) =>
+    optionsPopupAction(
+      (optionsPopupHitboxes(0x23).find((z) => x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1)
+        ?.action ?? -1),
+    );
+
+  it('asks again exactly when the save clock has run down', () => {
+    expect(quitNeedsSaveWarning(0)).toBe(true);
+    expect(quitNeedsSaveWarning(1)).toBe(false);
+    expect(quitNeedsSaveWarning(0x1770)).toBe(false);
+  });
+
+  it('answers only on its own lower row; its no is the same action as on 0x22', () => {
+    const answers = QUIT_WARNING_LABELS[QUIT_WARNING_LABELS.length - 1]!;
+    expect(answers.text).toBe(QUIT_POPUP_LABELS[3]!.text); // the same string @0x3bf08
+    for (const z of QUIT_WARNING_HITBOXES) {
+      expect(z.y0).toBe(answers.row);
+      expect(z.y1).toBe(answers.row + 7);
+    }
+    expect(hit(0x10, 0x80)).toEqual({ kind: 'quitConfirmUnsaved' });
+    expect(hit(0x60, 0x80)).toEqual({ kind: 'quitCancel' });
+    // The upper yes/no stays visible but no longer answers.
+    expect(hit(0x10, 0x30)).toBeNull();
+    expect(hit(0x60, 0x30)).toBeNull();
+  });
+
+  it('draws the 0x22 dialog unchanged and adds lines only below it', () => {
+    const provider: SpriteProvider = () =>
+      ({
+        width: 2,
+        height: 2,
+        offsetX: 0,
+        offsetY: 0,
+        deltaX: 0,
+        deltaY: 0,
+        pixels: new Uint8ClampedArray(16).fill(255),
+      }) as DecodedSprite;
+    const W = 128;
+    const H = 144;
+    const quit = createFramebuffer(W, H);
+    const warn = createFramebuffer(W, H);
+    expect(drawOptionsScreen(quit, provider, 0x22, VIEW, { textColor: TEXT })).toBe(true);
+    expect(drawOptionsScreen(warn, provider, 0x23, VIEW, { textColor: TEXT })).toBe(true);
+    let firstDiffRow = -1;
+    for (let i = 0; i < quit.rgba.length; i++) {
+      if (quit.rgba[i] !== warn.rgba[i]) {
+        firstDiffRow = Math.floor(i / 4 / W);
+        break;
+      }
+    }
+    expect(firstDiffRow).toBeGreaterThanOrEqual(QUIT_WARNING_LABELS[0]!.row);
+  });
+});
+
 describe('screen list', () => {
-  it('carries exactly the two footer screens', () => {
-    expect([...OPTIONS_SCREENS].sort()).toEqual([0x22, 0x25]);
+  it('carries exactly the three footer screens', () => {
+    expect([...OPTIONS_SCREENS].sort()).toEqual([0x22, 0x23, 0x25]);
     expect(optionsPopupHitboxes(0x25)).toBe(OPTIONS_POPUP_HITBOXES);
     expect(optionsPopupHitboxes(0x22)).toBe(QUIT_POPUP_HITBOXES);
+    expect(optionsPopupHitboxes(0x23)).toBe(QUIT_WARNING_HITBOXES);
   });
 
   it('draws the labels in renderer order', () => {

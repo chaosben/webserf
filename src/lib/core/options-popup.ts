@@ -6,6 +6,7 @@
  * |---|---|---|---|---|
  * | 0x25 | `FUN_0003b64c` | `FUN_0002c5d4` | `@0x2c7fa`, 14 | control options per screen half, music, volume |
  * | 0x22 | `FUN_0003bd6c` | `FUN_0002c5b8` | `@0x2c841`, 2 | quit confirmation, yes / no |
+ * | 0x23 | `FUN_0003be23` | `FUN_0002c5c6` | `@0x2c84c`, 2 | "game not saved" follow-up, yes / no |
  *
  * Both renderers resolve through the popup table `LAB_00037fb9 + (screen - 1)*8`, the click tables
  * through `LAB_0002c09e + screen*8` (no off-by-one), the action handlers through `@0x2cd66 + id*8`.
@@ -37,11 +38,19 @@
  * (`FUN_00001fd0`) so the opening click does not carry through, and clears `gs+0x1c8` bit 5
  * (`btr $0x5` @0x3be16), which only controls whether drawing continues and is not reproduced here.
  *
- * "NEIN" (`FUN_0002ecb1`) calls `resume_game_clock` (`FUN_0003ecd7`) and closes; "JA"
- * (`FUN_0002ebdb`) leaves the game - it advances the mission number `gs+0x356` (max. 0x1e = 30) and
- * sets the leave bit `gs+0x1c9` bit 2. Since the port has no game frame to leave, "JA" is reported
- * as an action rather than carried out (the state of a half return to the main menu would be
- * invented).
+ * "NEIN" (`FUN_0002ecb1`) calls `resume_game_clock` (`FUN_0003ecd7`) and closes. "JA"
+ * (`FUN_0002ebdb`) first tests the save clock `gs+0x186` (@0x2ebde): it is reset to 60 s by every
+ * successful save and runs down to 0. At 0 the handler only switches to screen 0x23 and returns
+ * (@0x2ebea..@0x2ebf8, no sound of its own); otherwise it falls into the leave body @0x2ebf9 -
+ * mission number `gs+0x356` (max. 0x1e = 30), sound 0x4c, leave bit `gs+0x1c9` bit 2. Here the leave
+ * body is the return to the main menu.
+ *
+ * ## Screen 0x23 - the follow-up question in the same dialog
+ *
+ * Its renderer draws no background, does not pause and does not wait: it only adds five lines and a
+ * second yes/no row below the text of screen 0x22, which stays on screen. Its zones cover only that
+ * lower row - the upper yes/no is still visible but no longer clickable. Its yes (`0xab`) enters the
+ * leave body @0x2ebf9 directly, i.e. without the clock test; its no is the same `0xaa` as on 0x22.
  */
 import {
   POPUP_BOUNDS_SMALL,
@@ -75,8 +84,18 @@ export const OPTIONS_POPUP_BG_ICON = 0x136;
 /** The confirmation dialog. Its renderer stops the game clock (`pause_game_clock` @0x3bd6c). */
 export const QUIT_POPUP_SCREEN = 0x22;
 
-/** The two screen numbers of this module. */
-export const OPTIONS_SCREENS: readonly number[] = [QUIT_POPUP_SCREEN, 0x25];
+/** The follow-up question "game not saved" (@0x3be23), drawn over screen 0x22. */
+export const QUIT_WARNING_SCREEN = 0x23;
+
+/** "EXTRA OPTION". */
+export const OPTIONS_POPUP_SCREEN = 0x25;
+
+/** The three screen numbers of this module. */
+export const OPTIONS_SCREENS: readonly number[] = [
+  QUIT_POPUP_SCREEN,
+  OPTIONS_POPUP_SCREEN,
+  QUIT_WARNING_SCREEN,
+];
 
 // --- Screen 0x25: EXTRA OPTION -------------------------------------------------------------------
 
@@ -227,6 +246,27 @@ export const QUIT_POPUP_LABELS: readonly OptionsLabel[] = [
   { text: '  JA       NEIN', col: 0, row: 0x2d },
 ];
 
+/**
+ * The six lines screen 0x23 adds (@0x3be23). The last one is the same string as the yes/no row of
+ * screen 0x22 (`@0x3bf08`), only lower.
+ */
+export const QUIT_WARNING_LABELS: readonly OptionsLabel[] = [
+  { text: '  DER AKTUELLE', col: 0, row: 0x46 },
+  { text: '   SPIELSTAND', col: 0, row: 0x50 },
+  { text: '  WURDE NICHT', col: 0, row: 0x5a },
+  { text: 'GESPEICHERT.SIND', col: 0, row: 0x64 },
+  { text: '  SIE SICHER ?', col: 0, row: 0x6e },
+  { text: '  JA       NEIN', col: 0, row: 0x7d },
+];
+
+/**
+ * `gs+0x186 == 0` (@0x2ebde) - more than 60 s since the last save, so yes on screen 0x22 asks again
+ * on screen 0x23 instead of leaving.
+ */
+export function quitNeedsSaveWarning(quitGrace: number): boolean {
+  return quitGrace === 0;
+}
+
 // --- click tables (verbatim) ---------------------------------------------------------------------
 
 /**
@@ -257,6 +297,12 @@ export const QUIT_POPUP_HITBOXES: readonly HitRect[] = [
   { action: 0xaa, x0: 0x58, x1: 0x77, y0: 0x2d, y1: 0x34 }, // NEIN
 ];
 
+/** Screen 0x23 - table `@0x2c84c`: the same two zones, on text row 0x7d; no is the same `0xaa`. */
+export const QUIT_WARNING_HITBOXES: readonly HitRect[] = [
+  { action: 0xab, x0: 0x08, x1: 0x27, y0: 0x7d, y1: 0x84 }, // JA
+  { action: 0xaa, x0: 0x58, x1: 0x77, y0: 0x7d, y1: 0x84 }, // NEIN
+];
+
 // --- actions -------------------------------------------------------------------------------------
 
 export type OptionsPopupAction =
@@ -284,8 +330,10 @@ export type OptionsPopupAction =
   | { readonly kind: 'volume'; readonly delta: -1 | 1 }
   /** On to the device screen (`0xf5` to 0x3c, {@link ./device-popup.ts}). */
   | { readonly kind: 'screen'; readonly screen: number; readonly label: string }
-  /** Yes (`0xa9`) - leave the game. Reported, not carried out. */
+  /** Yes on screen 0x22 (`0xa9`) - leave, or ask again if unsaved ({@link quitNeedsSaveWarning}). */
   | { readonly kind: 'quitConfirm' }
+  /** Yes on screen 0x23 (`0xab`, handler @0x2ebf9) - leave without the clock test. */
+  | { readonly kind: 'quitConfirmUnsaved' }
   /** No (`0xaa`) - let the game run on and close. */
   | { readonly kind: 'quitCancel' };
 
@@ -293,6 +341,7 @@ export type OptionsPopupAction =
 export function optionsPopupHitboxes(screen: number): readonly HitRect[] {
   if (screen === 0x25) return OPTIONS_POPUP_HITBOXES;
   if (screen === 0x22) return QUIT_POPUP_HITBOXES;
+  if (screen === 0x23) return QUIT_WARNING_HITBOXES;
   return [];
 }
 
@@ -328,6 +377,8 @@ export function optionsPopupAction(action: number): OptionsPopupAction | null {
       return { kind: 'quitConfirm' };
     case 0xaa:
       return { kind: 'quitCancel' };
+    case 0xab:
+      return { kind: 'quitConfirmUnsaved' };
     default:
       return null;
   }
@@ -441,7 +492,21 @@ export function drawQuitPopup(
   for (const l of QUIT_POPUP_LABELS) drawPanelText(fb, provider, t(l.text), l.col, l.row, opts.textColor);
 }
 
-/** Dispatcher for the two screens (like the original renderer jump). */
+/**
+ * Draw screen 0x23 - `FUN_0003be23`. The original draws only the six lines onto the image screen 0x22
+ * left behind; this port composes a popup from scratch on every call, so the 0x22 content is drawn
+ * first to give the same picture.
+ */
+export function drawQuitWarning(
+  fb: Framebuffer,
+  provider: SpriteProvider,
+  opts: OptionsPopupOptions,
+): void {
+  drawQuitPopup(fb, provider, opts);
+  for (const l of QUIT_WARNING_LABELS) drawPanelText(fb, provider, t(l.text), l.col, l.row, opts.textColor);
+}
+
+/** Dispatcher for the three screens (like the original renderer jump). */
 export function drawOptionsScreen(
   fb: Framebuffer,
   provider: SpriteProvider,
@@ -455,6 +520,10 @@ export function drawOptionsScreen(
   }
   if (screen === 0x22) {
     drawQuitPopup(fb, provider, opts);
+    return true;
+  }
+  if (screen === 0x23) {
+    drawQuitWarning(fb, provider, opts);
     return true;
   }
   return false;
