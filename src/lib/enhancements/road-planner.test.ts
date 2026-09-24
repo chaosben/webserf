@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planRoad, roadPlanCommands, samePlan, stepCounter } from './road-planner.js';
+import { planRoad, roadPlanCommands, stepCounter } from './road-planner.js';
 import { createRoadBuildingState } from '../core/engine/road-building.js';
 import { mapGeometry, posOf, Direction } from '../core/engine/position.js';
 import type { GameState, Player, Flag, Tile } from '../core/engine/state.js';
@@ -147,6 +147,5 @@ describe('road planner', () => {
     expect(cmds[0]).toEqual({ kind: 'beginRoadBuilding', col: 10, row: 10, player: 0 });
     expect(cmds.slice(1).map((c) => c.col)).toEqual([11, 12, 13, 14]);
     expect(cmds.every((c) => c.player === 0)).toBe(true);
-    expect(samePlan(res.plan, res.plan)).toBe(true);
   });
 });

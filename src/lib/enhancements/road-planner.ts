@@ -251,13 +251,3 @@ export function roadPlanCommands(
     ...plan.tiles.slice(1).map((t) => ({ kind: 'roadBuildClick' as const, col: t.col, row: t.row, player })),
   ];
 }
-
-/** Do two plans lay the same road? Compared before building, because the state moves between. */
-export function samePlan(a: RoadPlan, b: RoadPlan): boolean {
-  return (
-    a.from.col === b.from.col &&
-    a.from.row === b.from.row &&
-    a.dirs.length === b.dirs.length &&
-    a.dirs.every((d, i) => d === b.dirs[i])
-  );
-}

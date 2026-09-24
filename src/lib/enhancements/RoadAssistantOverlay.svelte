@@ -1,6 +1,8 @@
 <script lang="ts">
   /**
-   * The road assistant's plate over the game surface: start a plan, see what it costs, build it.
+   * The road assistant's plate over the game surface: start it, cancel it. What the road under the
+   * pointer would cost is shown at the pointer, not here — a line that changes with every tile the
+   * pointer crosses makes the plate jump. The road itself is built by the click on the target flag.
    *
    * OUR OWN ADDITION, and a DOM layer — it appears in neither a screenshot nor a recording, but the
    * road it builds does, through the ordinary commands. It holds no game state; everything runs
@@ -22,9 +24,6 @@
     /** The control bar's own scale (`uiScaleFor`), as for every plate. */
     scale: number;
   } = $props();
-
-  /** Counter ticks are game ticks, and the game runs 100 of them per second at speed 1. */
-  const seconds = (ticks: number): string => (ticks / 100).toFixed(1);
 
   const swallow = (e: Event): void => e.stopPropagation();
 </script>
@@ -59,22 +58,10 @@
     {:else}
       {#if roadAssistant.phase === 'pickStart'}
         <p>{st('enh.assist.road.pickStart')}</p>
-      {:else if roadAssistant.phase === 'pickTarget'}
+      {:else}
         <p>{st('enh.assist.road.pickTarget')}</p>
-      {:else if roadAssistant.plan !== null}
-        <p>
-          {st('enh.assist.road.summary', {
-            steps: roadAssistant.plan.dirs.length,
-            time: seconds(roadAssistant.plan.forward + roadAssistant.plan.backward)
-          })}
-        </p>
       {/if}
       <div class="row">
-        {#if roadAssistant.phase === 'preview'}
-          <button type="button" class="primary" onclick={() => roadAssistant.build()}>
-            {st('enh.assist.road.build')}
-          </button>
-        {/if}
         <button type="button" onclick={() => roadAssistant.reset()}>{st('enh.assist.road.cancel')}</button>
       </div>
     {/if}
@@ -121,10 +108,5 @@
     width: 1.3em;
     height: 1.3em;
     flex: none;
-  }
-
-  .primary {
-    border-color: var(--accent);
-    color: var(--accent);
   }
 </style>

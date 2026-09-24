@@ -294,10 +294,9 @@ const EN = {
 	'enh.assist.title': 'Show',
 	'enh.assist.note': 'Use them via the overlay. They build only with the clicks a player would make.',
 	'enh.assist.road': 'Road assistant',
-	'enh.assist.road.note': 'The quickest road between two of your flags, then built on request',
+	'enh.assist.road.note': 'The quickest road between two of your flags, built as soon as you click the target',
 	'enh.assist.road.plan': 'Road building',
 	'enh.assist.road.cancel': 'Cancel',
-	'enh.assist.road.build': 'Build',
 	'enh.assist.road.pickStart': 'Click the start flag',
 	'enh.assist.road.pickTarget': 'Click the target flag',
 	'enh.assist.road.summary': '{steps} steps · {time} s there and back',
@@ -305,9 +304,8 @@ const EN = {
 	'enh.assist.road.sameFlag': 'Start and target are the same flag.',
 	'enh.assist.road.noRoute': 'No road possible — it cannot cross roads, water or foreign land.',
 	'enh.assist.road.busy': 'Finish or cancel the road you are building first.',
-	'enh.assist.road.changed': 'The map has changed — here is the new route.',
 	'enh.assist.road.failed': 'The road could not be built.',
-	'enh.assist.road.built': 'Road built.',
+	'enh.assist.road.built': 'Road built: {steps} steps · {time} s there and back',
 
 	// -- Screen-reader labels for the game surfaces --------------------------------------------
 	// These are OURS, not the original's: the original has none. That is why they live here and not
@@ -562,10 +560,9 @@ const DE: Record<ShellKey, string> = {
 	'enh.assist.note':
 		'Nutze sie über das Overlay. Sie bauen nur mit den Klicks, die auch ein Spieler machen würde.',
 	'enh.assist.road': 'Wegebau-Assistent',
-	'enh.assist.road.note': 'Der schnellste Weg zwischen zwei deiner Fahnen, gebaut auf Wunsch',
+	'enh.assist.road.note': 'Der schnellste Weg zwischen zwei deiner Fahnen, gebaut beim Klick auf das Ziel',
 	'enh.assist.road.plan': 'Wegebau',
 	'enh.assist.road.cancel': 'Abbrechen',
-	'enh.assist.road.build': 'Bauen',
 	'enh.assist.road.pickStart': 'Startfahne anklicken',
 	'enh.assist.road.pickTarget': 'Zielfahne anklicken',
 	'enh.assist.road.summary': '{steps} Schritte · {time} s hin und zurück',
@@ -574,9 +571,8 @@ const DE: Record<ShellKey, string> = {
 	'enh.assist.road.noRoute':
 		'Kein Weg möglich — er kann keine Wege, kein Wasser und kein fremdes Land kreuzen.',
 	'enh.assist.road.busy': 'Beende oder brich zuerst den Wegebau ab, der gerade läuft.',
-	'enh.assist.road.changed': 'Die Karte hat sich geändert — hier ist der neue Weg.',
 	'enh.assist.road.failed': 'Der Weg ließ sich nicht bauen.',
-	'enh.assist.road.built': 'Weg gebaut.',
+	'enh.assist.road.built': 'Weg gebaut: {steps} Schritte · {time} s hin und zurück',
 	'record.stillTitle': 'Bildschirmfoto',
 	'record.stillNote':
 		'Aufgenommen, als dieses Fenster aufging — Karte, Bedienleiste und ein offenes Fenster, so wie sie gezeichnet waren.',

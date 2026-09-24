@@ -98,7 +98,7 @@
   import { settings, ticksPerSecondOf } from '../settings/settings.svelte.js';
   import { activeHackIds, hackInForce } from '../enhancements/hacks.js';
   import { roadAssistant, ROAD_REFUSAL_TEXT } from '../enhancements/road-assistant.svelte.js';
-  import { isOwnFlag, planRoad, roadPlanCommands, samePlan } from '../enhancements/road-planner.js';
+  import { isOwnFlag, planRoad, roadPlanCommands, type RoadPlan } from '../enhancements/road-planner.js';
   import { plannedRoadPaths } from '../core/road-plan-layer.js';
   import { logicFrame, runTicks } from '../core/engine/tick.js';
   import { missionEndScreenDue, writeMissionEndPassword } from '../core/engine/economy.js';
@@ -600,7 +600,7 @@
   // While this view is up, the shell has a clock to operate; it starts out running.
   $effect(() => (canPlay ? simulation.provide() : undefined));
   // … and the road assistant has someone to build for.
-  $effect(() => (canPlay ? roadAssistant.provide(buildAssistRoad) : undefined));
+  $effect(() => (canPlay ? roadAssistant.provide() : undefined));
   // Unlisting the assistant takes away its plate, and with it the only way to cancel a pick — so
   // the pick ends with it rather than keep swallowing map clicks.
   $effect(() => {
@@ -4132,9 +4132,10 @@
       lastY = e.clientY;
       return;
     }
-    // Deliberately NO hit test here: it costs `getBoundingClientRect` (forces layout) plus
-    // `windowToTile` on EVERY mouse move, and nothing reads the result. A hover display belongs
-    // here and would have to pay that.
+    // No general hit test here: it would cost `windowToTile` on EVERY mouse move with nothing to
+    // read it. The one hover display is the road assistant's preview, and it pays only in its target
+    // step — from the canvas pixel above, so without a layout measurement.
+    if (roadAssistant.phase === 'pickTarget' && e.isPrimary && e.pointerType !== 'touch') assistHover();
   }
   /**
    * Where the pointer is, in canvas pixels — kept only for the screen recording, which has to draw
@@ -4335,16 +4336,14 @@
 
   /** The road assistant's preview, as the road bits it would set. */
   const plannedRoad = $derived.by(() => {
-    const plan = roadAssistant.phase === 'preview' ? roadAssistant.plan : null;
+    const plan = roadAssistant.phase === 'pickTarget' ? roadAssistant.hover : null;
     return plan === null ? undefined : plannedRoadPaths(plan.from, plan.dirs, geo);
   });
 
   /**
-   * **A map click while the road assistant picks flags.** Reads the tile and plans; it changes
-   * nothing in the game state — the plan becomes a road only in {@link buildAssistRoad}.
-   *
-   * In the preview a click on another flag picks a new target, so trying a second destination does
-   * not mean starting over.
+   * **A map click while the road assistant picks flags.** The first click chooses the start flag;
+   * the second plans against the state as it is NOW and builds at once, so there is no preview to go
+   * stale in between.
    */
   function assistMapClick(col: number, row: number): void {
     const player = engineState.players[buildPlayer];
@@ -4360,42 +4359,95 @@
     }
     const start = roadAssistant.start;
     if (start === null) return;
+    if (roadBuild().active) {
+      roadAssistant.say('enh.assist.road.busy', 'warn');
+      return;
+    }
     const res = planRoad(engineState, player, start, { col, row });
     if (!res.ok) {
       roadAssistant.say(ROAD_REFUSAL_TEXT[res.reason], 'warn');
       return;
     }
-    roadAssistant.plan = res.plan;
-    roadAssistant.phase = 'preview';
+    buildAssistRoad(res.plan);
   }
 
   /**
-   * **Build the proposed road — with the player's own clicks.** Start road building on the start
-   * flag, then one road-building click per step, through {@link runCommand}/{@link runRoadClick}:
-   * the engine sees nothing it would not see from a player, and the action log holds every step.
-   *
-   * It plans again first. Ticks ran since the preview, and a serf, a tree or a new road may have
-   * changed the route; a route that differs is shown again rather than built blind.
+   * **The road assistant's preview while the pointer moves.** Only in the target step and only for a
+   * mouse or pen — a finger has no hover, it builds on the tap. Planned only when the pointer enters
+   * another tile: a search per pointer event would be work nobody sees.
    */
-  function buildAssistRoad(): void {
-    const plan = roadAssistant.plan;
+  /** Start and target of the last planned hover, so a new session or start flag plans afresh. */
+  let assistHoverKey = '';
+  /**
+   * Where the cost label of the hovered route sits, in canvas CSS pixels; `null` while there is no
+   * route under the pointer. Written only while there is one — outside a flag a pointer move then
+   * touches no reactive state at all.
+   */
+  let assistTip = $state.raw<{ x: number; y: number } | null>(null);
+  function assistHover(): void {
     const player = engineState.players[buildPlayer];
-    if (plan === null || !player || !player.active) return;
-    if (roadBuild().active) {
-      roadAssistant.say('enh.assist.road.busy', 'warn');
-      return;
+    const start = roadAssistant.start;
+    if (!player || !player.active || start === null) return;
+    // Before the tile cache: the label follows the pointer within a tile too, the route does not.
+    if (roadAssistant.hover !== null) assistTip = { x: pointerCanvasX, y: pointerCanvasY };
+    const t = windowToTile(pointerCanvasX / zoom, pointerCanvasY / zoom, camera, geo, heightAt, heightUnit);
+    const pos = posOf(t.col, t.row, geo);
+    const from = posOf(start.col, start.row, geo);
+    const key = `${from}:${pos}`;
+    if (key === assistHoverKey) return;
+    assistHoverKey = key;
+    const res =
+      isOwnFlag(engineState, player, t.col, t.row) && pos !== from
+        ? planRoad(engineState, player, start, { col: t.col, row: t.row })
+        : null;
+    roadAssistant.hover = res !== null && res.ok ? res.plan : null;
+    assistTip = roadAssistant.hover !== null ? { x: pointerCanvasX, y: pointerCanvasY } : null;
+  }
+
+  /** Size of the label, so it flips to the other side of the pointer at the window edge. */
+  let assistTipW = $state(0);
+  let assistTipH = $state(0);
+  /** Gap between the pointer tip and the label, clear of the game's own cursor sprite. */
+  const ASSIST_TIP_GAP = 16;
+  const assistTipLeft = $derived(
+    assistTip === null
+      ? 0
+      : assistTip.x + ASSIST_TIP_GAP + assistTipW <= viewportW
+        ? assistTip.x + ASSIST_TIP_GAP
+        : Math.max(0, assistTip.x - ASSIST_TIP_GAP - assistTipW),
+  );
+  const assistTipTop = $derived(
+    assistTip === null
+      ? 0
+      : assistTip.y + ASSIST_TIP_GAP + assistTipH <= viewportH
+        ? assistTip.y + ASSIST_TIP_GAP
+        : Math.max(0, assistTip.y - ASSIST_TIP_GAP - assistTipH),
+  );
+
+  // Leaving the target step — by building, cancelling or unlisting — forgets the last hover, so the
+  // next session plans again even if the pointer has not moved.
+  $effect(() => {
+    if (roadAssistant.phase !== 'pickTarget') {
+      assistHoverKey = '';
+      assistTip = null;
     }
-    const res = planRoad(engineState, player, plan.from, plan.to);
-    if (!res.ok) {
-      roadAssistant.say(ROAD_REFUSAL_TEXT[res.reason], 'warn');
-      return;
-    }
-    if (!samePlan(res.plan, plan)) {
-      roadAssistant.plan = res.plan;
-      roadAssistant.say('enh.assist.road.changed', 'info');
-      return;
-    }
-    const [begin, ...clicks] = roadPlanCommands(res.plan, buildPlayer);
+  });
+
+  function clearAssistHover(): void {
+    assistHoverKey = '';
+    assistTip = null;
+    if (roadAssistant.hover !== null) roadAssistant.hover = null;
+  }
+
+  /**
+   * **Build a planned road — with the player's own clicks.** Start road building on the start flag,
+   * then one road-building click per step, through {@link runCommand}/{@link runRoadClick}: the
+   * engine sees nothing it would not see from a player, and the action log holds every step.
+   */
+  function buildAssistRoad(plan: RoadPlan): void {
+    const player = engineState.players[buildPlayer];
+    if (!player || !player.active) return;
+    const [begin, ...clicks] = roadPlanCommands(plan, buildPlayer);
     // Entering road building clears the build helper, as the bar icon does (`btr $0x6` @0x28615).
     buildHelper = false;
     let finished = false;
@@ -4414,10 +4466,16 @@
     syncRoadView();
     refreshContextIcons(player.cursorCol, player.cursorRow);
     markEngineMutated(true);
-    if (finished) {
-      roadAssistant.reset();
-      roadAssistant.say('enh.assist.road.built', 'good');
-    } else roadAssistant.say('enh.assist.road.failed', 'error');
+    if (!finished) {
+      roadAssistant.say('enh.assist.road.failed', 'error');
+      return;
+    }
+    clearAssistHover();
+    roadAssistant.reset();
+    roadAssistant.say('enh.assist.road.built', 'good', {
+      steps: plan.dirs.length,
+      time: ((plan.forward + plan.backward) / 100).toFixed(1),
+    });
   }
 
   /**
@@ -4570,6 +4628,7 @@
   function onPointerLeave() {
     // No pointer in the picture once it has left the window (see `pointerInside`).
     pointerInside = false;
+    clearAssistHover();
   }
   /**
    * Mouse wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away.
@@ -4630,6 +4689,23 @@
          in a screenshot or a screen recording, which see the canvas alone — but what a hack DRAWS
          is. They sit before the end credits so that those, which take the whole stage, cover them. -->
     <GameOverlays {stockView} scale={uiScale} />
+    {#if assistTip !== null && roadAssistant.hover !== null}
+      <!-- The road assistant's cost of the route under the pointer. A DOM layer like the plates, so
+           not in a screenshot or recording; it never takes the pointer, the click belongs to the map. -->
+      <div
+        class="assist-tip"
+        role="status"
+        bind:clientWidth={assistTipW}
+        bind:clientHeight={assistTipH}
+        style:left="{assistTipLeft}px"
+        style:top="{assistTipTop}px"
+      >
+        {st('enh.assist.road.summary', {
+          steps: roadAssistant.hover.dirs.length,
+          time: ((roadAssistant.hover.forward + roadAssistant.hover.backward) / 100).toFixed(1),
+        })}
+      </div>
+    {/if}
     {#if showEndCredits && archive !== null}
       <!-- The end credits (`run_end_credits` @0x38b55): a full-screen sequence on a 352 × 240 surface
            of its own, not abortable, about 75 seconds. It covers the whole game screen because the
@@ -4679,6 +4755,17 @@
   }
   .viewport:active {
     cursor: grabbing;
+  }
+  .assist-tip {
+    position: absolute;
+    z-index: 15;
+    padding: 0.2rem 0.5rem;
+    background: var(--overlay);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    color: var(--fg);
+    white-space: nowrap;
+    pointer-events: none;
   }
   /*
    * No focus ring: the viewport is the whole playing field, not one control among several. The
