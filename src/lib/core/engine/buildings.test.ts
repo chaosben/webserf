@@ -47,6 +47,7 @@ function state(b: Building, f: Flag, p: Player): GameState {
     rotation: 0,
     inventories: [],
     serfs: [],
+    header: { flagSearchCounter: 0 },
   } as unknown as GameState;
 }
 
@@ -293,7 +294,7 @@ describe('razing a building', () => {
  // so without rotation 1 it is never visited and every burn assertion would pass vacuously.
       rotation: 1,
  // `mapGoldTotal` is the map gold counter (gs+0x4c), which the demolition adjusts.
-      header: { mapGoldTotal: 1000 },
+      header: { mapGoldTotal: 1000, flagSearchCounter: 0 },
       blockMeta: {
         buildings: { recordSize: 18, maxIndex: 76 },
         flags: { recordSize: 70, maxIndex: 72 },
@@ -597,7 +598,7 @@ describe('updateBuildings — phase A (request_serf), grouped into the driver (F
   it('runs phase A as part of the driver', () => {
     const f = { index: 1, stockPriority: [0, 0], bldFlags: 0, bld2Flags: 0, endpointDirs: [false, false, false, false, false, false], connections: [null, null, null, null, null, null] } as unknown as Flag;
     const b = bld({ type: 15, holder: false, constructing: false }); // mill, unoccupied -> requests a worker
-    const st = { buildings: [null, b], flags: [null, f], players: [player()], inventories: [], serfs: [], rotation: 0 } as unknown as GameState;
+    const st = { buildings: [null, b], flags: [null, f], players: [player()], inventories: [], serfs: [], rotation: 0, header: { flagSearchCounter: 0 } } as unknown as GameState;
     expect(b.serfRequestFailed).toBeFalsy();
  // Phase A: no inventory reachable (flag without connections) -> serfRequestFailed.
     updateBuildings(st);

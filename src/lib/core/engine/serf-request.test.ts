@@ -91,6 +91,7 @@ function makeState(over: { holder?: boolean; requested?: boolean; failed?: boole
     inventories: [inv],
     players: [player, null, null, null],
     serfs: [null, null, null, null, null, serf5],
+    header: { flagSearchCounter: 0 },
   } as unknown as GameState;
 
   return { state, bld: bld1, inv, serf: serf5 };
@@ -377,6 +378,7 @@ function makeMilitary(
     inventories: [inv],
     players: [player, null, null, null],
     serfs,
+    header: { flagSearchCounter: 0 },
   } as unknown as GameState;
   return { state, bld: bld1, inv };
 }

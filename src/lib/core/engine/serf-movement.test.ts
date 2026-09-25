@@ -24,7 +24,7 @@ function tile(over: Partial<Tile> = {}): Tile {
 /** Minimal state with an empty map; the caller sets the relevant tiles + serfs. */
 function makeState(): GameState {
   const mapTiles = Array.from({ length: geo.tileCount }, () => tile());
-  return { geo, gameTick: 1000, mapTiles, serfs: [] as (Serf | null)[] } as unknown as GameState;
+  return { geo, gameTick: 1000, mapTiles, serfs: [] as (Serf | null)[], header: { flagSearchCounter: 0 } } as unknown as GameState;
 }
 function mkSerf(over: Partial<Serf> & { index: number }): Serf {
   return {

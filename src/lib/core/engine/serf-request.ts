@@ -29,6 +29,8 @@ import type { GameState, Building, Inventory, Player, Serf } from './state.js';
 import { setSerfType } from './state.js';
 import { landNeighborFlag, flagInventory } from './flag-update.js';
 import { posOf } from './position.js';
+import { u16 } from './int.js';
+import { newFlagSearch, FLAG_BFS_LEVEL_BUDGET } from './flag-search.js';
 import { unionU16, setUnionU8, setUnionU16 } from './serf-machine.js';
 import { PLAYER_FLAG_RANK_FLOOR, PLAYER_FLAG_REDUCED_OCCUPANCY } from './player-settings.js';
 import { castleBuildingHandler } from './castle-garrison.js';
@@ -639,25 +641,31 @@ function walkFlagNetwork(
    */
   onWaveEnd?: () => boolean,
 ): void {
-  if (state.flags[startFlag] === null || state.flags[startFlag] === undefined) return;
-  if (visit(startFlag)) return;
-  const visited = new Set<number>([startFlag]);
+  const start = state.flags[startFlag];
+  if (start === null || start === undefined) return;
+  const search = newFlagSearch(state); // `call 0x1303f` @0x12534
+  start.searchNum = search; // @0x12554
   let frontier: number[] = [startFlag];
   while (frontier.length > 0) {
     const next: number[] = [];
     for (const fIdx of frontier) {
       const fl = state.flags[fIdx];
       if (!fl) continue;
+      // A flag is tested when it is taken OUT of the queue (@0x125f7 ff.), not when it is queued. That
+      // puts the flags of the next level behind this level's `onWaveEnd` — testing on enqueue would
+      // charge the wave budget one level late.
+      if (visit(fIdx)) return;
       for (let dir = 5; dir >= 0; dir--) {
         const nb = landNeighborFlag(fl, dir);
-        if (nb < 0 || visited.has(nb)) continue;
-        if (visit(nb)) return;
-        visited.add(nb);
+        const nf = nb >= 0 ? state.flags[nb] : null;
+        if (!nf || u16(nf.searchNum) === search) continue; // @0x12ba2
+        nf.searchNum = search; // @0x12baf
         next.push(nb);
       }
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break; // @0x12cdf
     }
     if (onWaveEnd !== undefined && onWaveEnd()) return;
-    frontier = next;
+    frontier = next; // `jns 0x1258f` @0x12d0d — only while the level added flags
   }
 }
 

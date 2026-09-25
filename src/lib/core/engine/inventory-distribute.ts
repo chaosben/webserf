@@ -41,6 +41,8 @@
 import type { GameState } from './state.js';
 import type { Building, Flag, Inventory, Player } from './state.js';
 import { setUnionU8, setUnionU16 } from './serf-machine.js';
+import { u16 } from './int.js';
+import { newFlagSearch } from './flag-search.js';
 
 /** One entry of a goods category list (3 x u16, `-1` terminates the list). */
 export interface CategoryEntry {
@@ -255,10 +257,10 @@ function ejectByPriority(inv: Inventory, player: Player): void {
 /**
  * **Phase B** (@0xff6a..@0x1066b) — ring-by-ring flooding of the flag network from the source flags.
  *
- * - `new_flag_search` @0x1303f draws a new search number and marks flags persistently in
- *   `flag[0]`/`flag[2]`. The port deliberately does not carry those two fields and uses a local map
- *   flag -> source index instead. That is equivalent because every search in the original gets its own
- *   number; `flagSearchCounter` (`gs+0x26e`) is therefore not advanced here either.
+ * - `new_flag_search` @0x1303f draws a new search number; every flag reached carries it in
+ *   `searchNum` and the index of the source that reached it in `searchDir` (`flag[2]`, here not a
+ *   direction). The source flags are stamped unconditionally (@0x10017/@0x10020), their neighbours
+ *   only when unmarked (@0x10146), and they inherit the source index (@0x10160).
  * - Neighbour directions run **5 -> 0** over the **carrier** mask `flag[5]`, not the path bits: a road
  *   without a carrier conducts no goods.
  * - A source whose bar has saturated at `0xff` is not expanded any further (@0x10112 `cmpb $0xff`) —
@@ -277,25 +279,23 @@ export function floodForTargets(
   const n = sources.length;
   const score = new Uint8Array(n); // gs+0xbc+0x800, zeroed @0xffb3
   const best: (Flag | null)[] = new Array<Flag | null>(n).fill(null);
-  const srcOf = new Map<number, number>(); // == flag[0] (besucht) + flag[2] (Quell-Index)
   const prioSlot = entry.selector === 0x42 ? 0 : 1;
+  const search = newFlagSearch(state); // `call 0x1303f` @0xff80
 
   // Seeding @0xffbe..@0x1002d: source flag = `inv[2]`, flag record via `gs+0x98 + idx*0x46`.
   let ring: Flag[] = [];
   for (let i = 0; i < n; i++) {
     const f = state.flags[sources[i].flag];
     if (!f) continue; // in the original inv[2] always points at a valid flag
-    if (!srcOf.has(f.index)) {
-      srcOf.set(f.index, i);
-      ring.push(f);
-    }
+    f.searchNum = search; // @0x10017
+    f.searchDir = i; // @0x10020
+    ring.push(f);
   }
 
   for (;;) {
     const next: Flag[] = [];
     for (const f of ring) {
-      const src = srcOf.get(f.index);
-      if (src === undefined) continue;
+      const src = f.searchDir; // @0x10105
       // @0x10112 saturated source => do not expand this flag (falls through to the ring test).
       if (score[src] !== 0xff) {
         for (let dir = 5; dir >= 0; dir--) {
@@ -307,8 +307,9 @@ export function floodForTargets(
           if (!c || c.kind !== 'flag') continue;
           const nb = state.flags[c.index];
           if (!nb) continue;
-          if (srcOf.has(nb.index)) continue; // @0x10146 `flag[0] == searchNum` => already visited
-          srcOf.set(nb.index, src);
+          if (u16(nb.searchNum) === search) continue; // @0x10146 `flag[0] == searchNum` => already visited
+          nb.searchNum = search; // @0x10157
+          nb.searchDir = src; // @0x10160
           next.push(nb);
 
       // Accept test @0x1016d..@0x101f8: bit `param1` in the accept byte, `stockPriority > 15`, and

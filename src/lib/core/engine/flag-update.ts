@@ -23,6 +23,7 @@ import { setSerfType } from './state.js';
 import { setUnionU8, setUnionU16 } from './serf-machine.js';
 import { returnTransitResourceToStock } from './road-teardown.js';
 import { u16 } from './int.js';
+import { newFlagSearch, FLAG_BFS_LEVEL_BUDGET } from './flag-search.js';
 
 /**
  * Demand table `DAT_0004b822`, indexed `(res+1)*2`. `null` = not routable to a building, inventory
@@ -197,23 +198,6 @@ export function servedNeighborFlag(f: Flag, dir: number): number {
   return f.transporters[dir] ? neighborFlag(f, dir) : -1; // `mov 0x5(%ebx),%al` … `jns`
 }
 
-/**
- * `new_flag_search` `FUN_0001303f` @0x1303f — draw a new search generation. If the counter overflows it
- * is raised a second time and **all** flag marks are cleared (@0x1309e..@0x130bb). The routine also
- * zeroes the queue toggle `gs+0x270` (@0x130ea); the port keeps its BFS levels as arrays and has no
- * toggle to reset.
- */
-export function newFlagSearch(state: GameState): number {
-  state.header.flagSearchCounter = u16(state.header.flagSearchCounter + 1);
-  if (state.header.flagSearchCounter === 0) {
-    state.header.flagSearchCounter = u16(state.header.flagSearchCounter + 1);
-    for (const flag of state.flags) {
-      if (flag !== undefined && flag !== null) flag.searchNum = 0;
-    }
-  }
-  return state.header.flagSearchCounter;
-}
-
 /** `searchDir` of the flag a known-destination search starts from (`mov $0x6,%al` @0x4c1c2). No road
  *  direction has this value, so a destination that carries it IS the origin. */
 const SEARCH_DIR_ORIGIN = 6;
@@ -317,7 +301,7 @@ function searchFromSources(
         next.push(nb);
       }
       // `cmp %ax,0x4(%edi) ; jns` @0x4c5d2 — the level ends once 995 flags have been added.
-      if (next.length >= DEMAND_BFS_NODE_BUDGET) break;
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break;
     }
     if (target !== null && u16(target.searchNum) === search) {
       return target.searchDir === SEARCH_DIR_ORIGIN ? null : target.searchDir;
@@ -354,9 +338,6 @@ function flagBuilding(state: GameState, f: Flag): (typeof state.buildings)[numbe
   return state.buildings[c.index] ?? null;
 }
 
-/** Level cap of the demand BFS: `cmpw $0x3e2,0x4(%edi)` + `jns` @0x4c054 ends the level once 994
- *  nodes have been added. `vreg1` counts from −1, so the level stops at 995 fresh flags. */
-const DEMAND_BFS_NODE_BUDGET = 995;
 
 /**
  * Routable demand BFS (`schedule_slot_to_unknown_dest`, routable branch @0x4b858 + `LAB_0004c0a4`):
@@ -388,7 +369,8 @@ export function findDemandingBuilding(
   // `vreg5`: both the best priority so far and the bar the next level has to beat. It starts at 0,
   // so a priority of 0 (phase B's "no demand") can never win.
   let bar = 0;
-  const visited = new Set<number>([f.index]);
+  const search = newFlagSearch(state); // `call 0x1303f` @0x4bbdd
+  f.searchNum = search; // @0x4bbe9 — searchNum only, `flag[2]` stays as it is
   let frontier: number[] = [f.index];
   while (frontier.length > 0) {
     const next: number[] = [];
@@ -397,10 +379,9 @@ export function findDemandingBuilding(
       if (!fl) continue;
       for (let dir = 5; dir >= 0; dir--) {
         const nb = servedNeighborFlag(fl, dir);
-        if (nb < 0 || visited.has(nb)) continue;
-        const nbFlag = state.flags[nb];
-        if (!nbFlag) continue;
-        visited.add(nb);
+        const nbFlag = nb >= 0 ? state.flags[nb] : null;
+        if (!nbFlag || u16(nbFlag.searchNum) === search) continue; // @0x4bd89
+        nbFlag.searchNum = search; // @0x4bd96, before the demand test
         next.push(nb);
         const mask = slot === 0 ? nbFlag.bldFlags : nbFlag.bld2Flags;
         if (((mask >> reqBit) & 1) === 0) continue;
@@ -410,7 +391,7 @@ export function findDemandingBuilding(
           best = nbFlag;
         }
       }
-      if (next.length >= DEMAND_BFS_NODE_BUDGET) break;
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break;
     }
     frontier = next;
     if (frontier.length === 0) break; // `js` @0x4c07c — no fresh nodes, the network is exhausted
@@ -535,8 +516,10 @@ function moveBackForth(f: Flag, slot: number, seedDirWord: number): void {
  * which means "already at the destination" and leads to the back-and-forth branch.
  */
 export function findNearestResourceInventory(state: GameState, f: Flag): number {
+  // `js` on `flag[0x44]` @0x44a98 — before the search number is drawn, so this exit costs none.
   if (f.acceptsResources) return -1; // start already accepts: at the destination
-  const visited = new Set<number>([f.index]);
+  const search = newFlagSearch(state); // `call 0x1303f` @0x44abf
+  f.searchNum = search; // @0x44acb
   let frontier: number[] = [f.index];
   while (frontier.length > 0) {
     const next: number[] = [];
@@ -545,13 +528,14 @@ export function findNearestResourceInventory(state: GameState, f: Flag): number 
       if (!fl) continue;
       for (let dir = 5; dir >= 0; dir--) {
         const nb = servedNeighborFlag(fl, dir);
-        if (nb < 0 || visited.has(nb)) continue;
-        const nbFlag = state.flags[nb];
-        if (!nbFlag) continue;
+        const nbFlag = nb >= 0 ? state.flags[nb] : null;
+        if (!nbFlag || u16(nbFlag.searchNum) === search) continue; // @0x44b6e
+        // The hit test (`js` @0x44b7c) comes BEFORE the stamp, so the flag found stays unmarked.
         if (nbFlag.acceptsResources) return nb;
-        visited.add(nb);
+        nbFlag.searchNum = search; // @0x44b89
         next.push(nb);
       }
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break;
     }
     frontier = next;
   }
@@ -581,19 +565,9 @@ function cancelTransportedResource(state: GameState, res: number, dest: number):
 // ===========================================================================================
 // Carrier request (`call_transporter`) + inventory serf dispatch
 //
-// Ports `FUN_0004c7c4` (trigger per road) + `FUN_00011a1a` (BFS to the inventory) + `FUN_00011e24`
-// (eject tail: serf -> state 15 ReadyToLeaveInventory).
+// Ports `FUN_0004c7c4` (trigger per road) and `find_inventory_serf_bfs` @0x11a1a/@0x11a81 (search
+// from BOTH road ends, eject tail @0x11e24: serf -> state 15 ReadyToLeaveInventory).
 // - Demand table `DAT_0004a188 = [1,2,3,4,6,8,11,15]` (carriers per road length category).
-// - Eject sets `field_0xb` = road direction, `field_0xc` = target flag, `state` = 0xf, raises the
-//   out-dispatch counter `inv+0x4a`, and marks `length[dir]` bit 7 on BOTH ends as a rate limit
-//   against re-requesting.
-// - Generic specialisation: type becomes Transporter, `serfIndices[Generic]` is cleared,
-//   `genericCount` drops, and the player census moves one serf between the two types.
-//
-// Deliberately not modelled: sustained dispatch needs the idle-serf registration chain. Dispatched
-// is the representative registered in `serfIndices[type]`; after the eject that slot is 0, and the
-// original refills it when the next serf becomes IdleInStock. Until that chain is ported, each
-// inventory yields at most one carrier.
 // ===========================================================================================
 
 /** Carriers needed per road length category (`DAT_0004a188` @0x4a188). Index = (len >> 4) & 7. */
@@ -696,125 +670,124 @@ export function flagInventory(state: GameState, f: Flag): Inventory | null {
 }
 
 /**
- * Can the inventory supply a carrier — either a stored specialist or a generic to specialise?
+ * Carrier request for road `dir` of `f` — `find_inventory_serf_bfs`, entered at @0x11a1a (land,
+ * `vreg4 = 0` @0x11a75) or @0x11a81 (water, `vreg4 = -1` @0x11adc). Both entries are the same
+ * routine: a byte-identical register frame, then the shared body @0x11ae4. Returns success; the
+ * original returns 0 or -1 and the caller turns the sign into `serfRequestFail`.
  *
- * `water` selects the two branches that hang on `vreg4` (@0x11ac1 vs @0x11a75): the land branch reads
- * `serfIndices[0]` (transporter), the water branch `serfIndices[1]` (sailor) and additionally
- * requires a BOAT in stock for the generic fallback. A stored sailor brings his own boat; only the
- * specialisation consumes one.
- */
-function inventoryCanSupplyTransporter(state: GameState, inv: Inventory, water: boolean): boolean {
-  const t = inv.serfIndices[water ? ST_SAILOR : ST_TRANSPORTER];
-  if (t !== 0 && state.serfs[t]?.state === 1) return true;
-  if (water && (inv.resources[RES_BOAT] ?? 0) === 0) return false;
-  const g = inv.serfIndices[ST_GENERIC];
-  return g !== 0 && inv.genericCount > 0 && state.serfs[g]?.state === 1;
-}
-
-/**
- * Core of `FUN_00011a1a`: BFS from `f` (directions 5 -> 0) to the nearest inventory flag that can
- * supply a carrier, dispatches him towards `f`/`dir` and marks the road as requested on both ends.
- * Returns success — in the original the sign of the return value, which the caller tests with `js`
- * and turns into `serfRequestFail`.
+ * Three properties a simpler "nearest inventory from `f`" search gets wrong:
+ * - It starts at BOTH road ends. `f` is stamped with `searchDir = 0` (@0x11b86), the other end with
+ *   `0xff` (@0x11b98), and every reached flag inherits the mark of the flag it came from. The mark
+ *   of the inventory flag decides where the carrier walks to (@0x11e91): the end it is nearer to.
+ * - A stored specialist wins at once. An inventory that could only SPECIALISE a generic is merely
+ *   remembered (the first one only, `gs+0x342`), and the search goes on for
+ *   `contSearchAfterNonOptimalFind` more level ends of the inventory OWNER (@0x11d2d) — the same rule
+ *   `send_serf_to_flag` uses.
+ * - Inventories are tested when a flag is TAKEN from the queue, never when it is queued.
  *
- * `water` is the ONLY difference between the two original entry points. `0x11a1a` and `0x11a81` are
- * the same routine: the first 0x67 bytes are a byte-identical register frame, and just before it one
- * sets `vreg4 = 0` (@0x11a75) and the other `vreg4 = -1` (@0x11ad8), after which both jump to the
- * same body @0x11ae4. Hence a parameter rather than a second function.
+ * The original tests only the representative index (`inv+0x42`/`0x44`/`0x6c`), neither the serf's
+ * state nor `genericCount`; in every original-written state these agree (an index is set exactly
+ * when an IdleInStock serf of that type is registered), so the port tests the index as well.
  */
 function callTransporter(state: GameState, f: Flag, dir: number, water: boolean): boolean {
-  const inv = findInventoryForTransporter(state, f, water);
-  if (inv === null) return false;
-  if (!dispatchTransporter(state, inv, f, dir, water)) return false;
-  markSerfRequested(state, f, dir);
-  return true;
-}
+  const specialist = water ? ST_SAILOR : ST_TRANSPORTER;
+  const otherIdx = neighborFlag(f, dir); // raw endpoint `flag+0x24+4·dir` @0x11b2e
+  const other = otherIdx >= 0 ? (state.flags[otherIdx] ?? null) : null;
+  const otherDir = f.otherEndDir[dir]; // `(flag[0x3c+dir] & 0x38) >> 3` @0x11af3..@0x11aff
 
-/** BFS from `f` (5 -> 0) to the first reachable inventory that can supply a carrier. */
-function findInventoryForTransporter(state: GameState, f: Flag, water: boolean): Inventory | null {
-  const check = (fl: Flag): Inventory | null => {
-    const inv = flagInventory(state, fl);
-    return inv && inventoryCanSupplyTransporter(state, inv, water) ? inv : null;
-  };
-  const hit0 = check(f);
-  if (hit0) return hit0;
-  const visited = new Set<number>([f.index]);
+  const search = newFlagSearch(state); // `call 0x1303f` @0x11b37
+  f.searchNum = search; // @0x11b7e
+  f.searchDir = 0; // @0x11b86
   let frontier: number[] = [f.index];
-  while (frontier.length > 0) {
+  if (other) {
+    other.searchNum = search; // @0x11b90
+    other.searchDir = 0xff; // @0x11b98
+    frontier.push(other.index);
+  }
+
+  let levelBudget = 0xffff; // `gs+0x340` @0x11bb2
+  let remembered: Inventory | null = null; // `gs+0x342` flag + `gs+0x344` inventory
+  let found: { inv: Inventory; flag: Flag; serf: number } | null = null;
+
+  levels: while (true) {
     const next: number[] = [];
     for (const fIdx of frontier) {
       const fl = state.flags[fIdx];
       if (!fl) continue;
-      for (let dir = 5; dir >= 0; dir--) {
-        const nb = landNeighborFlag(fl, dir);
-        if (nb < 0 || visited.has(nb)) continue;
-        const nbFlag = state.flags[nb];
-        if (!nbFlag) continue;
-        const hit = check(nbFlag);
-        if (hit) return hit;
-        visited.add(nb);
+      const inv = flagInventory(state, fl); // `flag+0x42` bit 6 @0x11c42, `bld+0xe` @0x11c60
+      if (inv) {
+        const s = inv.serfIndices[specialist]; // `inv+0x44` @0x11c76 (water) · `inv+0x42` @0x11e09
+        if (s !== 0) {
+          inv.serfIndices[specialist] = 0; // @0x11c89 / @0x11e20
+          found = { inv, flag: fl, serf: s };
+          break levels;
+        }
+        // @0x11c92 (water) / @0x11d54 (land): remember the first store that can specialise a generic.
+        if (
+          remembered === null &&
+          inv.serfIndices[ST_GENERIC] !== 0 && // `inv+0x6c` @0x11ca8 / @0x11d6a
+          (!water || (inv.resources[RES_BOAT] ?? 0) !== 0) // `inv+0x16` @0x11cb8, water only
+        ) {
+          remembered = inv; // @0x11ccb / @0x11d7d
+          // `player(inv.owner)+0x10a` @0x11d2d / @0x11ddf
+          levelBudget = state.players[inv.owner]?.contSearchAfterNonOptimalFind ?? 0xffff;
+        }
+      }
+      // @0x11f5e: land network (`flag[4]`), directions 5 -> 0; unstamped neighbours inherit the mark.
+      for (let d = 5; d >= 0; d--) {
+        const nb = landNeighborFlag(fl, d);
+        if (nb < 0) continue;
+        const n = state.flags[nb];
+        if (!n || u16(n.searchNum) === search) continue; // `cmp %ax,0x1c(%edi)` @0x11f84
+        n.searchNum = search; // @0x11f91
+        n.searchDir = fl.searchDir; // @0x11f9d
         next.push(nb);
       }
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break; // `cmp 0xc(%edi)` / `jns` @0x12109
+    }
+    // Level end @0x12119: `subw $0x1,gs+0x340` · `je 0x121af` — the remembered generic is taken.
+    levelBudget = (levelBudget - 1) & 0xffff;
+    if (levelBudget === 0) break;
+    if (next.length === 0) {
+      if (remembered === null) return false; // @0x1214e -> `ret` @0x121ae with -1
+      break;
     }
     frontier = next;
   }
-  return null;
-}
 
-/**
- * `FUN_00011e24` eject: sends a carrier out of `inv` (state 15 ReadyToLeaveInventory) towards
- * `roadFlag`/`dir`. Prefers a stored specialist, otherwise specialises a generic.
- *
- * The water branch (`LAB_000121af`, `vreg4 < 0`) differs from the land branch in exactly three
- * bookings: it raises `serfCount[1]` instead of `serfCount[0]`, it subtracts a BOAT, and it sets the
- * type bits to 1 instead of 0. Everything else, including the generic decrement, is shared.
- */
-function dispatchTransporter(
-  state: GameState,
-  inv: Inventory,
-  roadFlag: Flag,
-  dir: number,
-  water: boolean,
-): boolean {
-  const workerType = water ? ST_SAILOR : ST_TRANSPORTER;
-  let serf: Serf | null = null;
-  const t = inv.serfIndices[workerType];
-  if (t !== 0 && state.serfs[t]?.state === 1) {
-    serf = state.serfs[t];
-    inv.serfIndices[workerType] = 0;
-  } else {
+  if (found === null) {
+    // @0x121af: specialise the remembered generic. The budget runs down to 0 only after it was loaded
+    // from the player, so `remembered` is set here unless 65535 levels passed without a store.
+    const inv = remembered;
+    if (inv === null) return false;
     const g = inv.serfIndices[ST_GENERIC];
-    if (g === 0 || inv.genericCount <= 0 || state.serfs[g]?.state !== 1) return false;
-    if (water && (inv.resources[RES_BOAT] ?? 0) === 0) return false;
-    serf = state.serfs[g];
-    inv.serfIndices[ST_GENERIC] = 0;
-    inv.genericCount -= 1;
-    if (water) inv.resources[RES_BOAT] -= 1; // the new sailor's boat
-    setSerfType(serf, workerType);
     const player = inv.owner >= 0 ? state.players[inv.owner] : null;
     if (player) {
       const sc = player.serfCount as number[]; // Player is shallow-readonly; the cells are writable
-      sc[ST_GENERIC] = Math.max(0, sc[ST_GENERIC] - 1);
-      sc[workerType] = (sc[workerType] + 1) & 0xffff;
+      sc[ST_GENERIC] = u16(sc[ST_GENERIC] - 1); // `subw $0x1,-0x10(%ebx)` @0x12202, no clamp
+      sc[specialist] = u16(sc[specialist] + 1); // @0x12217 (water) / @0x122cc (land)
     }
+    if (water) inv.resources[RES_BOAT] -= 1; // @0x1221f — the new sailor's boat
+    const serf = state.serfs[g];
+    if (serf) setSerfType(serf, specialist); // `andb $0x83` (+ `orb $0x4` for water) @0x12250/@0x122fd
+    inv.serfIndices[ST_GENERIC] = 0; // @0x122aa / @0x12351
+    inv.genericCount -= 1; // `subw $0x1,0x40(%ebx)` @0x122b1 / @0x12358
+    const invFlag = state.flags[inv.flag]; // `inv+0x2` · 0x46 @0x1225c
+    found = { inv, flag: invFlag ?? f, serf: g };
   }
-  if (!serf) return false;
-  setUnionU8(serf, 0xb, dir); // field_0xb = road direction (0..5)
-  setUnionU16(serf, 0xc, roadFlag.index); // field_0xc = target flag
-  setUnionU16(serf, 0xe, inv.index); // field_0xe = inventory; state 15 decrements it. Survives from
-  // IdleInStock anyway, set defensively.
-  serf.state = 15; // ReadyToLeaveInventory
-  inv.serfIndices[4] = (inv.serfIndices[4] + 1) & 0xffff; // out-dispatch counter (inv+0x4a)
-  return true;
-}
 
-/** Set `length[dir]` bit 7 (serf_requested) on BOTH road ends, which blocks re-requesting. */
-function markSerfRequested(state: GameState, f: Flag, dir: number): void {
+  // Tail @0x11e24.
+  const { inv, flag: hitFlag, serf: serfIdx } = found;
+  inv.serfIndices[4] = u16(inv.serfIndices[4] + 1); // out-dispatch counter `inv+0x4a` @0x11e27
+  // `length` bit 7 (serf requested) on both road ends @0x11e40 / @0x11e81.
   f.length[dir] = (f.length[dir] | 0x80) & 0xff;
-  const nb = neighborFlag(f, dir);
-  if (nb < 0) return;
-  const other = state.flags[nb];
-  if (!other) return;
-  const od = f.otherEndDir[dir];
-  if (od >= 0 && od < 6) other.length[od] = (other.length[od] | 0x80) & 0xff;
+  if (other && otherDir >= 0 && otherDir < 6) other.length[otherDir] = (other.length[otherDir] | 0x80) & 0xff;
+  // @0x11e91: reached over the other end -> walk to that end, entering the road from its side.
+  const toOther = hitFlag.searchDir !== 0 && other !== null;
+  const serf = state.serfs[serfIdx];
+  if (!serf) return false;
+  setUnionU8(serf, 0xb, toOther ? otherDir : dir); // @0x11ee9
+  setUnionU16(serf, 0xc, toOther ? other!.index : f.index); // @0x11ef3
+  serf.state = 15; // ReadyToLeaveInventory @0x11efc
+  return true;
 }

@@ -26,7 +26,8 @@
  *   waiting serf keeps looking the way it wants to go), `field_0xe = 0xfa + dir`.
  */
 
-import { i8 } from './int.js';
+import { i8, u16 } from './int.js';
+import { newFlagSearch, FLAG_BFS_LEVEL_BUDGET } from './flag-search.js';
 import { COUNTER_FROM_ANIMATION } from './serf-tables.js';
 import { posOf, colOf, rowOf, neighbor, oppositeDir, type MapGeometry } from './position.js';
 import { cancelWalkingRequest } from './road-teardown.js';
@@ -212,8 +213,13 @@ export function tileHasFlag(state: GameState, pos: number): boolean {
  * **start direction** (search_dir), and once the destination flag is marked its search_dir gives the
  * first direction.
  *
- * We use **local scratch** (a `visited` set plus a `searchDir` map) instead of the transient flag
- * search fields (`flag+0`/`flag+2`) — functionally equivalent and without side effects on the oracle.
+ * The marks are the flags' own `searchNum`/`searchDir`. The origin gets the number only (@0x20469),
+ * the six start neighbours number AND direction **without** a mark test (@0x204d0/@0x204d9): with two
+ * roads to the same neighbour the lower direction, stamped last, wins — a first-wins set would pick
+ * the other one. The destination is tested at the end of each level (@0x2076d), which returns the
+ * same direction as a test on first contact, because a marked flag is never re-marked. The origin is
+ * never the destination: the caller only searches when `flag != dest` (`jne 0x20403` @0x2025c).
+ *
  * Direction iteration runs **descending 5 -> 0** (the original tests the endpoints +0x38...+0x24), so
  * ties between equally long paths break identically. Neighbours only through
  * `connections[dir].kind === 'flag'` (the UpLeft building endpoint is not expanded). Returns the
@@ -225,36 +231,37 @@ export function tileHasFlag(state: GameState, pos: number): boolean {
 export function flagSearchDir(state: GameState, fromFlagIdx: number, destFlagIdx: number): number | null {
   const src = state.flags[fromFlagIdx];
   if (!src) return null;
-  const searchDir = new Map<number, number>();
-  const visited = new Set<number>([fromFlagIdx]);
+  const search = newFlagSearch(state); // `call 0x1303f` @0x20435
+  src.searchNum = search; // @0x20469
   let frontier: number[] = [];
- // Initial frontier: the directly connected neighbour flags, each tagged with its start direction.
+  // Start neighbours, each stamped with its start direction.
   for (let dir = 5; dir >= 0; dir--) {
     const conn = src.endpointDirs[dir] ? src.connections[dir] : null; // `flag[4]` bit dir — land roads only
-    if (conn && conn.kind === 'flag' && !visited.has(conn.index)) {
-      if (conn.index === destFlagIdx) return dir; // the destination is a direct neighbour
-      visited.add(conn.index);
-      searchDir.set(conn.index, dir);
-      frontier.push(conn.index);
-    }
+    const nf = conn && conn.kind === 'flag' ? state.flags[conn.index] : null;
+    if (!nf) continue;
+    nf.searchNum = search;
+    nf.searchDir = dir;
+    frontier.push(conn!.index);
   }
+  const dest = state.flags[destFlagIdx] ?? null;
+  // `js 0x2078e` @0x20505 — no start neighbour at all.
   while (frontier.length > 0) {
     const next: number[] = [];
     for (const fIdx of frontier) {
       const f = state.flags[fIdx];
       if (!f) continue;
-      const startDir = searchDir.get(fIdx)!;
       for (let dir = 5; dir >= 0; dir--) {
-        const conn = f.endpointDirs[dir] ? f.connections[dir] : null; // dito
-        if (conn && conn.kind === 'flag' && !visited.has(conn.index)) {
-          if (conn.index === destFlagIdx) return startDir;
-          visited.add(conn.index);
-          searchDir.set(conn.index, startDir);
-          next.push(conn.index);
-        }
+        const conn = f.endpointDirs[dir] ? f.connections[dir] : null; // dito, @0x205af
+        const nf = conn && conn.kind === 'flag' ? state.flags[conn.index] : null;
+        if (!nf || u16(nf.searchNum) === search) continue; // @0x205d2
+        nf.searchNum = search; // @0x205df
+        nf.searchDir = f.searchDir; // @0x205eb
+        next.push(conn!.index);
       }
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break; // @0x20757
     }
-    frontier = next;
+    if (dest !== null && u16(dest.searchNum) === search) return dest.searchDir; // @0x2076d
+    frontier = next; // `jns 0x20538` @0x20788 — only while the level added flags
   }
   return null;
 }
@@ -277,8 +284,10 @@ export function flagSearchDir(state: GameState, fromFlagIdx: number, destFlagIdx
 export function findNearestInventory(state: GameState, fromFlagIdx: number): number | null {
   const src = state.flags[fromFlagIdx];
   if (!src) return null;
+  // `js 0x44a01` @0x44777 — tested before the search number is drawn, so this exit costs none.
   if (src.acceptsSerfs) return fromFlagIdx; // the start flag has an inventory itself (LAB_00044a01)
-  const visited = new Set<number>([fromFlagIdx]);
+  const search = newFlagSearch(state); // `call 0x1303f` @0x44793
+  src.searchNum = search; // @0x4479f
   let frontier: number[] = [fromFlagIdx];
   while (frontier.length > 0) {
     const next: number[] = [];
@@ -287,12 +296,14 @@ export function findNearestInventory(state: GameState, fromFlagIdx: number): num
       if (!f) continue;
       for (let dir = 5; dir >= 0; dir--) {
         const conn = f.endpointDirs[dir] ? f.connections[dir] : null; // `flag[4]` bit dir, @0x4481f
-        if (!conn || conn.kind !== 'flag' || visited.has(conn.index)) continue;
-        const nf = state.flags[conn.index];
-        if (nf && nf.acceptsSerfs) return conn.index; // nearest warehouse found
-        visited.add(conn.index);
-        next.push(conn.index);
+        const nf = conn && conn.kind === 'flag' ? state.flags[conn.index] : null;
+        if (!nf || u16(nf.searchNum) === search) continue; // @0x44842
+        // The hit test (`js` @0x44850) comes BEFORE the stamp, so the flag found stays unmarked.
+        if (nf.acceptsSerfs) return conn!.index; // nearest warehouse found
+        nf.searchNum = search; // @0x4485d
+        next.push(conn!.index);
       }
+      if (next.length >= FLAG_BFS_LEVEL_BUDGET) break;
     }
     frontier = next;
   }

@@ -95,6 +95,7 @@ function makeCastle(
     inventories: [inv],
     players: [player, null, null, null],
     serfs,
+    header: { flagSearchCounter: 0 },
   } as unknown as GameState;
   return { state, castle, inv, player };
 }

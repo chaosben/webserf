@@ -47,7 +47,7 @@ import { spiralPos } from './spiral.js';
 import { classifyBuildSite, persistBuildSiteBits, buildFlag, BUILD_FLAG } from './build-site.js';
 import { aiBuildRoads } from './ai-road-builder.js';
 import { aiProbeMap } from './ai-probe.js';
-import { newFlagSearch } from './flag-update.js';
+import { newFlagSearch } from './flag-search.js';
 
 /** Slots of the loss register (block 572). */
 export const AI_LOSS_SLOTS = 8;

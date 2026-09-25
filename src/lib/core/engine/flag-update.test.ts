@@ -381,19 +381,19 @@ describe('updateFlags — resource scheduler', () => {
     const invAt7 = () => flag({ index: 7, acceptsResources: true });
  // Rotation 1 -> block 1 (index 32..63) -> flag #1 not in it -> unchanged.
     const wrongBlock = mk();
-    updateFlags({ flags: [null, wrongBlock, null, null, null, null, null, invAt7()], players: [null], rotation: 1, rotationWrap: 49 } as unknown as GameState);
+    updateFlags({ flags: [null, wrongBlock, null, null, null, null, null, invAt7()], players: [null], rotation: 1, rotationWrap: 49, header: { flagSearchCounter: 0 } } as unknown as GameState);
     expect(wrongBlock.slotDest[0]).toBe(0);
     expect(wrongBlock.hasResources).toBe(true);
  // Rotation 0 -> block 0 (index 0..31) -> flag #1 processed.
     const on = mk();
-    updateFlags({ flags: [null, on, null, null, null, null, null, invAt7()], players: [null], rotation: 0, rotationWrap: 49 } as unknown as GameState);
+    updateFlags({ flags: [null, on, null, null, null, null, null, invAt7()], players: [null], rotation: 0, rotationWrap: 49, header: { flagSearchCounter: 0 } } as unknown as GameState);
     expect(on.slotDest[0]).toBe(7);
   });
 
   it('processes no flags in economy rotations (rotation >= 32)', () => {
     const f = flag({ index: 1, hasResources: true, resourceSlots: [9, -1, -1, -1, -1, -1, -1, -1], slotDest: [0, 0, 0, 0, 0, 0, 0, 0], connections: [null, conn(7), null, null, null, null], transporters: [false, true, false, false, false, false] });
     const inv = flag({ index: 7, acceptsResources: true });
-    updateFlags({ flags: [null, f, null, null, null, null, null, inv], players: [null], rotation: 40, rotationWrap: 49 } as unknown as GameState);
+    updateFlags({ flags: [null, f, null, null, null, null, null, inv], players: [null], rotation: 40, rotationWrap: 49, header: { flagSearchCounter: 0 } } as unknown as GameState);
     expect(f.slotDest[0]).toBe(0);
     expect(f.hasResources).toBe(true);
   });
@@ -410,7 +410,7 @@ describe('updateFlags — resource scheduler', () => {
     return { stock: [{ available: 0, requested: stock0req }, { available: 0, requested: stock1req }] } as unknown as NonNullable<GameState['buildings'][number]>;
   }
   function stateWithBld(flags: (Flag | null)[], buildings: (GameState['buildings'][number] | null)[]): GameState {
-    return { flags, buildings, players: [null], gameTick: 0, rotation: 0, rotationWrap: 49 } as unknown as GameState;
+    return { flags, buildings, players: [null], gameTick: 0, rotation: 0, rotationWrap: 49, header: { flagSearchCounter: 0 } } as unknown as GameState;
   }
 
   it('routable unknown-dest: a fresh resource is routed to the requesting building (priority consumed, requested++)', () => {
@@ -560,7 +560,7 @@ describe('updateFlags — transporter request (call_transporter)', () => {
     return { index: 10, type: 21, state: 1, stateData: [0, 0, 0, 0, 0], col: 25, row: 46, ...over } as unknown as NonNullable<GameState['serfs'][number]>;
   }
   function inventory(over: Record<string, unknown> = {}) {
-    return { index: 1, owner: 0, genericCount: 5, serfIndices: new Array(27).fill(0), ...over } as unknown as NonNullable<GameState['inventories'][number]>;
+    return { index: 1, owner: 0, flag: 2, genericCount: 5, serfIndices: new Array(27).fill(0), ...over } as unknown as NonNullable<GameState['inventories'][number]>;
   }
   function castle() {
     return { index: 1, type: 24, inventoryIndex: 1 } as unknown as NonNullable<GameState['buildings'][number]>;
@@ -580,7 +580,7 @@ describe('updateFlags — transporter request (call_transporter)', () => {
   }
   function mk(flags: (Flag | null)[], inv: NonNullable<GameState['inventories'][number]>, serf: NonNullable<GameState['serfs'][number]>, p: Player): GameState {
     const serfs = Array.from({ length: 11 }, (_v, i) => (i === 10 ? serf : null));
-    return { flags, buildings: [null, castle()], inventories: [null, inv], players: [p, null, null, null], serfs, gameTick: 0, rotation: 0, rotationWrap: 49 } as unknown as GameState;
+    return { flags, buildings: [null, castle()], inventories: [null, inv], players: [p, null, null, null], serfs, gameTick: 0, rotation: 0, rotationWrap: 49, header: { flagSearchCounter: 0 } } as unknown as GameState;
   }
 
   it('dispatches a generic as transporter (state 1 -> 15, specialised + counters)', () => {
@@ -594,9 +594,11 @@ describe('updateFlags — transporter request (call_transporter)', () => {
     updateFlags(mk([null, rf, iff], inv, s, p));
     expect(s.state).toBe(15); // ReadyToLeaveInventory
     expect(s.type).toBe(0); // generic -> transporter
-    expect(s.stateData[0]).toBe(0); // field_0xb = road direction 0
-    expect(s.stateData[1]).toBe(1); // field_0xc (low) = flag #1
-    expect(s.stateData[3]).toBe(1); // field_0xe (low) = inventory #1
+    // The warehouse IS the other road end, reached with mark 0xff: the carrier enters the road from
+    // that side (@0x11e91) — flag #2, direction otherEndDir = 3.
+    expect(s.stateData[0]).toBe(3); // field_0xb
+    expect(s.stateData[1]).toBe(2); // field_0xc (low)
+    expect(s.stateData[3]).toBe(0); // field_0xe is not written: an idle stock serf already carries it
     expect(inv.genericCount).toBe(4);
     expect(inv.serfIndices[21]).toBe(0);
     expect(inv.serfIndices[4]).toBe(1); // out-dispatch counter
@@ -727,5 +729,146 @@ describe('updateFlags — transporter request (call_transporter)', () => {
  // length[0] = 1 transporter, category 0 -> need=1 -> count==need, no res_waiting demand.
     updateFlags(mk([null, roadFlag({ length: [0x01, 0, 0, 0, 0, 0] }), invFlag()], inv, s, withCensus()));
     expect(s.state).toBe(1);
+  });
+});
+
+/**
+ * `find_inventory_serf_bfs` @0x11a1a: the search starts at BOTH ends of the road, a stored specialist
+ * beats a generic that would have to be specialised, and the carrier is sent to the nearer end.
+ */
+describe('transporter request — search from both road ends', () => {
+  const bcon = (i: number) => ({ kind: 'building' as const, index: i });
+  type Inv = NonNullable<GameState['inventories'][number]>;
+  type S = NonNullable<GameState['serfs'][number]>;
+  /** A staffed land road — carries no request of its own (count 1 == need 1, no demand). */
+  const STAFFED = 1;
+
+  function serf(index: number, type: number): S {
+    return { index, type, state: 1, stateData: [0, 0, 0, 0, 0] } as unknown as S;
+  }
+  function inv(index: number, flagIdx: number, idx: Record<number, number>, res: Record<number, number> = {}): Inv {
+    const serfIndices = new Array(27).fill(0);
+    for (const [k, v] of Object.entries(idx)) serfIndices[Number(k)] = v;
+    const resources = new Array(26).fill(0);
+    for (const [k, v] of Object.entries(res)) resources[Number(k)] = v;
+    return { index, owner: 0, flag: flagIdx, genericCount: serfIndices[21] ? 1 : 0, serfIndices, resources } as unknown as Inv;
+  }
+  /** Road between `a` (direction `da`) and `b` (direction `db`), `len` on both ends. */
+  function road(a: Flag, da: number, b: Flag, db: number, len: number): void {
+    (a.connections as unknown[])[da] = conn(b.index);
+    (b.connections as unknown[])[db] = conn(a.index);
+    a.paths[da] = b.paths[db] = true;
+    a.otherEndDir[da] = db;
+    b.otherEndDir[db] = da;
+    a.length[da] = b.length[db] = len;
+    a.transporters[da] = b.transporters[db] = len !== 0;
+  }
+  function withStore(f: Flag, bld: number): Flag {
+    f.bldFlags = 0x40;
+    (f.connections as unknown[])[4] = bcon(bld);
+    return f;
+  }
+  function world(flags: Flag[], invs: Inv[], serfs: S[], contSearch = 7): GameState {
+    const fl: (Flag | null)[] = new Array(Math.max(...flags.map((f) => f.index)) + 1).fill(null);
+    for (const f of flags) fl[f.index] = f;
+    const buildings: unknown[] = [null];
+    const inventories: (Inv | null)[] = [null];
+    for (const i of invs) {
+      inventories[i.index] = i;
+      buildings[i.index] = { index: i.index, type: 10, inventoryIndex: i.index };
+    }
+    const ss: (S | null)[] = new Array(Math.max(...serfs.map((s) => s.index)) + 1).fill(null);
+    for (const s of serfs) ss[s.index] = s;
+    const p = { serfCount: new Array(27).fill(0), contSearchAfterNonOptimalFind: contSearch } as unknown as Player;
+    return { flags: fl, buildings, inventories, serfs: ss, players: [p, null, null, null], gameTick: 0, rotation: 0, rotationWrap: 49, header: { flagSearchCounter: 0 } } as unknown as GameState;
+  }
+
+  it('a store behind the OTHER end sends the carrier to that end, and the marks tell the sides apart', () => {
+    // #1 --(0|3, unstaffed)-- #2 --(0|3)-- #3 store
+    const f1 = flag({ index: 1 });
+    const f2 = flag({ index: 2 });
+    const f3 = withStore(flag({ index: 3 }), 1);
+    road(f1, 0, f2, 3, 0);
+    road(f2, 0, f3, 3, STAFFED);
+    const t = serf(10, 0);
+    updateFlags(world([f1, f2, f3], [inv(1, 3, { 0: 10 })], [t]));
+    expect(t.state).toBe(15);
+    expect(t.stateData[0]).toBe(3); // field_0xb = otherEndDir of the road
+    expect(t.stateData[1]).toBe(2); // field_0xc = the other end, not the requesting flag
+    expect([f1.searchDir, f2.searchDir, f3.searchDir]).toEqual([0, 0xff, 0xff]);
+    expect(new Set([f1.searchNum, f2.searchNum, f3.searchNum]).size).toBe(1);
+  });
+
+  it('a store on the requesting side sends the carrier to the requesting flag', () => {
+    // #4 store --(0|3)-- #1 --(0|3, unstaffed)-- #2
+    const f1 = flag({ index: 1 });
+    const f2 = flag({ index: 2 });
+    const f4 = withStore(flag({ index: 4 }), 1);
+    road(f1, 0, f2, 3, 0);
+    road(f4, 0, f1, 3, STAFFED);
+    const t = serf(10, 0);
+    updateFlags(world([f1, f2, f4], [inv(1, 4, { 0: 10 })], [t]));
+    expect(t.stateData[0]).toBe(0);
+    expect(t.stateData[1]).toBe(1);
+    expect(f4.searchDir).toBe(0);
+  });
+
+  /** Near store with a generic only, far store with a transporter three levels out. */
+  function nearGenericFarSpecialist(contSearch: number) {
+    // #3 generic --(3|0)-- #2 --(3|0)-- #1 --(0|3, unstaffed)-- #5 -- #6 -- #8 -- #7 transporter
+    // The generic's store is two levels out, the transporter's three: one level END apart.
+    const f1 = flag({ index: 1 });
+    const f2 = flag({ index: 2 });
+    const f3 = withStore(flag({ index: 3 }), 1);
+    const f5 = flag({ index: 5 });
+    const f6 = flag({ index: 6 });
+    const f7 = withStore(flag({ index: 7 }), 2);
+    const f8 = flag({ index: 8 });
+    road(f1, 0, f5, 3, 0);
+    road(f2, 0, f1, 3, STAFFED);
+    road(f3, 0, f2, 3, STAFFED);
+    road(f5, 0, f6, 3, STAFFED);
+    road(f6, 0, f8, 3, STAFFED);
+    road(f8, 0, f7, 3, STAFFED);
+    const g = serf(10, 21);
+    const t = serf(11, 0);
+    const st = world([f1, f2, f3, f5, f6, f7, f8], [inv(1, 3, { 21: 10 }), inv(2, 7, { 0: 11 })], [g, t], contSearch);
+    updateFlags(st);
+    return { g, t, st };
+  }
+
+  it('a stored transporter further out beats a nearer generic within the continue budget', () => {
+    const { g, t } = nearGenericFarSpecialist(7);
+    expect(t.state).toBe(15);
+    expect(g.state).toBe(1);
+    expect(t.stateData[1]).toBe(5); // reached over the far end
+  });
+
+  it('beyond the continue budget the remembered generic is specialised', () => {
+    const { g, t, st } = nearGenericFarSpecialist(1);
+    expect(g.state).toBe(15);
+    expect(g.type).toBe(0);
+    expect(t.state).toBe(1);
+    expect(g.stateData[1]).toBe(1); // the generic's store lies on the requesting side
+    expect(st.inventories[1]!.genericCount).toBe(0);
+  });
+
+  it('water: a store without a boat is not remembered, the search goes on to one with a sailor', () => {
+    // #3 generic, no boat --(3|0)-- #1 --(0|3, WATER)-- #2; #1 --(4|1)-- #4 --(4|1)-- #5 sailor
+    const f1 = flag({ index: 1 });
+    const f2 = flag({ index: 2 });
+    const f3 = withStore(flag({ index: 3 }), 1);
+    const f4 = flag({ index: 4 });
+    const f5 = withStore(flag({ index: 5 }), 2);
+    road(f1, 0, f2, 3, 0);
+    f1.endpointDirs[0] = f2.endpointDirs[3] = false;
+    road(f3, 0, f1, 3, STAFFED);
+    road(f1, 5, f4, 2, STAFFED);
+    road(f4, 5, f5, 2, STAFFED);
+    const g = serf(10, 21);
+    const sailor = serf(11, 1);
+    updateFlags(world([f1, f2, f3, f4, f5], [inv(1, 3, { 21: 10 }), inv(2, 5, { 1: 11 })], [g, sailor], 1));
+    expect(sailor.state).toBe(15);
+    expect(g.state).toBe(1);
   });
 });
