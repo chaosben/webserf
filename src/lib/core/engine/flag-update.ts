@@ -22,6 +22,7 @@ import type { GameState, Flag, Inventory, Serf } from './state.js';
 import { setSerfType } from './state.js';
 import { setUnionU8, setUnionU16 } from './serf-machine.js';
 import { returnTransitResourceToStock } from './road-teardown.js';
+import { u16 } from './int.js';
 
 /**
  * Demand table `DAT_0004b822`, indexed `(res+1)*2`. `null` = not routable to a building, inventory
@@ -197,52 +198,85 @@ export function servedNeighborFlag(f: Flag, dir: number): number {
 }
 
 /**
- * `schedule_slot_to_known_dest` (@0x4b858 else branch + `FUN_0004c2bd`): source-seeded network search.
- * Seeds neighbour flags in transporter-idle directions (levels from `res_waiting`), each with
+ * `new_flag_search` `FUN_0001303f` @0x1303f — draw a new search generation. If the counter overflows it
+ * is raised a second time and **all** flag marks are cleared (@0x1309e..@0x130bb). The routine also
+ * zeroes the queue toggle `gs+0x270` (@0x130ea); the port keeps its BFS levels as arrays and has no
+ * toggle to reset.
+ */
+export function newFlagSearch(state: GameState): number {
+  state.header.flagSearchCounter = u16(state.header.flagSearchCounter + 1);
+  if (state.header.flagSearchCounter === 0) {
+    state.header.flagSearchCounter = u16(state.header.flagSearchCounter + 1);
+    for (const flag of state.flags) {
+      if (flag !== undefined && flag !== null) flag.searchNum = 0;
+    }
+  }
+  return state.header.flagSearchCounter;
+}
+
+/** `searchDir` of the flag a known-destination search starts from (`mov $0x6,%al` @0x4c1c2). No road
+ *  direction has this value, so a destination that carries it IS the origin. */
+const SEARCH_DIR_ORIGIN = 6;
+
+/**
+ * `schedule_slot_to_known_dest` (@0x4c1b3 + the source adder `FUN_0004c2bd`): source-seeded network
+ * search. Seeds neighbour flags in transporter-idle directions (levels from `res_waiting`), each with
  * `search_dir = dir` (ccw 5 -> 0), and looks for the source that reaches `dest`; its starting
  * direction becomes the pickup direction. Unreachable destination: cancel the resource, clear dest,
  * set hasResources again.
+ *
+ * The marks are the persistent `searchNum`/`searchDir` of the flag records, not a local set, and the
+ * origin flag is marked too. That is not bookkeeping: a local set without the origin lets the search
+ * run back through the flag the resource lies on and hand out a pickup direction that points away
+ * from the destination — the resource then shuttles between two flags.
  */
 function scheduleKnownDest(state: GameState, f: Flag, slot: number, resWaiting: number[]): void {
   const dest = f.slotDest[slot];
+  const search = newFlagSearch(state); // `call 0x1303f` @0x4c1b3
+  f.searchNum = search; // @0x4c1bf
+  f.searchDir = SEARCH_DIR_ORIGIN; // @0x4c1c7
   let tr = transporterMask(f);
-  const visited = new Set<number>([f.index]); // local scratch instead of a persistent searchNum
-  const sources: { flag: number; dir: number }[] = [];
+  const sources: number[] = [];
 
-  // Source adder (`FUN_0004c2bd`): directions 5 -> 0; per set bit clear tr[dir] and queue the
-  // neighbour, if unvisited, as a source with search_dir = dir.
+  // Source adder (`FUN_0004c2bd`): directions 5 -> 0; per set bit clear tr[dir] (`btr` @0x4c2da, before
+  // the mark test) and queue the neighbour, if not yet marked, with search_dir = dir.
   const addSources = (bitmap: number): void => {
     for (let dir = 5; dir >= 0; dir--) {
       if ((bitmap & (1 << dir)) === 0) continue;
       tr &= ~(1 << dir);
       const nb = neighborFlag(f, dir);
-      if (nb >= 0 && !visited.has(nb)) {
-        visited.add(nb);
-        sources.push({ flag: nb, dir });
-      }
+      const n = nb >= 0 ? state.flags[nb] : null;
+      if (!n || u16(n.searchNum) === search) continue; // @0x4c30f
+      n.searchNum = search; // @0x4c31c
+      n.searchDir = dir; // @0x4c325
+      sources.push(nb);
     }
   };
 
   // Level 0 = idle carrier directions (no waiting slots).
   const idle = (resWaiting[0] ^ 0x3f) & tr;
   if (idle !== 0) addSources(idle);
-  // Levels 1..3, each only while tr still has bits left.
+  // Levels 1..4, each only while tr still has bits left (`je 0x4c341` @0x4c20d ff.).
   if (tr !== 0) {
     addSources(resWaiting[0] ^ resWaiting[1]);
     if (tr !== 0) addSources(resWaiting[1] ^ resWaiting[2]);
     if (tr !== 0) addSources(resWaiting[2] ^ resWaiting[3]);
+    // `or al,al ; je 0x4c2bd` @0x4c2b1 would fall into the adder's body and leave through its `ret`,
+    // skipping the search and the frame restore. Unreachable: the four masks are nested (a direction
+    // in resWaiting[k+1] is also in resWaiting[k]), so a `tr` still non-empty here lies inside
+    // resWaiting[3], which therefore is not zero.
     if (tr !== 0) addSources(resWaiting[3]);
   }
 
+  // `jns 0x4c386` @0x4c352 — no source added: `bts $0x7` on flag[4] @0x4c375, next slot.
   if (sources.length === 0) {
     f.hasResources = true;
     return;
   }
 
-  // BFS from the source set across the flag network; search_dir propagates from the source.
-  const dir = searchFromSources(state, sources, dest);
+  const dir = searchFromSources(state, sources, dest, search);
   if (dir === null) {
-    // Undeliverable: cancel the resource and let it be rescheduled.
+    // @0x4c609: cancel the resource (`call 0x4a3af` @0x4c669), clear dest, let it be rescheduled.
     cancelTransportedResource(state, f.resourceSlots[slot], dest);
     f.slotDest[slot] = 0;
     f.hasResources = true;
@@ -252,43 +286,45 @@ function scheduleKnownDest(state: GameState, f: Flag, slot: number, resWaiting: 
 }
 
 /**
- * Multi-source flag network BFS: finds which source (carrying its `dir` marking) reaches `dest`.
- * Direction iteration 5 -> 0 is the original's tie-break. Returns the source direction or null.
+ * The level loop of the known-destination search (@0x4c3b3..@0x4c603). Expands over roads with a
+ * carrier (`flag[5]`, @0x4c42a), marks with `search` and passes the source's `searchDir` on.
+ *
+ * The destination is tested only at the END of a level (`cmp` @0x4c5e8), not when it is reached. That
+ * is equivalent to returning on first contact — a marked flag is never re-marked, so its `searchDir`
+ * is the one of the first source to reach it in 5 -> 0 order. What the end-of-level test adds is the
+ * origin case: the origin carries direction 6, and a destination with direction 6 is undeliverable
+ * (`cmpb $0x6` @0x4c6ba).
  */
 function searchFromSources(
   state: GameState,
-  sources: { flag: number; dir: number }[],
+  sources: number[],
   dest: number,
+  search: number,
 ): number | null {
-  const searchDir = new Map<number, number>();
-  const visited = new Set<number>();
-  let frontier: number[] = [];
-  for (const s of sources) {
-    if (s.flag === dest) return s.dir;
-    if (!visited.has(s.flag)) {
-      visited.add(s.flag);
-      searchDir.set(s.flag, s.dir);
-      frontier.push(s.flag);
-    }
-  }
-  while (frontier.length > 0) {
+  const target = state.flags[dest] ?? null;
+  let frontier = sources;
+  for (;;) {
     const next: number[] = [];
-    for (const fIdx of frontier) {
-      const fl = state.flags[fIdx];
+    for (const idx of frontier) {
+      const fl = state.flags[idx];
       if (!fl) continue;
-      const sd = searchDir.get(fIdx)!;
       for (let dir = 5; dir >= 0; dir--) {
         const nb = servedNeighborFlag(fl, dir);
-        if (nb < 0 || visited.has(nb)) continue;
-        if (nb === dest) return sd;
-        visited.add(nb);
-        searchDir.set(nb, sd);
+        const n = nb >= 0 ? state.flags[nb] : null;
+        if (!n || u16(n.searchNum) === search) continue; // @0x4c44d
+        n.searchNum = search; // @0x4c45a
+        n.searchDir = fl.searchDir; // @0x4c466
         next.push(nb);
       }
+      // `cmp %ax,0x4(%edi) ; jns` @0x4c5d2 — the level ends once 995 flags have been added.
+      if (next.length >= DEMAND_BFS_NODE_BUDGET) break;
     }
+    if (target !== null && u16(target.searchNum) === search) {
+      return target.searchDir === SEARCH_DIR_ORIGIN ? null : target.searchDir;
+    }
+    if (next.length === 0) return null; // `jns 0x4c3b3` @0x4c603 not taken
     frontier = next;
   }
-  return null;
 }
 
 /**

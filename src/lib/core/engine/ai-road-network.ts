@@ -47,6 +47,7 @@ import { spiralPos } from './spiral.js';
 import { classifyBuildSite, persistBuildSiteBits, buildFlag, BUILD_FLAG } from './build-site.js';
 import { aiBuildRoads } from './ai-road-builder.js';
 import { aiProbeMap } from './ai-probe.js';
+import { newFlagSearch } from './flag-update.js';
 
 /** Slots of the loss register (block 572). */
 export const AI_LOSS_SLOTS = 8;
@@ -113,20 +114,7 @@ function i16(v: number): number {
   return (v << 16) >> 16;
 }
 
-/**
- * `new_flag_search` `FUN_0001303f` @0x1303f — draw a new search generation. If the counter overflows it
- * is raised a second time and **all** flag marks are cleared (@0x1309e..@0x130bb).
- */
-export function newFlagSearch(state: GameState): number {
-  state.header.flagSearchCounter = u16(state.header.flagSearchCounter + 1);
-  if (state.header.flagSearchCounter === 0) {
-    state.header.flagSearchCounter = u16(state.header.flagSearchCounter + 1);
-    for (const flag of state.flags) {
-      if (flag !== undefined && flag !== null) flag.searchNum = 0;
-    }
-  }
-  return state.header.flagSearchCounter;
-}
+export { newFlagSearch };
 
 /** Outcome of an attach attempt — it determines what the budget is charged. */
 export type AiConnectResult = 'saturated' | 'built' | 'failed';

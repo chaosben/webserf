@@ -11,6 +11,8 @@ function flag(over: Partial<Flag> = {}): Flag {
   return {
     index: 1,
     owner: 0,
+    searchNum: 0,
+    searchDir: 0,
     hasBuilding: false,
     hasResources: false,
     acceptsResources: false,
@@ -40,7 +42,14 @@ function conn(index: number): { kind: 'flag'; index: number } {
 // updateFlags is a pure block processor (the frame clock belongs to advanceFrameClock/tick.ts):
 // rotation 0 means block 0 (flag index 0..31), so the flag under test (index 1) is processed.
 function makeState(flags: (Flag | null)[], players: (Player | null)[] = [null, null, null, null]): GameState {
-  return { flags, players, gameTick: 0, rotation: 0, rotationWrap: 49 } as unknown as GameState;
+  return {
+    flags,
+    players,
+    gameTick: 0,
+    rotation: 0,
+    rotationWrap: 49,
+    header: { flagSearchCounter: 0 },
+  } as unknown as GameState;
 }
 
 function player(flagPriority: number[]): Player {
@@ -106,6 +115,55 @@ describe('updateFlags — resource scheduler', () => {
     expect(f.hasResources).toBe(true);
   });
 
+  it('known-dest: the destination is the origin flag itself -> cancelled, not shipped out and back', () => {
+ // The origin carries searchDir 6 (@0x4c1c7), and a destination with direction 6 is undeliverable
+ // (@0x4c6ba). Without the origin mark the search reached flag #1 again via #2 and returned
+ // direction 1 — the resource left towards #2 only to be carried back.
+    const f = flag({
+      index: 1,
+      hasResources: true,
+      resourceSlots: [9, -1, -1, -1, -1, -1, -1, -1],
+      slotDest: [1, 0, 0, 0, 0, 0, 0, 0],
+      connections: [null, conn(2), null, null, null, null],
+      transporters: [false, true, false, false, false, false],
+    });
+    const back = flag({
+      index: 2,
+      connections: [null, null, null, null, conn(1), null],
+      transporters: [false, false, false, false, true, false],
+    });
+    updateFlags(makeState([null, f, back]));
+    expect(f.slotDest[0]).toBe(0);
+    expect(f.slotDir[0]).toBe(-1);
+    expect(f.scheduled.some((b) => b)).toBe(false);
+    expect(f.hasResources).toBe(true);
+  });
+
+  it('known-dest: the search leaves its marks in the flag records and advances the counter', () => {
+    const f = flag({
+      index: 1,
+      hasResources: true,
+      resourceSlots: [9, -1, -1, -1, -1, -1, -1, -1],
+      slotDest: [5, 0, 0, 0, 0, 0, 0, 0],
+      connections: [null, conn(2), null, null, null, null],
+      transporters: [false, true, false, false, false, false],
+    });
+    const mid = flag({
+      index: 2,
+      connections: [conn(5), null, null, null, null, null],
+      transporters: [true, false, false, false, false, false],
+    });
+    const dest = flag({ index: 5 });
+    const state = makeState([null, f, mid, null, null, dest]);
+    updateFlags(state);
+    const search = (state as unknown as { header: { flagSearchCounter: number } }).header.flagSearchCounter;
+    expect(search).toBe(1);
+    expect([f.searchNum, f.searchDir]).toEqual([1, 6]);
+    expect([mid.searchNum, mid.searchDir]).toEqual([1, 1]);
+    expect([dest.searchNum, dest.searchDir]).toEqual([1, 1]);
+    expect(f.slotDir[0]).toBe(1);
+  });
+
   it('known-dest unreachable: the booking goes back to the destination building (call 0x4a3af @0x4c669)', () => {
  // Without the return the site keeps a phantom `requested` forever: the demand tail goes silent as
  // soon as available + requested == stockMaximum, so it never asks again and the build stalls.
@@ -134,7 +192,7 @@ describe('updateFlags — resource scheduler', () => {
     };
     const state = makeState([null, f, dead, null, null, dest]);
     (state as unknown as { buildings: unknown[] }).buildings = [null, null, null, site];
-    (state as unknown as { header: { mapGoldTotal: number } }).header = { mapGoldTotal: 384 };
+    (state as unknown as { header: { mapGoldTotal: number } }).header = { mapGoldTotal: 384, flagSearchCounter: 0 } as never;
     updateFlags(state);
     expect(f.slotDest[0]).toBe(0);
     expect(site.stock[0]).toEqual({ available: 0, requested: 1 }); // plank slot given back
