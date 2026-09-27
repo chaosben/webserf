@@ -1,8 +1,11 @@
 <script lang="ts">
   /**
-   * The road assistant's plate over the game surface: start it, cancel it. What the road under the
-   * pointer would cost is shown at the pointer, not here — a line that changes with every tile the
-   * pointer crosses makes the plate jump. The road itself is built by the click on the target flag.
+   * The road assistant's plate over the game surface: one button that starts it and, while it runs,
+   * cancels it. The plate keeps ONE shape in every step — both labels share a grid cell, the other one
+   * hidden, so the button is always as wide as the longer one; a plate that resizes shifts every
+   * plate stacked in its corner. For the same reason the step's instruction is a status message (the
+   * bus shows it) and the cost of the road under the pointer is shown at the pointer. The road itself
+   * is built by the click on the target flag.
    *
    * OUR OWN ADDITION, and a DOM layer — it appears in neither a screenshot nor a recording, but the
    * road it builds does, through the ordinary commands. It holds no game state; everything runs
@@ -26,6 +29,7 @@
   } = $props();
 
   const swallow = (e: Event): void => e.stopPropagation();
+  const active = $derived(roadAssistant.phase !== 'idle');
 </script>
 
 {#if roadAssistant.present}
@@ -48,33 +52,22 @@
       e.stopPropagation();
     }}
   >
-    {#if roadAssistant.phase === 'idle'}
-      <!-- The shell's own icon language, not a game sprite: the assistant is ours, and a picture
-           from the control bar would claim it were part of the original's controls. -->
-      <button type="button" class="start" onclick={() => roadAssistant.begin()}>
-        <IconAssistant aria-hidden="true" />
-        <span>{st('enh.assist.road.plan')}</span>
-      </button>
-    {:else}
-      {#if roadAssistant.phase === 'pickStart'}
-        <p>{st('enh.assist.road.pickStart')}</p>
-      {:else}
-        <p>{st('enh.assist.road.pickTarget')}</p>
-      {/if}
-      <div class="row">
-        <button type="button" onclick={() => roadAssistant.reset()}>{st('enh.assist.road.cancel')}</button>
-      </div>
-    {/if}
+    <!-- The shell's own icon language, not a game sprite: the assistant is ours, and a picture
+         from the control bar would claim it were part of the original's controls. -->
+    <button type="button" onclick={() => (active ? roadAssistant.reset() : roadAssistant.begin())}>
+      <IconAssistant aria-hidden="true" />
+      <!-- `visibility: hidden` also takes the other label out of the accessibility tree. -->
+      <span class="labels">
+        <span class:hidden={active}>{st('enh.assist.road.plan')}</span>
+        <span class:hidden={!active}>{st('enh.assist.road.cancel')}</span>
+      </span>
+    </button>
   </section>
 {/if}
 
 <style>
   .assist {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.35em;
-    max-width: 18em;
     padding: 0.35em;
     background: var(--bg-sunken);
     border: 1px solid var(--line);
@@ -82,31 +75,29 @@
     user-select: none;
   }
 
-  p {
-    margin: 0;
-    line-height: 1.4;
-  }
-
-  .row {
-    display: flex;
-    gap: 0.35em;
-  }
-
   button {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
     padding: 0.25em 0.5em;
     white-space: nowrap;
   }
 
-  .start {
-    display: flex;
-    align-items: center;
-    gap: 0.35em;
-    align-self: flex-start;
-  }
-
-  .start :global(svg) {
+  button :global(svg) {
     width: 1.3em;
     height: 1.3em;
     flex: none;
+  }
+
+  .labels {
+    display: grid;
+  }
+
+  .labels > span {
+    grid-area: 1 / 1;
+  }
+
+  .hidden {
+    visibility: hidden;
   }
 </style>

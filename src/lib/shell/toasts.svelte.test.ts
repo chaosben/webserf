@@ -51,4 +51,14 @@ describe('toast bus', () => {
     expect(bus.items).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('keeps an unbounded message until it is dismissed', () => {
+    const bus = new ToastBus();
+    const id = bus.push('click the flag', { ms: Infinity });
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(24 * 3600 * 1000);
+    expect(bus.items.map((t) => t.text)).toEqual(['click the flag']);
+    bus.dismiss(id);
+    expect(bus.items).toEqual([]);
+  });
 });

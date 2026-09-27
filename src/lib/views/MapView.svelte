@@ -4353,8 +4353,7 @@
       return;
     }
     if (roadAssistant.phase === 'pickStart') {
-      roadAssistant.start = { col, row };
-      roadAssistant.phase = 'pickTarget';
+      roadAssistant.chooseStart({ col, row });
       return;
     }
     const start = roadAssistant.start;

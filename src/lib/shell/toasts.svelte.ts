@@ -31,7 +31,7 @@ export interface Toast {
 export interface ToastOptions {
   readonly tone?: ToastTone;
   readonly icon?: Component | null;
-  /** Lifetime in milliseconds; the tone's default otherwise. */
+  /** Lifetime in milliseconds; the tone's default otherwise. `Infinity` = until `dismiss`. */
   readonly ms?: number;
 }
 
@@ -83,6 +83,8 @@ export class ToastBus {
 
   #arm(id: number, ms: number): void {
     this.#disarm(id);
+    // `setTimeout` clamps a delay beyond 2^31 − 1 to 0, so an unbounded one must not reach it.
+    if (!Number.isFinite(ms)) return;
     this.#timers.set(
       id,
       setTimeout(() => this.dismiss(id), ms),

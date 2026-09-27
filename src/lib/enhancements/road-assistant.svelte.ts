@@ -25,6 +25,9 @@ class RoadAssistantBus {
   /** Is a game view mounted that can build? */
   present = $state(false);
 
+  /** The status message that says what to click; it stands exactly as long as its step. */
+  #hintId: number | null = null;
+
   /** Register a game view. Returns the unregister function — fits straight into an `$effect`. */
   provide(): () => void {
     this.present = true;
@@ -39,12 +42,32 @@ class RoadAssistantBus {
     this.phase = 'pickStart';
     this.start = null;
     this.hover = null;
+    this.#hint('enh.assist.road.pickStart');
+  }
+
+  /** The start flag is chosen: the next map click is the target. */
+  chooseStart(start: TilePoint): void {
+    this.start = start;
+    this.phase = 'pickTarget';
+    this.hover = null;
+    this.#hint('enh.assist.road.pickTarget');
   }
 
   reset(): void {
     this.phase = 'idle';
     this.start = null;
     this.hover = null;
+    this.#hint(null);
+  }
+
+  /**
+   * The step's instruction lives among the status messages and not on the plate: a line that comes
+   * and goes with the step would resize the plate and shift every plate stacked in its corner.
+   */
+  #hint(key: ShellKey | null): void {
+    if (this.#hintId !== null) toasts.dismiss(this.#hintId);
+    this.#hintId =
+      key === null ? null : toasts.push(st(key), { tone: 'info', icon: IconAssistant, ms: Infinity });
   }
 
   /** A refusal or an outcome goes to the shell's status messages, with the assistants' icon. */
