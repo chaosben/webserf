@@ -612,6 +612,11 @@ export function runRoadSearch(state: GameState, grid: RbGrid): void {
  // (`cmp ; jne` @0x560cb).
       if (entry.cost !== grid.best[entry.cell]) continue;
       const cost = u16(entry.cost + RB_STEP_BASE); // @0x560d0 — the start (0xffff) becomes 2
+ // ONE shift per expanded entry (`shll $0x3` + three carries @0x56151…@0x5618a); each direction
+ // then only adds its digit to the reloaded shifted path (`addw $0x1,0x14(%edi)` @0x56278 up to
+ // `addw $0x6,0x14(%edi)` @0x56b15). Shifting again per direction spends six bits a step, and a
+ // path of more than ten steps loses its first steps off the top — the road is then laid from the
+ // cursor to a tile that is not the target.
       const shifted = appendDir(entry.hi, entry.lo, 0);
 
       for (let dir = 0; dir < 6; dir++) {
@@ -627,7 +632,8 @@ export function runRoadSearch(state: GameState, grid: RbGrid): void {
         const newCost = u16(u16(cost + kind) + rbSlopePenalty(dh));
         if (newCost >= grid.best[nbCell]) continue; // @0x561d5
         grid.best[nbCell] = newCost;
-        const path = appendDir(shifted.hi, shifted.lo, dir + 1);
+        // The low three bits are zero after the shift, so the 16-bit `addw` never carries.
+        const path: RbPath = { hi: shifted.hi, lo: (shifted.lo + dir + 1) >>> 0 };
         if (kind < RB_ID_FLAG_BASE) {
           next.push({ cost: newCost, cell: nbCell, hi: path.hi, lo: path.lo });
         } else {

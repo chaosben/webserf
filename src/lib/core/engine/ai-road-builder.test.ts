@@ -18,14 +18,17 @@ import {
   RB_STAMP_FORESTER_W,
   RB_STAMP_SCAN_FROM,
   RB_TARGETS,
+  type RbGrid,
   pathSteps,
   popPathDir,
   rbAlignPath,
   rbHexDistance,
   rbSlopePenalty,
   rbStamp,
+  runRoadSearch,
   type RbPath,
 } from './ai-road-builder.js';
+import type { GameState } from './state.js';
 import { DIR_DELTA, Direction } from './position.js';
 
 /** Build a path the way the search does: per step `<<3`, appending the digit `dir+1` at the bottom. */
@@ -175,5 +178,35 @@ describe('AI road builder: path as a base-8 number', () => {
 
   it('the empty path yields null (an endless loop in the original)', () => {
     expect(popPathDir({ hi: 0, lo: 0 })).toBeNull();
+  });
+  it('the search itself writes three bits a step, so a 14-step path reaches its target', () => {
+    // A single corridor: nine cells Right from the centre, then five Up, the target id at its end.
+    // Only the corridor is passable (0xff elsewhere), and Right-then-Up has no hex shortcut (there is no
+    // UpRight), so the search has exactly one way to the target.
+    const dirs = [...Array(9).fill(Direction.Right), ...Array(5).fill(Direction.Up)];
+    const grid: RbGrid = {
+      kind: new Uint8Array(RB_GRID_CELLS).fill(0xff),
+      pos: Int32Array.from({ length: RB_GRID_CELLS }, (_, i) => i),
+      best: new Uint16Array(RB_GRID_CELLS).fill(0xffff),
+      targetCost: new Uint16Array(RB_TARGETS),
+      targetHi: new Uint32Array(RB_TARGETS),
+      targetLo: new Uint32Array(RB_TARGETS),
+      peakQueue: 0,
+    };
+    grid.kind[RB_GRID_CENTER] = 0;
+    let cell = RB_GRID_CENTER;
+    for (const [i, d] of dirs.entries()) {
+      const [dc, dr] = DIR_DELTA[d];
+      cell += dr * RB_GRID_W + dc;
+      grid.kind[cell] = i === dirs.length - 1 ? RB_ID_FLAG_BASE : 1;
+    }
+    const state = {
+      mapTiles: Array.from({ length: RB_GRID_CELLS }, () => ({ height: 0 })),
+    } as unknown as GameState;
+    runRoadSearch(state, grid);
+    const path = { hi: grid.targetHi[0], lo: grid.targetLo[0] };
+    expect(grid.targetCost[0]).toBeGreaterThan(0);
+    expect(pathSteps(path)).toBe(dirs.length);
+    expect(popAll(rbAlignPath(path))).toEqual(dirs);
   });
 });
