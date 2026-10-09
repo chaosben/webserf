@@ -349,4 +349,31 @@ describe('planning searches (RNG spiral)', () => {
     expect([5, 7]).toContain(serf.state);
     expect(serf.stateData[4]).toBe(0x16); // next_state = 22 (only visible in state 7)
   });
+
+  // The standing tile is tested for the blocked marker only (`bt $0x6` @0x1c1d4), not its object.
+  function stoneWithStandingTile(standing: Partial<Tile>): Serf {
+    const state = makeState();
+    const pos = posOf(20, 20, geo);
+    state.mapTiles[pos] = tile({ objIndex: 1 });
+    state.mapTiles[neighbor(pos, Direction.DownRight, geo)] = tile({ objIndex: 1 });
+    const dist = ((new Rng([1, 2, 3]).next() >> 2) & 0x7f) + 1;
+    const dp = spiralPos(pos, dist, geo);
+    state.mapTiles[dp] = tile(standing);
+    state.mapTiles[neighbor(dp, Direction.UpLeft, geo)] = tile({ object: 72, blocked: true } as Partial<Tile>);
+    const serf = mkSerf({ index: 1, state: 21, tick: 999, counter: 0, type: 7 });
+    state.serfs[1] = serf;
+    dispatchSerf(state, serf);
+    return serf;
+  }
+
+  it('PlanningStoneCutting (21): a tree on the standing tile does not stop the search', () => {
+    const serf = stoneWithStandingTile({ object: 0x10 });
+    expect([5, 7]).toContain(serf.state);
+    expect(serf.stateData[4]).toBe(0x16);
+  });
+
+  it('PlanningStoneCutting (21): a blocked standing tile is rejected', () => {
+    const serf = stoneWithStandingTile({ blocked: true } as Partial<Tile>);
+    expect(serf.state).toBe(21);
+  });
 });

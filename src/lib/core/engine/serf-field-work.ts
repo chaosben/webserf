@@ -98,8 +98,9 @@ export const planningStoneCutting = (state: GameState, serf: Serf): void => {
     const dist = ((state.rng.next() >> 2) & 0x7f) + 1;
     const dp = spiralPos(pos, dist, geo);
     const uobj = state.mapTiles[neighbor(dp, Direction.UpLeft, geo)].object;
-    // can_pass approximation: the target object itself is passable (the original tests byte 0 bit 6).
-    if (uobj >= 72 && uobj <= 79 && state.mapTiles[dp].object === 0) {
+    // The standing tile is tested for the blocked marker only (`bt $0x6` @0x1c1d4), not for its
+    // object: a tree or stump there does not stop the stonecutter — trees never carry the marker.
+    if (uobj >= 72 && uobj <= 79 && !state.mapTiles[dp].blocked) {
       planningReadyToLeave(state, serf, dist, 0x16); // StoneCutterFreeWalking (22)
       return;
     }
