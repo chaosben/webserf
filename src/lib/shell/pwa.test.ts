@@ -217,6 +217,18 @@ describe('service worker', () => {
 		expect(page).toBe(worker);
 	});
 
+	it('agrees with the page about the build question', () => {
+		const literal = (text: string) => /const GET_VERSION = '(\w+)'/.exec(text)?.[1] ?? null;
+
+		const worker = literal(source);
+		const page = literal(read('src/lib/shell/update.svelte.ts'));
+
+		expect(worker).not.toBeNull();
+		expect(page).toBe(worker);
+		// The answer must be the worker's own build, the value the page compares against.
+		expect(code).toContain('event.ports[0]?.postMessage({ version })');
+	});
+
 	describe('sensitivity', () => {
 		// Every promise above is a function of a source string, so the fallback can be staged in
 		// memory. A check that cannot go red is not a check.

@@ -25,6 +25,12 @@
  *    nothing. `clients.claim()` is not needed on top of that: the activate step of a
  *    `skipWaiting()` worker claims the clients its predecessor held.
  *
+ *    The page asks for it in a SECOND situation, without reloading: when it already runs the
+ *    waiting worker's build. Because the document goes network-first (decision 3), any navigation
+ *    after a deployment loads the new code while the old worker still controls the tab — the new
+ *    one waits, and a reload does not change that. Taking over then costs nothing and gives the
+ *    page the cache that holds its own late-fetched files.
+ *
  * 3. Cache-first is allowed only where the NAME CARRIES THE CONTENT, which is `build` and nothing
  *    else. The document and the static folder go network-first with the stored copy as the
  *    fallback. Answered from the cache they would hide a deployment until the last tab of the old
@@ -71,6 +77,12 @@ const NAVIGATION_TIMEOUT = 2500;
  * cannot share a module and a watchdog has to hold them together instead.
  */
 const SKIP_WAITING = 'SKIP_WAITING';
+
+/**
+ * The question the page asks a waiting worker: which build are you? Answered over the message port
+ * the page hands along. Same pairing with `update.svelte.ts` as {@link SKIP_WAITING}.
+ */
+const GET_VERSION = 'GET_VERSION';
 
 /**
  * `fetch`, except that a navigation gives up after {@link NAVIGATION_TIMEOUT} so the stored
@@ -150,7 +162,9 @@ sw.addEventListener('activate', (event) => {
 });
 
 sw.addEventListener('message', (event) => {
-	if ((event.data as { type?: string } | null)?.type === SKIP_WAITING) void sw.skipWaiting();
+	const type = (event.data as { type?: string } | null)?.type;
+	if (type === SKIP_WAITING) void sw.skipWaiting();
+	if (type === GET_VERSION) event.ports[0]?.postMessage({ version });
 });
 
 sw.addEventListener('fetch', (event) => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { version } from "$app/environment";
 	import { resolve } from "$app/paths";
 	import { updates } from "$lib/shell/update.svelte.js";
 	import { settings } from "$lib/settings/settings.svelte.js";
@@ -9,7 +10,7 @@
 		Watching the service worker belongs to the layout rather than the page: it needs nothing from
 		the page, and here it exists exactly once no matter what the page shows.
 	*/
-	$effect(() => updates.watch());
+	$effect(() => updates.watch(version));
 
 	/*
 		The chosen size of the shell, as one property on the document root — every `rem` below hangs

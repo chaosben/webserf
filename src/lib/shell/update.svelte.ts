@@ -28,6 +28,16 @@
  *  5. Counter-check: the same without pressing anything, just F5 — must show the new version.
  *  6. Counter-check: devtools offline, reload — must still start.
  *  7. Counter-check: first visit in a fresh profile — NO notice.
+ *  8. Counter-check: with the first tab still open, build again and open a SECOND tab — it shows
+ *     the new version and NO notice, and the devtools list the new worker as activated, not
+ *     waiting. The first tab then says that another window switched.
+ *
+ * A WAITING WORKER IS NOT YET A REASON TO SPEAK. The document goes network-first, so every
+ * navigation after a deployment already runs the new build while the old worker still controls the
+ * tab; the new one waits beside it and keeps waiting across reloads. Offering a restart there would
+ * be a notice about a version already on screen. The page therefore asks the waiting worker for its
+ * build and only speaks when that differs from its own; when it matches, it lets the worker take
+ * over quietly — the page already runs those files, so nothing is pulled from under it.
  */
 
 /**
@@ -36,6 +46,15 @@
  * cannot share a module — `pwa.test.ts` holds them together instead.
  */
 const SKIP_WAITING = 'SKIP_WAITING';
+
+/** The build question; paired with `service-worker.ts` exactly like {@link SKIP_WAITING}. */
+const GET_VERSION = 'GET_VERSION';
+
+/**
+ * How long a waiting worker gets to name its build. A worker from before this question existed
+ * never answers — the notice is then shown as if the builds differed, which is the safe side.
+ */
+export const VERSION_TIMEOUT = 1000;
 
 /**
  * At most one check per this much wall time. Each check that finds something downloads the whole
@@ -55,7 +74,7 @@ export const HANDOVER_TIMEOUT = 3000;
 /** As much of a `ServiceWorker` as this module uses. */
 export interface UpdateWorker {
   readonly state: string;
-  postMessage(message: unknown): void;
+  postMessage(message: unknown, transfer?: Transferable[]): void;
   addEventListener(type: 'statechange', listener: () => void): void;
   removeEventListener(type: 'statechange', listener: () => void): void;
 }
@@ -76,10 +95,14 @@ export interface UpdateContainer {
   removeEventListener(type: 'controllerchange', listener: () => void): void;
 }
 
-/** The two things this module would otherwise take straight from the browser. */
+/** What this module would otherwise take straight from the browser. */
 export interface UpdateEnv {
   reload(): void;
   now(): number;
+  /** The build this page runs (`version` from `$app/environment`). */
+  pageVersion: string;
+  /** The build of a worker, or `null` when it does not answer. */
+  askVersion(worker: UpdateWorker): Promise<string | null>;
 }
 
 /**
@@ -104,16 +127,34 @@ export class UpdateBus {
   #timer: ReturnType<typeof setTimeout> | null = null;
   #reloaded = false;
   #lastRefresh = 0;
+  /** The worker whose build has been asked for — several triggers report the same one. */
+  #asked: UpdateWorker | null = null;
+  /** A quiet handover is running; its `controllerchange` is ours, not another window's. */
+  #adopting = false;
 
   /**
    * A first-ever installation has nothing to replace: without a controller this page is not being
    * served by a worker at all, so the files it runs ARE the ones just cached. Offering a restart
    * there would be a notice about nothing.
    */
-  #offer(): void {
+  #offer(worker: UpdateWorker): void {
     const controller = this.#container?.controller;
     if (controller === null || controller === undefined) return;
-    this.ready = true;
+    const env = this.#env;
+    if (env === null || worker === this.#asked) return;
+    this.#asked = worker;
+
+    void env.askVersion(worker).then((built) => {
+      if (this.#env !== env || this.#asked !== worker || worker.state === 'redundant') return;
+      if (built !== null && built === env.pageVersion) {
+        // The page already runs this build — see the module head. No reload: nothing changes for
+        // the code on screen, only the cache behind it.
+        this.#adopting = true;
+        worker.postMessage({ type: SKIP_WAITING });
+      } else {
+        this.ready = true;
+      }
+    });
   }
 
   #reload(): void {
@@ -163,9 +204,10 @@ export class UpdateBus {
       unfollow();
       watched = worker;
       onState = () => {
-        if (worker.state === 'installed') this.#offer();
+        if (worker.state === 'installed') this.#offer(worker);
         if (worker.state === 'redundant') {
           this.ready = false;
+          if (this.#asked === worker) this.#asked = null;
           unfollow();
         }
       };
@@ -177,6 +219,10 @@ export class UpdateBus {
     const onFound = () => follow(reg.installing);
 
     const onController = () => {
+      if (this.#adopting) {
+        this.#adopting = false;
+        return;
+      }
       if (this.applying) {
         this.#reload();
         return;
@@ -185,7 +231,7 @@ export class UpdateBus {
       this.ready = false;
     };
 
-    if (reg.waiting !== null) this.#offer();
+    if (reg.waiting !== null) this.#offer(reg.waiting);
     follow(reg.installing);
 
     reg.addEventListener('updatefound', onFound);
@@ -202,6 +248,8 @@ export class UpdateBus {
       this.#reg = null;
       this.#container = null;
       this.#env = null;
+      this.#asked = null;
+      this.#adopting = false;
     };
   }
 
@@ -222,7 +270,7 @@ export class UpdateBus {
     const env = this.#env;
     if (reg === null || env === null) return;
 
-    if (reg.waiting !== null) this.#offer();
+    if (reg.waiting !== null) this.#offer(reg.waiting);
 
     const at = env.now();
     if (!force && at - this.#lastRefresh < REFRESH_INTERVAL) return;
@@ -250,11 +298,34 @@ export class UpdateBus {
     this.#timer = setTimeout(() => this.#reload(), HANDOVER_TIMEOUT);
   }
 
-  /** Watch the browser's worker. Returns the teardown — fits straight into an `$effect`. */
-  watch(): () => void {
+  /**
+   * Watch the browser's worker. `pageVersion` comes from the caller because `$app/environment` is
+   * a SvelteKit module and this one stays importable without it. Returns the teardown — fits
+   * straight into an `$effect`.
+   */
+  watch(pageVersion: string): () => void {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return () => {};
 
-    const env: UpdateEnv = { reload: () => location.reload(), now: () => Date.now() };
+    const env: UpdateEnv = {
+      reload: () => location.reload(),
+      now: () => Date.now(),
+      pageVersion,
+      askVersion: (worker) =>
+        new Promise((resolve) => {
+          const channel = new MessageChannel();
+          const timer = setTimeout(() => {
+            channel.port1.close();
+            resolve(null);
+          }, VERSION_TIMEOUT);
+          channel.port1.onmessage = (event) => {
+            clearTimeout(timer);
+            channel.port1.close();
+            const built = (event.data as { version?: unknown } | null)?.version;
+            resolve(typeof built === 'string' ? built : null);
+          };
+          worker.postMessage({ type: GET_VERSION }, [channel.port2]);
+        }),
+    };
     const onVisible = () => {
       if (document.visibilityState === 'visible') this.refresh();
     };

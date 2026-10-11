@@ -98,6 +98,9 @@ let reg: FakeRegistration;
 let container: FakeContainer;
 let reloads: number;
 let clock: number;
+/** What the waiting worker names as its build; `null` is a worker that never answers. */
+let workerVersion: string | null;
+const PAGE_VERSION = 'page-build';
 
 /** A fresh bus per case — the reload latch fires once and is never reset. */
 beforeEach(() => {
@@ -107,6 +110,7 @@ beforeEach(() => {
   container = new FakeContainer();
   reloads = 0;
   clock = 1_000_000;
+  workerVersion = 'next-build';
 });
 
 afterEach(() => {
@@ -119,10 +123,17 @@ const attach = () =>
       reloads += 1;
     },
     now: () => clock,
+    pageVersion: PAGE_VERSION,
+    askVersion: () => Promise.resolve(workerVersion),
   });
 
+/** The build question is answered asynchronously; let its promise chain run out. */
+const settle = async () => {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
+
 describe('noticing a new version', () => {
-  it('sees a worker that was already waiting before the page loaded', () => {
+  it('sees a worker that was already waiting before the page loaded', async () => {
     // THE NORMAL CASE, and the only one that already happens in production today: an earlier reload
     // installed the new worker and it has been waiting ever since. No event fires for a state that
     // already holds, so this is the case a purely event-driven version gets wrong.
@@ -130,11 +141,12 @@ describe('noticing a new version', () => {
     reg.waiting.state = 'installed';
 
     attach();
+    await settle();
 
     expect(bus.ready).toBe(true);
   });
 
-  it('sees an installation that was already running when it attached', () => {
+  it('sees an installation that was already running when it attached', async () => {
     // SvelteKit's own `register()` starts a check on load, which can run before this attach — then
     // `updatefound` is missed and only `installing` is left to see it.
     const worker = new FakeWorker();
@@ -142,11 +154,12 @@ describe('noticing a new version', () => {
 
     attach();
     worker.become('installed');
+    await settle();
 
     expect(bus.ready).toBe(true);
   });
 
-  it('sees a version found later in the session', () => {
+  it('sees a version found later in the session', async () => {
     attach();
 
     const worker = new FakeWorker();
@@ -154,10 +167,11 @@ describe('noticing a new version', () => {
     expect(bus.ready).toBe(false); // it only just STARTED installing
 
     worker.become('installed');
+    await settle();
     expect(bus.ready).toBe(true);
   });
 
-  it('says nothing on the very first visit', () => {
+  it('says nothing on the very first visit', async () => {
     // Without a controller this page is not served by a worker at all: the files it runs ARE the
     // ones just cached, and a restart would change nothing.
     container.controller = null;
@@ -166,15 +180,17 @@ describe('noticing a new version', () => {
 
     attach();
     worker.become('installed');
+    await settle();
 
     expect(bus.ready).toBe(false);
   });
 
-  it('takes the offer back when the installation dies halfway', () => {
+  it('takes the offer back when the installation dies halfway', async () => {
     const worker = new FakeWorker();
     reg.installing = worker;
     attach();
     worker.become('installed');
+    await settle();
     expect(bus.ready).toBe(true);
 
     // `addAll` cut off mid-download. The button would otherwise point at a worker that never comes.
@@ -182,6 +198,71 @@ describe('noticing a new version', () => {
 
     expect(bus.ready).toBe(false);
     expect(worker.watchers).toBe(0);
+  });
+});
+
+describe('a version already on screen', () => {
+  // The document goes network-first: a tab opened after a deployment runs the new build while the
+  // old worker still controls it and the new one waits. That is not news.
+
+  it('says nothing and lets the worker take over quietly when the builds match', async () => {
+    workerVersion = PAGE_VERSION;
+    const worker = new FakeWorker();
+    worker.state = 'installed';
+    reg.waiting = worker;
+
+    attach();
+    await settle();
+
+    expect(bus.ready).toBe(false);
+    expect(worker.posted).toEqual([{ type: 'SKIP_WAITING' }]);
+
+    // The takeover reports back like any other — it must neither reload nor read as another window.
+    container.change();
+    expect(reloads).toBe(0);
+    expect(bus.switched).toBe(false);
+  });
+
+  it('asks each worker only once, however many triggers report it', async () => {
+    workerVersion = PAGE_VERSION;
+    const worker = new FakeWorker();
+    worker.state = 'installed';
+    reg.waiting = worker;
+
+    attach();
+    bus.refresh(true);
+    bus.refresh(true);
+    await settle();
+
+    expect(worker.posted).toEqual([{ type: 'SKIP_WAITING' }]);
+  });
+
+  it('offers the restart when the worker does not answer', async () => {
+    // A worker from before the build question existed: the safe side is the notice.
+    workerVersion = null;
+    reg.waiting = new FakeWorker();
+    reg.waiting.state = 'installed';
+
+    attach();
+    await settle();
+
+    expect(bus.ready).toBe(true);
+    expect(reg.waiting.posted).toEqual([]);
+  });
+
+  it('a later window switch is still reported after a quiet takeover', async () => {
+    workerVersion = PAGE_VERSION;
+    const worker = new FakeWorker();
+    worker.state = 'installed';
+    reg.waiting = worker;
+    attach();
+    await settle();
+    container.change();
+
+    // The next deployment, taken over by another window.
+    container.change();
+    expect(bus.switched).toBe(true);
+    expect(reloads).toBe(0);
   });
 });
 
@@ -219,11 +300,12 @@ describe('handing over', () => {
     expect(reloads).toBe(1);
   });
 
-  it('does not reload when another window switches', () => {
+  it('does not reload when another window switches', async () => {
     const worker = new FakeWorker();
     worker.state = 'installed';
     reg.waiting = worker;
     attach();
+    await settle();
     expect(bus.ready).toBe(true);
 
     // `skipWaiting()` in the other window claims THIS client too. The session keeps running, but on
@@ -258,7 +340,7 @@ describe('looking for a new version', () => {
     expect(reg.updates).toBe(2);
   });
 
-  it('finds a waiting worker even without a single event', () => {
+  it('finds a waiting worker even without a single event', async () => {
     attach();
 
     // Events are accelerators, not the mechanism: miss all of them and the next look still finds
@@ -266,6 +348,7 @@ describe('looking for a new version', () => {
     reg.waiting = new FakeWorker();
     reg.waiting.state = 'installed';
     bus.refresh();
+    await settle();
 
     expect(bus.ready).toBe(true);
   });
