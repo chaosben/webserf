@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   ENTITY_NAME_TABLES,
   UNNAMED_SERF_TYPES,
+  buildingName,
   goodName,
   serfName,
 } from './entity-names.js';
@@ -98,6 +99,23 @@ const DE_RANKS_LEGEND = [
   'Hauptmann',
 ];
 
+/** German building legend, row by row as printed (six rows of four). */
+const DE_BUILDINGS_LEGEND = [
+  'Wachhütte', 'Wachturm', 'Wachburg', 'Forsthütte', 'Holzfällerhütte', 'Sägewerk',
+  'Steinbruch', 'Farm', 'Schweinehof', 'Fischerhütte', 'Mühle', 'Bäckerei',
+  'Schlachthof', 'Goldmine', 'Kohlemine', 'Eisenmine', 'Granitmine', 'Goldschmelzhaus',
+  'Eisenschmelze', 'Schmied', 'Schlosser', 'Bootswerft', 'Lager', 'Schloß',
+];
+
+/** English "Reference Material: Buildings", read column-wise. */
+const EN_BUILDINGS_LEGEND = [
+  'Bakery', "Blacksmith's Shop", 'Butcher Shop', 'Castle', 'Coal Mine', 'Farm (Wheat)',
+  "Fisherman's Hut", "Forest Ranger's Hut", 'Garrison', 'Gold Foundry', 'Gold Mine',
+  'Granite Mine', 'Guard Hut', 'Guard Tower', 'Iron Foundry', 'Iron Mine', "Lumberjack's Hut",
+  'Pig Farm', "Quarryman's Hut", 'Sawmill', "Ship Maker's Shop", "Tool Maker's Shop", 'Warehouse',
+  'Windmill',
+];
+
 /** Serf type 21 is in neither legend — the manuals only call them "unemployed" in running text. */
 const SETTLER_TYPE = 21;
 const KNIGHT_TYPES = [22, 23, 24, 25, 26];
@@ -110,7 +128,7 @@ describe('entity names', () => {
    * the affected type would simply carry a neighbour's name, in one language only.
    */
   it('fills both languages for exactly the same indices', () => {
-    for (const group of ['goods', 'serfs'] as const) {
+    for (const group of ['goods', 'serfs', 'buildings'] as const) {
       const table = ENTITY_NAME_TABLES[group];
       const filled = (list: readonly (string | undefined)[]): number[] =>
         list.map((v, i) => (v === undefined ? -1 : i)).filter((i) => i >= 0);
@@ -135,7 +153,7 @@ describe('entity names', () => {
   });
 
   it('uses no name twice', () => {
-    for (const group of ['goods', 'serfs'] as const) {
+    for (const group of ['goods', 'serfs', 'buildings'] as const) {
       for (const lang of SHELL_LANGUAGES) {
         const names = ENTITY_NAME_TABLES[group][lang].filter((v) => v !== undefined);
         expect(new Set(names).size).toBe(names.length);
@@ -211,5 +229,20 @@ describe('entity names', () => {
   it('falls back visibly for an unknown index', () => {
     expect(goodName(99)).toBe('#99');
     expect(serfName(4)).toBe('#4');
+  });
+  it('carries exactly both building legends, on types 1..24', () => {
+    const { de, en } = ENTITY_NAME_TABLES.buildings;
+    expect(de[0]).toBeUndefined();
+    expect([...de.slice(1)].sort()).toEqual([...DE_BUILDINGS_LEGEND].sort());
+    expect([...en.slice(1)].sort()).toEqual([...EN_BUILDINGS_LEGEND].sort());
+    expect(EN_BUILDINGS_LEGEND).toEqual([...EN_BUILDINGS_LEGEND].sort());
+    expect(de.length).toBe(25);
+  });
+
+  it('names the buildings in the shell language', () => {
+    setShellLanguage('de');
+    expect(buildingName(22)).toBe('Wachburg');
+    setShellLanguage('en');
+    expect(buildingName(22)).toBe('Garrison');
   });
 });

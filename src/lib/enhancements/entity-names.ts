@@ -1,5 +1,5 @@
 /**
- * Names of goods and professions, as the ORIGINAL calls them.
+ * Names of goods, professions and buildings, as the ORIGINAL calls them.
  *
  * These names exist nowhere in the game itself: on screen those things are always PICTURES, never
  * text, which is why the program files carry no such strings either. The one place the original
@@ -156,11 +156,78 @@ const SERF_NAMES: NameTable = {
   ]
 };
 
+/**
+ * Buildings, indexed by building type (0 = none). Both manuals have a picture legend of the
+ * buildings as well — the German one in six rows of four, the English one ("Reference Material:
+ * Buildings") alphabetical — and both are used verbatim, short forms included (`Lager`, `Schmied`,
+ * `Schlosser`: the German legend names the building after its trade).
+ *
+ * The order is the internal type order of `BUILDING_TYPE_NAMES`. Unlike goods and professions,
+ * neither legend runs in that order, so the pairing type → caption follows the meaning of the name;
+ * what the tests can pin is that each table holds exactly the 24 captions of its legend.
+ */
+const BUILDING_NAMES: NameTable = {
+  de: [
+    undefined,
+    'Fischerhütte',
+    'Holzfällerhütte',
+    'Bootswerft',
+    'Steinbruch',
+    'Granitmine',
+    'Kohlemine',
+    'Eisenmine',
+    'Goldmine',
+    'Forsthütte',
+    'Lager',
+    'Wachhütte',
+    'Farm',
+    'Schlachthof',
+    'Schweinehof',
+    'Mühle',
+    'Bäckerei',
+    'Sägewerk',
+    'Eisenschmelze',
+    'Schlosser',
+    'Schmied',
+    'Wachturm',
+    'Wachburg',
+    'Goldschmelzhaus',
+    'Schloß'
+  ],
+  en: [
+    undefined,
+    "Fisherman's Hut",
+    "Lumberjack's Hut",
+    "Ship Maker's Shop",
+    "Quarryman's Hut",
+    'Granite Mine',
+    'Coal Mine',
+    'Iron Mine',
+    'Gold Mine',
+    "Forest Ranger's Hut",
+    'Warehouse',
+    'Guard Hut',
+    'Farm (Wheat)',
+    'Butcher Shop',
+    'Pig Farm',
+    'Windmill',
+    'Bakery',
+    'Sawmill',
+    'Iron Foundry',
+    "Tool Maker's Shop",
+    "Blacksmith's Shop",
+    'Guard Tower',
+    'Garrison',
+    'Gold Foundry',
+    'Castle'
+  ]
+};
+
 /** The serf types the legend names — the two gaps above, spelled out for the tests. */
 export const UNNAMED_SERF_TYPES: readonly number[] = [4, 27];
 
 /** Both tables, for tests. Production code goes through the two functions. */
-export const ENTITY_NAME_TABLES = { goods: GOOD_NAMES, serfs: SERF_NAMES } as const;
+export const ENTITY_NAME_TABLES = { goods: GOOD_NAMES, serfs: SERF_NAMES, buildings: BUILDING_NAMES } as const;
 
 function pick(table: NameTable, index: number): string {
   return table[shellLanguage()][index] ?? table.en[index] ?? `#${index}`;
@@ -174,4 +241,9 @@ export function goodName(resourceType: number): string {
 /** Display name of a serf type, in the shell's language. */
 export function serfName(serfType: number): string {
   return pick(SERF_NAMES, serfType);
+}
+
+/** Display name of a building type, in the shell's language. */
+export function buildingName(buildingType: number): string {
+  return pick(BUILDING_NAMES, buildingType);
 }

@@ -16,7 +16,7 @@
 	import DrawerRail from '$lib/shell/DrawerRail.svelte';
 	import { blockPageZoom } from '$lib/shell/page-zoom.js';
 	import { followVisualViewport, visualViewportEnv } from '$lib/shell/visual-viewport.js';
-	import type { DrawerGroup, DrawerMark, OverlayTab } from '$lib/shell/drawer.js';
+	import type { DrawerMark, OverlayTab } from '$lib/shell/drawer.js';
 	import OverlayPanel from '$lib/shell/OverlayPanel.svelte';
 	import SettingsPanel from '$lib/shell/SettingsPanel.svelte';
 	import BugReportPanel from '$lib/shell/BugReportPanel.svelte';
@@ -27,12 +27,11 @@
 	import EnhancementNav from '$lib/enhancements/EnhancementNav.svelte';
 	import { ENHANCEMENTS, enhancementFor, enhancementTabFor } from '$lib/enhancements/registry.js';
 	import { provideIconSource } from '$lib/enhancements/icon-images.svelte.js';
-	import IconSettings from '~icons/material-symbols-light/settings-outline';
-	import IconTransfer from '~icons/material-symbols-light/swap-vert';
-	import IconBug from '~icons/material-symbols-light/bug-report-outline';
-	import IconRecord from '~icons/material-symbols-light/videocam-outline';
-	import IconEnhance from '~icons/material-symbols-light/extension-outline';
-	import IconInfo from '~icons/material-symbols-light/info-outline';
+	import HelpPanel from '$lib/shell/HelpPanel.svelte';
+	import { drawerGroups } from '$lib/shell/groups.js';
+	import { HELP_TABS, helpSectionForShot } from '$lib/shell/help-content.js';
+	import { helpShotForScreen } from '$lib/shell/help-shots.js';
+	import { helpContext } from '$lib/shell/help-context.svelte.js';
 	import { recordings } from '$lib/shell/recording.svelte.js';
 	import { updates } from '$lib/shell/update.svelte.js';
 	import { toasts } from '$lib/shell/toasts.svelte.js';
@@ -57,15 +56,6 @@
 	import { snapshot } from '$lib/core/engine/state.js';
 	import { MAP_GEN_BAR, type CampaignProgress, type MainMenuState } from '$lib/core/main-menu.js';
 	import type { Palette, SaveGameState } from '$lib/core/types.js';
-
-	const GROUPS: readonly DrawerGroup[] = [
-		{ id: 'settings', icon: IconSettings, labelKey: 'group.settings' },
-		{ id: 'io', icon: IconTransfer, labelKey: 'group.io' },
-		{ id: 'bug', icon: IconBug, labelKey: 'group.bug' },
-		{ id: 'record', icon: IconRecord, labelKey: 'group.record' },
-		{ id: 'enhance', icon: IconEnhance, labelKey: 'group.enhance' },
-		{ id: 'info', icon: IconInfo, labelKey: 'group.info' }
-	];
 
 	/**
 	 * The tabs of the import/export screen. The two halves are tabs and not one list below each other
@@ -197,6 +187,15 @@
 	let enhanceId = $state<string>(ENHANCEMENTS[0]!.id);
 	let enhanceTab = $state<string>(ENHANCEMENTS[0]!.tabs[0]!.id);
 	const enhancement = $derived(enhancementFor(enhanceId));
+	/** Session state like the tabs above: where the help was left is not worth persisting. */
+	let helpTab = $state<string>(HELP_TABS[0]!.id);
+	/**
+	 * The page of the dialog that was open in the game when the help opened. Taken once on opening
+	 * and not followed afterwards: the help would otherwise jump while you read it.
+	 */
+	let helpFocus = $state<{ tab: string; section: string; shot: string } | null>(null);
+	/** The help exists only with an archive — it is made of the original's pictures. */
+	const groups = $derived(drawerGroups(archive !== null));
 
 	const palette = $derived(palettes[GAME_PALETTE_INDEX] ?? null);
 	/**
@@ -227,10 +226,26 @@
 	 * Which drawer group is open (`null` = collapsed). Deliberately NOT persisted: a panel is what
 	 * you are looking at, not how the program should behave, and a reload is where you want the game
 	 * and not the screen you last read. Being session state also drops the guard the persisted id
-	 * needed — a stored group can vanish between two versions, a variable holding one of `GROUPS`
+	 * needed — a stored group can vanish between two versions, a variable holding one of the rail groups (`shell/groups.ts`)
 	 * cannot.
 	 */
 	let activeGroup = $state<string | null>(null);
+
+	function selectGroup(id: string | null): void {
+		if (id === 'help') {
+			const screen = helpContext.openScreen;
+			const shot = screen === null ? null : helpShotForScreen(screen);
+			const where = shot === null ? null : helpSectionForShot(shot.id);
+			helpFocus = shot === null || where === null ? null : { ...where, shot: shot.id };
+			if (helpFocus !== null) helpTab = helpFocus.tab;
+		}
+		activeGroup = id;
+	}
+
+	/** Removing the archive takes the help off the rail; an open help panel goes with it. */
+	$effect(() => {
+		if (archive === null && activeGroup === 'help') activeGroup = null;
+	});
 
 	function apply(loaded: PaArchive, name: string): void {
 		archive = loaded;
@@ -598,10 +613,10 @@
 
 <div class="shell" bind:this={shellEl}>
 	<DrawerRail
-		groups={GROUPS}
+		{groups}
 		active={activeGroup}
 		{marks}
-		onselect={(id) => (activeGroup = id)}
+		onselect={selectGroup}
 	/>
 
 	<div class="stage">
@@ -732,6 +747,23 @@
 					/>
 				{/snippet}
 				<EnhancementsPanel {enhancement} tab={enhanceTab} />
+			</OverlayPanel>
+		{:else if activeGroup === 'help' && archive !== null && palette !== null}
+			<OverlayPanel
+				title={st('group.help')}
+				scroll
+				tabs={HELP_TABS}
+				tab={helpTab}
+				ontab={(id) => (helpTab = id)}
+				onclose={() => (activeGroup = null)}
+			>
+				<HelpPanel
+					tab={helpTab}
+					ontab={(id) => (helpTab = id)}
+					{archive}
+					{palette}
+					focus={helpFocus}
+				/>
 			</OverlayPanel>
 		{:else if activeGroup === 'info'}
 			<OverlayPanel title={st('group.info')} onclose={() => (activeGroup = null)}>

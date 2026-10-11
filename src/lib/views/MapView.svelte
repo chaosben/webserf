@@ -91,6 +91,7 @@
   } from './debug-export.js';
   import { bugReports } from '../shell/bug-report.svelte.js';
   import { simulation } from '../shell/simulation.svelte.js';
+  import { helpContext } from '../shell/help-context.svelte.js';
   import { log } from '../shell/log.js';
   import { buttonTransition } from './button-ledger.js';
   import { st } from '../shell/i18n.js';
@@ -2513,6 +2514,36 @@
    * with "no popup open" — hence derived rather than kept as a second state that could drift apart.
    */
   const mapAcceptsClicks = $derived(openPopupSlot === null);
+
+  /**
+   * The original screen number of the open popup (`vp[0x70]`), for the help: it opens on the page
+   * that explains this dialog. The mission end has no page there.
+   */
+  const openScreenNumber = $derived.by((): number | null => {
+    switch (openPopupSlot) {
+      case 'buildMenu':
+        return buildMenuScreen;
+      case 'menu':
+        return menuScreen;
+      case 'object':
+        return objectScreen;
+      case 'message':
+        return 0x33;
+      case 'preview':
+        return 1;
+      case 'soil':
+        return 0x16;
+      default:
+        return null;
+    }
+  });
+
+  $effect(() => {
+    helpContext.openScreen = openScreenNumber;
+    return () => {
+      helpContext.openScreen = null;
+    };
+  });
 
   /**
    * What the playing field announces itself as. With the popups drawn into the canvas there is no

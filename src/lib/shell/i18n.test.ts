@@ -109,7 +109,9 @@ describe('tables', () => {
 		'enh.place.corner',
 		'record.videoTitle',
 		'enh.hacks.name', // loan word — "Hacks" is what they are called in German too
-		'enh.hacks.tab.list'
+		'enh.hacks.tab.list',
+		'help.start.tips.title', // "Tips" — the German manual's own heading (S. 51)
+		'help.table.touch' // loan word
 	];
 
 	it('really differ — otherwise one side was copied', () => {

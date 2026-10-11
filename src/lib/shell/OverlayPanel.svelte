@@ -15,6 +15,10 @@
 	 * A `nav` SNIPPET is optional too: a column to the left of tab bar and body, for a panel whose
 	 * content has a level above its tabs. Without it nothing about the panel changes, which is why
 	 * the other callers stay untouched.
+	 *
+	 * `scroll` keeps the panel inside the window and scrolls only its BODY — for long content whose
+	 * head (a search field, a table of contents) has to stay in view. Without it the whole overlay
+	 * scrolls, as it always did.
 	 */
 	import type { Snippet } from 'svelte';
 	import type { OverlayTab } from './drawer.js';
@@ -27,6 +31,7 @@
 		tab,
 		ontab,
 		nav,
+		scroll = false,
 		children
 	}: {
 		title: string;
@@ -38,6 +43,8 @@
 		ontab?: (id: string) => void;
 		/** Optional column to the left of tab bar and body. */
 		nav?: Snippet;
+		/** Fit the panel into the window and scroll inside the body instead of the overlay. */
+		scroll?: boolean;
 		children: Snippet;
 	} = $props();
 
@@ -81,7 +88,7 @@
 	}}
 />
 
-<div class="overlay">
+<div class="overlay" class:fit={scroll}>
 	<div class="panel" class:wide={nav !== undefined}>
 		<header>
 			<h2>{title}</h2>
@@ -178,8 +185,10 @@
 		line-height: 1;
 	}
 
+	/* Wraps instead of overflowing: with many or long labels the bar would otherwise be wider than the panel. */
 	.tabs {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 1px;
 		padding: 0 0.5rem;
 		background: var(--bg-sunken);
@@ -207,6 +216,44 @@
 		padding: 0.75rem;
 		display: grid;
 		gap: 0.75rem;
+	}
+
+	/*
+	 * `scroll`: the overlay no longer scrolls, the panel is capped at its height, and the body is the
+	 * one scroll container. `minmax(0, 1fr)` is what lets the cap reach the body — an `auto` row
+	 * would grow with the content.
+	 */
+	.overlay.fit {
+		overflow: hidden;
+		grid-template-rows: minmax(0, 1fr);
+	}
+
+	.overlay.fit .panel {
+		max-height: 100%;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	.overlay.fit .main {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.overlay.fit .stack {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.overlay.fit .body {
+		overflow: auto;
+		flex: 1;
+		min-height: 0;
+		overscroll-behavior: contain;
 	}
 
 	/* A panel with a navigation column needs room for two of them. */
