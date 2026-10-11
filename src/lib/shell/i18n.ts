@@ -349,7 +349,7 @@ const EN = {
 
 export type ShellKey = keyof typeof EN;
 
-/** German. Formal address ("Sie"), matching the original manual and the strings in the binary. */
+/** German. Informal address ("du"), the same easy tone as the English table. */
 const DE: Record<ShellKey, string> = {
 	'rail.aria': 'Werkzeuggruppen',
 	'group.settings': 'Einstellungen',
@@ -365,17 +365,17 @@ const DE: Record<ShellKey, string> = {
 	'rail.folder': 'Ordner braucht Erlaubnis',
 
 	'drop.aria': 'Archiv-Datei hier ablegen',
-	'drop.lead': 'Legen Sie Ihr Spiel-Archiv hier ab — oder wählen Sie eine Datei.',
+	'drop.lead': 'Leg dein Spiel-Archiv hier ab — oder wähl eine Datei aus.',
 	'drop.reading': 'Archiv wird gelesen…',
 	'drop.choose': 'Archiv auswählen',
 	'drop.what':
-		'„Die Siedler“ von 1993 — im Browser. Dieselben Regeln, dieselbe Grafik, direkt aus den Dateien des Originals gelesen. Ihr Archiv und Ihre Spielstände bleiben dabei bei Ihnen, hochgeladen wird nichts.',
+		'„Die Siedler“ von 1993 — im Browser. Dieselben Regeln, dieselbe Grafik, direkt aus den Dateien des Originals gelesen. Dein Archiv und deine Spielstände bleiben dabei bei dir, hochgeladen wird nichts.',
 	'drop.need':
-		'Es fehlt nur noch das Grafik-Archiv aus Ihrer eigenen Kopie — eine einzelne Datei aus einer Installation von 1993. Wir würden sie ja gern mitbringen, aber die Grafiken gehören ihrem Verlag, und Verlage verstehen da bekanntlich wenig Spaß.',
+		'Es fehlt nur noch das Grafik-Archiv aus deiner eigenen Kopie — eine einzelne Datei aus einer Installation von 1993. Wir würden sie ja gern mitbringen, aber die Grafiken gehören ihrem Verlag, und Verlage verstehen da bekanntlich wenig Spaß.',
 	'drop.buy': 'Noch zu kaufen:',
 	'drop.buyLink': 'Die Siedler History Edition (Ubisoft)',
 	'link.store': 'https://www.ubisoft.com/de-de/games/the-settlers-history-edition',
-	'drop.search': 'Stöbern Sie in der alten Installation — oder lassen Sie eine Suchmaschine stöbern:',
+	'drop.search': 'Stöber in der alten Installation — oder lass eine Suchmaschine stöbern:',
 	'drop.searchLink': 'nach „{terms}“ suchen',
 	'assets.badType': 'Unerwarteter Dateityp: {file} — erwartet wird eine .PA-Datei.',
 	'assets.unreadable': 'Archiv ist nicht lesbar: {why}',
@@ -386,7 +386,7 @@ const DE: Record<ShellKey, string> = {
 
 	'folder.title': 'Spielstand-Ordner',
 	'folder.what':
-		'Ein Ordner hält eine zweite Kopie als echte Dateien ARCHIV.DS / SAVE0..9.DS, im Gleichschritt mit diesem Browser — kopieren Sie sie in ein DOSBox-Verzeichnis, und das Original lädt sie.',
+		'Ein Ordner hält eine zweite Kopie als echte Dateien ARCHIV.DS / SAVE0..9.DS, im Gleichschritt mit diesem Browser — kopier sie in ein DOSBox-Verzeichnis, und das Original lädt sie.',
 	'folder.unsupported':
 		'Dieser Browser hat keinen Ordner-Zugriff, die Spielstände liegen also nur hier — zum Umziehen dienen die Knöpfe oben.',
 	'folder.attached': 'Verknüpft:',
@@ -415,7 +415,7 @@ const DE: Record<ShellKey, string> = {
 	'saves.downloadAll': 'Alle herunterladen ({count})',
 	'saves.importPackage': 'Paket einlesen…',
 	'saves.footnote':
-		'Eine einzelne SAVEn.DS ist die Datei, die das Original liest — in ein DOSBox-Verzeichnis kopieren und dort laden. Ihr Name steht nicht in der Datei, sondern in ARCHIV.DS; ein eingelesener Stand wird deshalb nach seinem Dateinamen benannt. Das Paket nimmt die Namen mit.',
+		'Eine einzelne SAVEn.DS ist die Datei, die das Original liest — in ein DOSBox-Verzeichnis kopieren und dort laden. Der Name des Stands steht nicht in der Datei, sondern in ARCHIV.DS; ein eingelesener Stand wird deshalb nach seinem Dateinamen benannt. Das Paket nimmt die Namen mit.',
 	'saves.deleteLocal': 'Löschen betrifft nur diesen Browser.',
 	'saves.deleteBoth': 'Löschen entfernt die Datei auch aus {folder}.',
 	'saves.downloaded': '{file} heruntergeladen ({bytes} Bytes).',
@@ -449,33 +449,33 @@ const DE: Record<ShellKey, string> = {
 		'Gilt für diese Shell — die Leiste und diese Fenster. Die Spielfläche behält ihre eigene Größe: sie folgt der Kontrollleiste, wie im Original. Die Seite selbst zoomt nicht, weil ein Pinch über der Karte „Karte zoomen“ bedeutet.',
 	'set.rest': 'Alles andere',
 	'set.restNote':
-		'Klang, Musik und die Bedien-Optionen liegen auf dem Original-Bildschirm „EXTRA OPTION“ — erreichbar aus dem Hauptmenü und aus dem Spiel; dieser Browser merkt sich, was Sie dort einstellen.',
+		'Klang, Musik und die Bedien-Optionen liegen auf dem Original-Bildschirm „EXTRA OPTION“ — erreichbar aus dem Hauptmenü und aus dem Spiel; dieser Browser merkt sich, was du dort einstellst.',
 	'set.reset': 'Auf Vorgabewerte zurücksetzen',
 
 	'bug.building': 'Wird gebaut…',
 	'bug.build': 'Bericht erzeugen und Issue öffnen',
 	'bug.filed':
-		'Der Bericht liegt in Ihrem Download-Ordner, das Issue hat sich in einem neuen Tab geöffnet. Ziehen Sie die Datei dort hinein, bevor Sie abschicken — das Kästchen im Issue erinnert daran.',
+		'Der Bericht liegt in deinem Download-Ordner, das Issue hat sich in einem neuen Tab geöffnet. Zieh die Datei dort hinein, bevor du abschickst — das Kästchen im Issue erinnert dich daran.',
 	'bug.where': 'Berichte werden zu Issues in',
 	'bug.intro':
-		'Ein Bericht enthält den Spielzustand, die aufgezeichneten Aktionen, ein Bild und eine Zusammenfassung. Solange dieses Fenster offen ist, steht die Simulation — der Bericht beschreibt also, was Sie gesehen haben.',
+		'Ein Bericht enthält den Spielzustand, die aufgezeichneten Aktionen, ein Bild und eine Zusammenfassung. Solange dieses Fenster offen ist, steht die Simulation — der Bericht beschreibt also, was du gesehen hast.',
 	'bug.what': 'Was ist schiefgegangen?',
 	'bug.placeholder': 'z. B. Träger liefern immer weiter Steine zu einer fertigen Hütte',
-	'bug.needGame': 'Starten Sie erst ein Spiel — ein Bericht braucht eine laufende Partie.',
+	'bug.needGame': 'Starte erst ein Spiel — ein Bericht braucht eine laufende Partie.',
 
 	'info.about.title': 'Was das hier ist',
 	'info.about.what':
-		'webserf holt „Die Siedler“ (Blue Byte, 1993) in den Browser: Die Regeln stammen aus dem Original-Programm, die Grafik aus Ihrer eigenen Kopie des Spiels.',
+		'webserf holt „Die Siedler“ (Blue Byte, 1993) in den Browser: Die Regeln stammen aus dem Original-Programm, die Grafik aus deiner eigenen Kopie des Spiels.',
 	'info.about.assets':
-		'Vom Original ist hier nichts dabei. Ihr geladenes Archiv bleibt in Ihrem Browser, Ihre Spielstände auch — hochgeladen wird nichts.',
+		'Vom Original ist hier nichts dabei. Dein geladenes Archiv bleibt in deinem Browser, deine Spielstände auch — hochgeladen wird nichts.',
 	'info.source.title': 'Quelltext',
 	'info.source.note':
 		'Offener Quelltext, und über Issues und Pull Requests freuen wir uns jederzeit. Fehlerberichte aus dem Bildschirm „Fehler melden“ landen an derselben Stelle.',
 	'update.title': 'Neue Version',
 	'update.ready':
-		'Eine neuere Fassung ist geladen und liegt bereit. Sie wird nach einem Neustart wirksam — der beendet eine laufende Partie, weil der Spielstand nicht selbsttätig gesichert wird.',
+		'Eine neuere Fassung ist geladen und liegt bereit. Wirksam wird sie nach einem Neustart — der beendet eine laufende Partie, weil der Spielstand nicht selbsttätig gesichert wird.',
 	'update.switched':
-		'Ein anderes Fenster ist schon auf eine neuere Fassung umgeschaltet. Diese hier läuft noch auf den alten Dateien; Teile davon können ausfallen, vor allem der Klang. Starten Sie neu, wenn es passt.',
+		'Ein anderes Fenster ist schon auf eine neuere Fassung umgeschaltet. Diese hier läuft noch auf den alten Dateien; Teile davon können ausfallen, vor allem der Klang. Starte neu, wenn es dir passt.',
 	'update.apply': 'Jetzt neu starten',
 	'toast.update': 'Eine neue Version liegt bereit — mehr unter „Über webserf“.',
 	'toast.dismiss': 'Ausblenden',
@@ -500,13 +500,13 @@ const DE: Record<ShellKey, string> = {
 	'enh.pick.all': 'Alle',
 	'enh.pick.none': 'Keine',
 	'enh.pick.count': '{on} von {all} ausgewählt',
-	'enh.pick.noIcons': 'Laden Sie ein Archiv, um die Bilder zu sehen.',
+	'enh.pick.noIcons': 'Lade ein Archiv, um die Bilder zu sehen.',
 	'enh.stock.hideUnusedNote':
 		'Zeilen, die gerade nichts sagen, bleiben weg. Ist alles ausgeblendet, bleibt die Platte leer ' +
 		'und verschwindet.',
 	'enh.stock.goods.title': 'Welche Waren',
 	'enh.stock.goods.note':
-		'Gezählt über alle Ihre Lager, dazu die Bau-Reserve, die das Schloss bei der Gründung ' +
+		'Gezählt über alle deine Lager, dazu die Bau-Reserve, die das Schloss bei der Gründung ' +
 		'zurücklegt — dieselbe Summe, die auch die Lager-Statistik zeigt.',
 	'enh.stock.goods.hideUnused': 'Waren ohne Bestand ausblenden',
 	'enh.stock.serfs.title': 'Welche Siedler',
@@ -525,7 +525,7 @@ const DE: Record<ShellKey, string> = {
 		'heißt, er kommt nicht nach.',
 	'enh.stock.supply.hideUnused': 'Zeiger ohne Gebäude ausblenden',
 	'enh.stock.supply.hideUnusedNote':
-		'Ein Zeiger, dessen Gebäude Sie nicht haben, misst nichts.',
+		'Ein Zeiger, dessen Gebäude du nicht hast, misst nichts.',
 	'enh.stock.supply.food': 'Nahrung',
 	'enh.stock.supply.mineGold': 'Goldmine',
 	'enh.stock.supply.mineCoal': 'Kohlemine',
@@ -558,7 +558,7 @@ const DE: Record<ShellKey, string> = {
 	'enh.assist.tab.view': 'Darstellung',
 	'enh.assist.title': 'Anzeigen',
 	'enh.assist.note':
-		'Nutze sie über das Overlay. Sie bauen nur mit den Klicks, die auch ein Spieler machen würde.',
+		'Nutze sie über das Overlay. Sie bauen nur mit den Klicks, die du auch selbst machen würdest.',
 	'enh.assist.road': 'Wegebau-Assistent',
 	'enh.assist.road.note': 'Der schnellste Weg zwischen zwei deiner Fahnen, gebaut beim Klick auf das Ziel',
 	'enh.assist.road.plan': 'Wegebau',
