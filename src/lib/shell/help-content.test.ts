@@ -5,6 +5,8 @@ import {
   HELP_SECTIONS,
   HELP_TABS,
   helpImageEntry,
+  helpItemImages,
+  HELP_TOOLLESS_SERFS,
   helpSectionForShot,
   normalizeForSearch,
   searchHelp,
@@ -16,6 +18,8 @@ import { ALL_GROUPS, drawerGroups } from './groups.js';
 import { ENHANCEMENTS } from '../enhancements/registry.js';
 import { ENTITY_NAME_TABLES } from '../enhancements/entity-names.js';
 import { CONTROL_PANEL_BUTTON_ACTIONS } from '../core/ui-render.js';
+import { PROFESSION_TOOLS } from '../core/engine/serf-request.js';
+import { goodName, serfName } from '../enhancements/entity-names.js';
 import { SHELL_LANGUAGES, setShellLanguage, detectShellLanguage, st } from './i18n.js';
 
 /**
@@ -33,12 +37,16 @@ const allItems = () =>
   );
 
 const imagesIn = (tab: string): HelpImage[] =>
-  (HELP_SECTIONS[tab] ?? []).flatMap((s) => s.items.flatMap((i) => (i.kind === 'text' ? (i.images ?? []) : [])));
+  (HELP_SECTIONS[tab] ?? []).flatMap((s) => s.items.flatMap((i) => [...helpItemImages(i)]));
 
 const usedKeys = (): Set<string> =>
   new Set(
     allItems().flatMap(({ item }) =>
-      item.kind === 'text' ? [item.textKey] : [item.labelKey, item.mouseKey, item.touchKey],
+      item.kind === 'text'
+        ? [item.textKey]
+        : item.kind === 'control'
+          ? [item.labelKey, item.mouseKey, item.touchKey]
+          : [],
     ),
   );
 
@@ -203,6 +211,97 @@ describe('sample game', () => {
     const palette = { rgba: new Uint8Array(256 * 4) } as never;
     for (const shot of HELP_SHOTS) {
       expect(shot.render({ scene, draw: () => null, palette }), shot.id).not.toBeNull();
+    }
+  });
+});
+
+describe('tools of the professions', () => {
+  /**
+   * The manual's list (German edition p. 63–65, English "tools" list): the engine's request tables
+   * have to say the same, so this checks the engine as much as the help. Resources: shovel 15,
+   * hammer 16, rod 17, cleaver 18, scythe 19, axe 20, saw 21, pick 22, pincer 23, sword 24, shield 25.
+   */
+  const MANUAL: ReadonlyMap<number, readonly number[]> = new Map([
+    [2, [15]], // Planierer: Schaufel
+    [11, [17]], // Fischer: Angel
+    [13, [18]], // Fleischer: Fleischerbeil
+    [14, [19]], // Farmer: Sense
+    [5, [20]], // Holzfäller: Axt
+    [6, [21]], // Schreiner: Säge
+    [9, [22]], // Minenarbeiter: Pike
+    [7, [22]], // Steinbrucharbeiter: Pike
+    [3, [16]], // Bauarbeiter: Hammer
+    [17, [16]], // Bootsbauer: Hammer
+    [20, [16]], // Geologe: Hammer
+    [18, [16, 21]], // Schlosser: Hammer und Säge
+    [19, [16, 23]], // Schmied: Hammer und Zange
+    [22, [24, 25]], // Ritter: Schwert und Schild (p. 89)
+  ]);
+
+  it('the engine requests exactly the tools the manual names, each profession once', () => {
+    const fromEngine = new Map(PROFESSION_TOOLS.filter((r) => r.tools.length > 0).map((r) => [r.serfType, [...r.tools]]));
+    expect(fromEngine.size).toBe(PROFESSION_TOOLS.filter((r) => r.tools.length > 0).length);
+    expect(fromEngine).toEqual(new Map([...MANUAL].map(([k, v]) => [k, [...v]])));
+  });
+
+  it('lists every profession: with its tools, or among the ones that need none', () => {
+    const rows = allItems().flatMap(({ item }) => (item.kind === 'profession' ? [item] : []));
+    for (const req of PROFESSION_TOOLS) {
+      if (req.tools.length === 0) {
+        expect(HELP_TOOLLESS_SERFS, `serf ${req.serfType}`).toContain(req.serfType);
+        expect(rows.some((r) => r.serf === req.serfType), `serf ${req.serfType} has no row`).toBe(false);
+      } else {
+        expect(rows.filter((r) => r.serf === req.serfType).map((r) => r.tools), `serf ${req.serfType}`).toEqual([req.tools]);
+      }
+    }
+    for (const type of HELP_TOOLLESS_SERFS) {
+      expect(PROFESSION_TOOLS.find((r) => r.serfType === type)?.tools, `serf ${type}`).toEqual([]);
+    }
+  });
+
+  it('finds the pincer and the blacksmith in both languages', () => {
+    for (const lang of SHELL_LANGUAGES) {
+      setShellLanguage(lang);
+      for (const query of [goodName(23), serfName(19)]) {
+        expect(searchHelp(query).some((h) => h.section === 'professions'), `${lang}: ${query}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe('how the economy hangs together', () => {
+  // The words a player types when something puzzles them; each must lead to the section that explains it.
+  const QUERIES: Record<string, Record<string, string[]>> = {
+    de: {
+      transport: ['Fahnen Länge', 'Umwege'],
+      construction: ['Notprogramm'],
+      distribution: ['Balken null'],
+      knights: ['Ritter ausbilden', 'Anwerbe'],
+      combat: ['Mut Gold', 'Rang verdoppelt'],
+      military: ['Schichtwechsel'],
+      land: ['Grenze Wachburg'],
+      settlers: ['Nachwuchs'],
+    },
+    en: {
+      transport: ['flags length', 'detours'],
+      construction: ['emergency program'],
+      distribution: ['bar zero'],
+      knights: ['training knights', 'recruit'],
+      combat: ['morale gold', 'rank doubles'],
+      military: ['shift change'],
+      land: ['borders garrison'],
+      settlers: ['new arrivals'],
+    },
+  };
+
+  it('finds each topic in both languages', () => {
+    for (const lang of SHELL_LANGUAGES) {
+      setShellLanguage(lang);
+      for (const [section, queries] of Object.entries(QUERIES[lang] ?? {})) {
+        for (const query of queries) {
+          expect(searchHelp(query).some((h) => h.section === section), `${lang}: ${query}`).toBe(true);
+        }
+      }
     }
   });
 });

@@ -34,7 +34,7 @@
  */
 import type { GameState, Building, Player } from './state.js';
 import { posOf, neighbor, Direction } from './position.js';
-import { sendSerfToFlag, type WorkerRequest } from './serf-request.js';
+import { sendSerfToFlag, DIGGER_REQUEST, BUILDER_REQUEST } from './serf-request.js';
 import { demolishBuilding } from './buildings.js';
 
 /**
@@ -46,11 +46,6 @@ import { demolishBuilding } from './buildings.js';
 export const LARGE_CONSTRUCTION_TYPES: ReadonlySet<number> = new Set([
   10, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23,
 ]);
-
-/** Digger: serf type 2, tool shovel (`mov $0x2` @0x13aef, `vreg6 = 0x20` == (15+1)*2). */
-const DIGGER_REQUEST: WorkerRequest = { serfType: 2, tools: [15] };
-/** Builder: serf type 3, tool hammer (`mov $0x3` @0x13bc1, `vreg6 = 0x22` == (16+1)*2). */
-const BUILDER_REQUEST: WorkerRequest = { serfType: 3, tools: [16] };
 
 /** `messageFlags` bit 6 — the emergency programme is running (set/cleared in `player-hints.ts`). */
 const HINT_PENDING = 1 << 6;

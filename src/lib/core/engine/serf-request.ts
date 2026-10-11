@@ -124,6 +124,11 @@ WORKER_REQUEST[19] = { serfType: 18, tools: [16, 21] }; // toolmaker   -> toolma
 WORKER_REQUEST[20] = { serfType: 19, tools: [16, 23] }; // weaponsmith -> weaponsmith+ hammer + pincer
 WORKER_REQUEST[23] = { serfType: 10, tools: [] }; //   gold smelter-> smelter
 
+/** Digger: serf type 2, tool shovel (`mov $0x2` @0x13aef, `vreg6 = 0x20` == (15+1)*2). */
+export const DIGGER_REQUEST: WorkerRequest = { serfType: 2, tools: [15] };
+/** Builder: serf type 3, tool hammer (`mov $0x3` @0x13bc1, `vreg6 = 0x22` == (16+1)*2). */
+export const BUILDER_REQUEST: WorkerRequest = { serfType: 3, tools: [16] };
+
 /**
  * Rotation-gated phase A driver (a pure block processor). `tick.ts` calls it only at the frame boundary,
  * right after `updateFlags` and with the rotation already set. It processes the 32-building block
@@ -685,6 +690,20 @@ export function sendSerfToFlag(state: GameState, bld: Building, req: WorkerReque
 
 /** The geologist is the only serf the original requests to a **flag** (`vreg0 = 0x14`). */
 export const GEOLOGIST_REQUEST: WorkerRequest = { serfType: 20, tools: [16] }; // geologist + hammer
+
+/**
+ * Which tools turn a generic into which profession — every request the original issues, once per
+ * serf type, in the order the help lists them. Derived from the request tables above rather than
+ * written out, so the help cannot drift from the engine. Knights come from the recruitment in
+ * {@link requestKnightForBuilding}, which takes a sword and a shield (@0x126fa / @0x1270a).
+ */
+export const PROFESSION_TOOLS: readonly WorkerRequest[] = (() => {
+  const all: WorkerRequest[] = [DIGGER_REQUEST, BUILDER_REQUEST, GEOLOGIST_REQUEST];
+  for (const req of WORKER_REQUEST) if (req !== null) all.push(req);
+  all.push({ serfType: 22, tools: [RES_SWORD, RES_SHIELD] });
+  const seen = new Set<number>();
+  return all.filter((req) => !seen.has(req.serfType) && seen.add(req.serfType) !== undefined);
+})();
 
 /**
  * **Sending a geologist to a flag** — `FUN_00012370` -> `FUN_000123d9`, the entry with a **flag**. The

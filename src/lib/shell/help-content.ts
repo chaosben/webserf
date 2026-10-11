@@ -17,6 +17,7 @@ import { goodIcon, serfIcon } from '../enhancements/ui-icons.js';
 import { UI_ICON_BASE, UI_PANELBUTTON_BASE, CURSOR_MARKER_BASE } from '../core/ui-render.js';
 import { MAP_OBJECT_BASE } from '../core/map-render.js';
 import { MAP_BUILDING_SPRITE } from '../core/building-sprites.js';
+import { PROFESSION_TOOLS } from '../core/engine/serf-request.js';
 import type { HelpShotId } from './help-shots.js';
 
 export const HELP_TABS: readonly OverlayTab[] = [
@@ -51,6 +52,12 @@ export type HelpItem =
       readonly labelKey: ShellKey;
       readonly mouseKey: ShellKey;
       readonly touchKey: ShellKey;
+    }
+  /** A profession and the tools a generic needs to take it up — names and pictures only, no text. */
+  | {
+      readonly kind: 'profession';
+      readonly serf: number;
+      readonly tools: readonly number[];
     };
 
 export interface HelpSection {
@@ -63,6 +70,10 @@ const b = (type: number): HelpImage => ({ kind: 'building', type });
 const g = (resource: number): HelpImage => ({ kind: 'good', resource });
 const panel = (icon: number): HelpImage => ({ kind: 'panel', icon });
 const marker = (m: number): HelpImage => ({ kind: 'marker', marker: m });
+const serf = (type: number): HelpImage => ({ kind: 'serf', type });
+
+/** Professions that take up their work without a tool (manual p. 63: "manche brauchen gar kein Werkzeug"). */
+export const HELP_TOOLLESS_SERFS: readonly number[] = [8, 12, 15, 16, 10];
 
 /** Message note and return arrow of the control bar (absolute archive entries). */
 export const HELP_MESSAGE_NOTE = 1781;
@@ -193,11 +204,42 @@ export const HELP_SECTIONS: Readonly<Record<string, readonly HelpSection[]>> = {
   ],
   economy: [
     {
+      id: 'settlers',
+      titleKey: 'help.eco.settlers.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.settlers.birth', images: [serf(21), b(24), b(10)] },
+        { kind: 'text', textKey: 'help.eco.settlers.limit' },
+        { kind: 'text', textKey: 'help.eco.settlers.knights', images: [g(24), g(25)] },
+        { kind: 'text', textKey: 'help.eco.settlers.empty' },
+      ],
+    },
+    {
+      id: 'transport',
+      titleKey: 'help.eco.transport.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.transport.carriers', images: [serf(0)] },
+        { kind: 'text', textKey: 'help.eco.transport.flag', images: [marker(MARK.flag)] },
+        { kind: 'text', textKey: 'help.eco.transport.route' },
+        { kind: 'text', textKey: 'help.eco.transport.goal' },
+        { kind: 'text', textKey: 'help.eco.transport.water', images: [serf(1), g(8)] },
+        { kind: 'text', textKey: 'help.eco.transport.prio' },
+        { kind: 'text', textKey: 'help.eco.transport.tip' },
+      ],
+    },
+    {
       id: 'materials',
       titleKey: 'help.eco.materials.title',
       items: [
         { kind: 'text', textKey: 'help.eco.wood', images: [b(9), b(2), g(6), b(17), g(7)] },
         { kind: 'text', textKey: 'help.eco.stone', images: [b(4), g(9)] },
+      ],
+    },
+    {
+      id: 'construction',
+      titleKey: 'help.eco.build.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.build.steps', images: [serf(2), serf(3), g(7), g(9)] },
+        { kind: 'text', textKey: 'help.eco.build.emergency', images: [b(2), b(17), b(4)] },
       ],
     },
     {
@@ -207,7 +249,14 @@ export const HELP_SECTIONS: Readonly<Record<string, readonly HelpSection[]>> = {
         { kind: 'text', textKey: 'help.eco.fish', images: [b(1), g(0)] },
         { kind: 'text', textKey: 'help.eco.bread', images: [b(12), g(3), b(15), g(4), b(16), g(5)] },
         { kind: 'text', textKey: 'help.eco.meat', images: [b(14), g(1), b(13), g(2)] },
-        { kind: 'text', textKey: 'help.eco.foodMenu', shot: 'food' },
+      ],
+    },
+    {
+      id: 'distribution',
+      titleKey: 'help.eco.dist.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.dist.bar', shot: 'food' },
+        { kind: 'text', textKey: 'help.eco.dist.scarce' },
       ],
     },
     {
@@ -216,6 +265,7 @@ export const HELP_SECTIONS: Readonly<Record<string, readonly HelpSection[]>> = {
       items: [
         { kind: 'text', textKey: 'help.eco.geologist', images: [{ kind: 'serf', type: 20 }] },
         { kind: 'text', textKey: 'help.eco.mines', images: [b(5), b(6), b(7), b(8)] },
+        { kind: 'text', textKey: 'help.eco.mines.empty' },
         { kind: 'text', textKey: 'help.eco.smelters', images: [b(18), g(11), b(23), g(14)] },
       ],
     },
@@ -229,11 +279,53 @@ export const HELP_SECTIONS: Readonly<Record<string, readonly HelpSection[]>> = {
       ],
     },
     {
+      id: 'professions',
+      titleKey: 'help.eco.prof.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.prof.intro', images: [serf(21)] },
+        ...PROFESSION_TOOLS.filter((req) => req.tools.length > 0).map(
+          (req): HelpItem => ({ kind: 'profession', serf: req.serfType, tools: req.tools }),
+        ),
+        { kind: 'text', textKey: 'help.eco.prof.none', images: HELP_TOOLLESS_SERFS.map(serf) },
+        { kind: 'text', textKey: 'help.eco.prof.menu', shot: 'tools' },
+      ],
+    },
+    {
+      id: 'knights',
+      titleKey: 'help.eco.knights.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.knights.recruit', images: [serf(21), g(24), g(25), serf(22)] },
+        { kind: 'text', textKey: 'help.eco.knights.train', images: [serf(22), serf(23), serf(24), serf(25), serf(26)] },
+      ],
+    },
+    {
+      id: 'combat',
+      titleKey: 'help.eco.combat.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.combat.strength' },
+        { kind: 'text', textKey: 'help.eco.combat.defend' },
+        { kind: 'text', textKey: 'help.eco.gold', images: [g(14)], shot: 'knights' },
+        { kind: 'text', textKey: 'help.eco.combat.castle', images: [b(24)] },
+      ],
+    },
+    {
       id: 'military',
       titleKey: 'help.eco.military.title',
       items: [
         { kind: 'text', textKey: 'help.eco.buildings', images: [b(11), b(21), b(22)], shot: 'military' },
-        { kind: 'text', textKey: 'help.eco.gold', images: [g(14)], shot: 'knights' },
+        { kind: 'text', textKey: 'help.eco.garrison.fill' },
+        { kind: 'text', textKey: 'help.eco.garrison.castle', images: [b(24)] },
+        { kind: 'text', textKey: 'help.eco.garrison.shift' },
+        { kind: 'text', textKey: 'help.eco.garrison.attack' },
+      ],
+    },
+    {
+      id: 'land',
+      titleKey: 'help.eco.land.title',
+      items: [
+        { kind: 'text', textKey: 'help.eco.land.claim', images: [b(11), b(21), b(22)] },
+        { kind: 'text', textKey: 'help.eco.land.lost' },
+        { kind: 'text', textKey: 'help.eco.land.capture' },
       ],
     },
     {
@@ -251,6 +343,7 @@ export const HELP_SECTIONS: Readonly<Record<string, readonly HelpSection[]>> = {
       items: [
         { kind: 'text', textKey: 'help.eco.stockStats', shot: 'stock' },
         { kind: 'text', textKey: 'help.eco.compare', shot: 'compare' },
+        { kind: 'text', textKey: 'help.eco.victory' },
       ],
     },
   ],
@@ -347,16 +440,24 @@ export function helpImageCaption(img: HelpImage): string | null {
   }
 }
 
+/** The pictures of a line: its own, or for a profession the serf followed by its tools. */
+export function helpItemImages(item: HelpItem): readonly HelpImage[] {
+  if (item.kind === 'text') return item.images ?? [];
+  if (item.kind === 'profession') return [serf(item.serf), ...item.tools.map(g)];
+  return [];
+}
+
 /** Every picture of the help with a readable label — for the contact sheet in the workbench. */
 export function helpImageEntries(): { entry: number; key: string }[] {
   const out: { entry: number; key: string }[] = [];
   for (const [tab, sections] of Object.entries(HELP_SECTIONS)) {
     for (const section of sections) {
       for (const item of section.items) {
-        if (item.kind !== 'text') continue;
-        for (const img of item.images ?? []) {
+        if (item.kind === 'control') continue;
+        for (const img of helpItemImages(item)) {
           const entry = helpImageEntry(img);
-          out.push({ entry: entry ?? -1, key: `${tab}/${section.id}/${item.textKey}/${img.kind}` });
+          const line = item.kind === 'text' ? item.textKey : `serf-${item.serf}`;
+          out.push({ entry: entry ?? -1, key: `${tab}/${section.id}/${line}/${img.kind}` });
         }
       }
     }
@@ -384,8 +485,8 @@ export interface HelpHit {
 
 function itemTexts(item: HelpItem): string[] {
   if (item.kind === 'control') return [st(item.labelKey), st(item.mouseKey), st(item.touchKey)];
-  const captions = (item.images ?? []).map(helpImageCaption).filter((c): c is string => c !== null);
-  return [st(item.textKey), ...captions];
+  const captions = helpItemImages(item).map(helpImageCaption).filter((c): c is string => c !== null);
+  return item.kind === 'text' ? [st(item.textKey), ...captions] : captions;
 }
 
 /**

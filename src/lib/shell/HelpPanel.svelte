@@ -14,6 +14,7 @@
 		HELP_TABS,
 		helpImageCaption,
 		helpImageEntry,
+		helpItemImages,
 		searchHelp,
 		type HelpHit,
 		type HelpImage,
@@ -67,7 +68,26 @@
 	}
 
 	function itemLine(item: HelpItem): string {
+		if (item.kind === 'profession') {
+			const [who = '', ...tools] = helpItemImages(item)
+				.map(helpImageCaption)
+				.filter((c): c is string => c !== null);
+			return `${who}: ${tools.join(', ')}`;
+		}
 		return item.kind === 'text' ? st(item.textKey) : `${st(item.labelKey)}: ${st(item.mouseKey)} · ${st(item.touchKey)}`;
+	}
+
+	type ProfessionItem = Extract<HelpItem, { kind: 'profession' }>;
+
+	/** The run of consecutive profession items starting at `from`; the section shows them as ONE table. */
+	function professionRun(items: readonly HelpItem[], from: number): ProfessionItem[] {
+		const run: ProfessionItem[] = [];
+		for (let k = from; k < items.length; k++) {
+			const it = items[k];
+			if (it === undefined || it.kind !== 'profession') break;
+			run.push(it);
+		}
+		return run;
 	}
 
 	const anchorId = (tabId: string, section: string): string => `help-${tabId}-${section}`;
@@ -118,7 +138,8 @@
 		</label>
 		{#if query.trim() === '' && sections.length > 2}
 			<nav class="toc" aria-label={st('help.contents')}>
-				{#each sections as section (section.id)}
+				{#each sections as section, j (section.id)}
+					{#if j > 0}<span class="sep" aria-hidden="true">·</span>{/if}
 					<button type="button" onclick={() => void scrollTo(tab, section.id)}>
 						{st(section.titleKey)}
 					</button>
@@ -205,6 +226,42 @@
 								{/if}
 							{/if}
 						</div>
+					{:else if item.kind === 'profession' && section.items[i - 1]?.kind !== 'profession'}
+						<div class="professions" role="table">
+							<div class="row" role="row">
+								<span class="head-cell" role="columnheader">{st('help.table.profession')}</span>
+								<span class="head-cell tools-head" role="columnheader">{st('help.table.tools')}</span>
+							</div>
+							{#each professionRun(section.items, i) as prof, k (k)}
+								{@const [serfImg, ...toolImgs] = helpItemImages(prof)}
+								<div class="row" role="row">
+									<div class="serf" role="rowheader">
+										{#if serfImg !== undefined}
+											{@const pic = image(serfImg)}
+											{@const caption = helpImageCaption(serfImg)}
+											{#if pic !== null}
+												<figure>
+													<img src={pic.url} width={pic.width} height={pic.height} alt={caption ?? ''} />
+													{#if caption !== null}<figcaption>{caption}</figcaption>{/if}
+												</figure>
+											{/if}
+										{/if}
+									</div>
+									{#each toolImgs as img, j (j)}
+										{@const pic = image(img)}
+										{@const caption = helpImageCaption(img)}
+										<div class="tool" role="cell">
+											{#if pic !== null}
+												<figure>
+													<img src={pic.url} width={pic.width} height={pic.height} alt={caption ?? ''} />
+													{#if caption !== null}<figcaption>{caption}</figcaption>{/if}
+												</figure>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/each}
+						</div>
 					{/if}
 				{/each}
 			</section>
@@ -254,7 +311,12 @@
 	.toc {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.3rem 0.8rem;
+		gap: 0.3rem 0.5rem;
+	}
+
+	.sep {
+		opacity: 0.5;
+		user-select: none;
 	}
 
 	.toc button,
@@ -372,5 +434,43 @@
 	tbody th {
 		font-weight: normal;
 		color: inherit;
+	}
+
+	/*
+	 * A grid, not a table: a table stretches its columns over the full panel width. Each tool has its
+	 * own column, so a caption's length cannot shift the icons of the next tool.
+	 */
+	.professions {
+		display: grid;
+		grid-template-columns: repeat(3, max-content);
+		justify-content: start;
+		column-gap: 0.9rem;
+		row-gap: 0.4rem;
+		align-items: end;
+	}
+
+	.professions .row {
+		display: contents;
+	}
+
+	.head-cell {
+		color: var(--fg-dim);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		font-size: 0.85em;
+	}
+
+	.tools-head {
+		grid-column: 2 / span 2;
+	}
+
+	/* Every profession starts a new row; one with a single tool leaves column 3 empty. */
+	.serf {
+		grid-column: 1;
+	}
+
+	/* Icons at the left edge of their column, so the tools of all rows sit under each other. */
+	.professions figure {
+		justify-items: start;
 	}
 </style>
