@@ -723,7 +723,7 @@ export interface PlayerRecord {
   readonly genericRequestCooldown: number;
   /**
    * **Shift-change countdown** (u16, offset 496 = `player+0x170`). `0` = no shift change running;
-   * otherwise the remaining ticks of the running rotation. The button in the knight menu (`@0x2dda4`)
+   * otherwise the remaining frames of the running rotation (the player tick counts it down once per frame). The button in the knight menu (`@0x2dda4`)
    * and the AI counterpart (`@0x54862`) set it to 1200, the player tick (`@0xf0f9`) counts it down and
    * switches the three `flags` bits 2/4/5 by it (details in `engine/player-settings.ts`).
    */

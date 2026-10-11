@@ -13,7 +13,7 @@
  * Frame cadence: the original runs two clocks — a ~100 Hz game tick and a ~12.5 fps frame loop with
  * `delta = 8` game ticks per frame. `Flag::update` belongs to the FRAME loop: one block of 32 flags
  * per frame (start index `rotation·32`, wrap `rotationWrap` = 49, only rotations < 32 touch flags).
- * A flag is therefore visited once per wrap cycle (~2 s), and that delay IS the pause before a
+ * A flag is therefore visited once per wrap cycle (49 frames of 8 ticks, ~3.9 s at 100 Hz), and that delay IS the pause before a
  * resting carrier starts moving — the wake handler itself is instant. Scheduling a fresh resource
  * needs two passes: unknown-dest sets `dest`, known-dest sets `scheduled`. Driving this off the
  * game tick instead would run it ~8x too fast.

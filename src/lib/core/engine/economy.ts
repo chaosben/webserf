@@ -359,7 +359,7 @@ function pickInventory(state: GameState, owner: number, wantKnight: boolean): In
   for (const inv of state.inventories) {
     if (inv === null) continue;
     if (inv.owner !== owner) continue; // (char)vreg0 == inv[0]
-    if ((inv.serfMode & 1) !== 0) continue; // serfMode „stop" (1) ausgeschlossen; „in"(0)/„out"(2) ok
+    if ((inv.serfMode & 1) !== 0) continue; // only "in" (0) qualifies: "stop" (1) and "out" (3) both carry bit 0
     if (wantKnight && (inv.resources[RES_SWORD] === 0 || inv.resources[RES_SHIELD] === 0)) continue;
     if (inv.genericCount === 0) return inv; // erstes leeres sofort
     if (inv.genericCount < bestCount) {

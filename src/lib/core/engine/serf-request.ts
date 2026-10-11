@@ -208,7 +208,7 @@ const MILITARY_OCCUPANCY: Record<number, readonly number[]> = {
 
 // `flags` bit 4 shifts the table index by 5 into the consistently **smaller** second half: it is
 // **phase 1 of the shift change**. It is never set in any saved game, which fits — the phase lasts only
-// 177 of 1200 ticks, so its meaning comes from the code, not from data.
+// 177 of 1200 frames (the countdown runs in the player tick, once per frame), so its meaning comes from the code, not from data.
 
 /** Inventory knight slots in the order `request_serf` tests them: K4 -> K0. */
 const KNIGHT_TYPES_HIGH_FIRST: readonly number[] = [26, 25, 24, 23, 22];
@@ -222,11 +222,12 @@ const KNIGHT_RANK_STOP: readonly number[] = [-10, -8, -6, -4, NaN];
 
 /**
  * The **type parameter of a knight request** (`vreg4` in `request_serf`, @0x124b1–@0x1251d). Normally
- * `-1 * 2 = -2`; with `flags` bit 5 set instead `-((knightShiftTimer >> 8) + 1) * 2`, i.e. `-10 / -8 /
- * -6 / -4 / -2` depending on the remaining countdown.
+ * `-1 * 2 = -2`; with `flags` bit 5 set instead `-((knightShiftTimer >> 8) + 1) * 2`, i.e. `-8 / -6 /
+ * -4 / -2` depending on the remaining countdown. `-10` would need a countdown above 1023, and bit 5 is
+ * only set at `0x3ff`, so phase 2 never produces it.
  *
  * Phase 2 of the shift change thereby acts as a **descending rank floor**: just after switching, a
- * store only yields a K4, later K3, K2, K1 and finally any rank — so buildings get the strongest
+ * store only yields a K4 or K3, later down to K2, K1 and finally any rank — so buildings get the strongest
  * knights as replacements without the refill getting stuck when no high ranks exist.
  *
  * The conversion is deliberately **not** condensed into a rank number: the cascade compares for
@@ -551,9 +552,9 @@ type RequestTarget =
  * then neighbours in directions 5->0 — and returns the inventory that can supply.
  *
  * **Two-phase preference (@0x12a6a).** A store with a **ready** serf of the type wins immediately. A
- * store that only has a **generic plus tools** is merely *remembered* (`gs+0x342/0x344`) and used only
- * if the search finds no ready serf anywhere — a ready worker always beats specialising one, even from
- * further away.
+ * store that only has a **generic plus tools** is merely *remembered* (`gs+0x342/0x344`) and used if no
+ * ready serf turns up within the search budget below — a ready worker beats specialising one only when
+ * it is at most that many waves further away.
  *
  * **The search budget** (`player+0x10a`, default 7) decides whether specialising happens **at all**,
  * and its granularity is a **wave** of the breadth-first search, not a flag:

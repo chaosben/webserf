@@ -105,7 +105,7 @@ export function growObject(rawObject: number, rng: () => number, decayCountdown:
   if (o <= 0x5c) return rawObject;
  // 0x5d..0x66 — felled tree, any stage => becomes stump 0x53 (@0xf683).
   if (o <= 0x66) return water | 0x53;
- // 0x67 — sapling A => with 1/1024 per visit a broadleaf tree 0x10..0x17 (@0xf69a).
+ // 0x67 — sapling A => with 1/4 per visit a broadleaf tree 0x10..0x17 (@0xf69a).
   if (o === 0x67) {
     const r = rng();
     if ((r & 0x300) !== 0) return rawObject;

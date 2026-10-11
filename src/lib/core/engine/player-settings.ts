@@ -319,8 +319,9 @@ export function startKnightShift(player: Player): void {
  * ```
  *
  * **Phase 1** (lowered occupancy, the buildings give knights away) therefore lasts 1200 -> 1023 =
- * **177** ticks and **phase 2** (normal targets, but only high ranks out of the warehouse) the
- * remaining **1023**. The order matters: the test against `0x3ff` sees the **already decremented**
+ * **177** frames and **phase 2** (normal targets, but only high ranks out of the warehouse) the
+ * remaining **1023**. The player tick runs once per frame (see `updateEconomy`), so the whole shift
+ * change takes 1200 frames — 9600 game ticks. The order matters: the test against `0x3ff` sees the **already decremented**
  * value.
  */
 export function tickKnightShift(player: Player): void {
