@@ -8,7 +8,7 @@
  * rejected (a wrong pixel, an upside-down image, a wrong size).
  */
 import { describe, expect, it } from 'vitest';
-import { gpuProbeSurface, readbackMatchesCpu } from './index-presenter.js';
+import { gpuProbeSurface, readbackMatchesCpu, upscaleIndexSurface } from './index-presenter.js';
 import { indexSurfaceToRgba } from '../core/index-target.js';
 import type { Palette } from '../core/types.js';
 
@@ -78,5 +78,23 @@ describe('self-test of the GPU presenter', () => {
     expect(readbackMatchesCpu(back, s, b)).toBe(true);
     // Counter-check: the CPU route really does write 0xff, not the palette value.
     expect(indexSurfaceToRgba(s, a)[3]).toBe(0xff);
+  });
+});
+
+describe('upscaleIndexSurface — the reference for the GPU path at n > 1', () => {
+  it('turns every pixel into an n×n square, rows and columns in order', () => {
+    const big = upscaleIndexSurface(gpuProbeSurface(), 2);
+    expect(big.width).toBe(32);
+    expect(big.height).toBe(32);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        expect(big.data[y * 32 + x]).toBe((y >> 1) * 16 + (x >> 1));
+      }
+    }
+  });
+
+  it('is the identity at n = 1', () => {
+    const probe = gpuProbeSurface();
+    expect(Array.from(upscaleIndexSurface(probe, 1).data)).toEqual(Array.from(probe.data));
   });
 });

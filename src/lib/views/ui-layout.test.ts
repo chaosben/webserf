@@ -135,6 +135,29 @@ describe('boxPixel', () => {
     expect(boxPixel(...at(361, 539), rect, 800, 600, bar, 352, 40)).toEqual({ x: 351, y: 39 });
   });
 
+  it('hits the same bar pixel on a high-density canvas as on a plain one', () => {
+    // The map view lays the canvas out at CSS size and gives it `dpr` times the backing store; the
+    // parts are placed with the same rectangle function, fed in canvas pixels.
+    const vw = 1280;
+    const vh = 720;
+    const s = uiScaleFor(1.7, vw);
+    const host = { left: 0, top: 0, width: vw, height: vh };
+    for (const dpr of [1.25, 1.5, 2]) {
+      const cw = Math.round(vw * dpr);
+      const ch = Math.round(vh * dpr);
+      const plain = originBoxRect(CONTROL_PANEL_BOUNDS, s, vw, vh);
+      const dense = originBoxRect(CONTROL_PANEL_BOUNDS, s * dpr, cw, ch);
+      // Centres of a column of bar pixels: they must land on the same source pixel at either density.
+      for (let px = 0; px < CONTROL_PANEL_BOUNDS.width; px += 7) {
+        const cx = plain.x + ((px + 0.5) * plain.w) / CONTROL_PANEL_BOUNDS.width;
+        const cy = plain.y + plain.h / 2;
+        const a = boxPixel(cx, cy, host, vw, vh, plain, CONTROL_PANEL_BOUNDS.width, CONTROL_PANEL_BOUNDS.height);
+        const b = boxPixel(cx, cy, host, cw, ch, dense, CONTROL_PANEL_BOUNDS.width, CONTROL_PANEL_BOUNDS.height);
+        expect(b?.x, `dpr ${dpr}, bar pixel ${px}`).toBe(a?.x);
+      }
+    }
+  });
+
   it('has nothing to say about a window that has not been laid out yet', () => {
     expect(boxPixel(0, 0, { left: 0, top: 0, width: 0, height: 0 }, 800, 600, box, 144, 160)).toBeNull();
   });

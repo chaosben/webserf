@@ -19,14 +19,15 @@
 	 */
 	import { untrack } from 'svelte';
 	import { recordings, recordingSupported } from './recording.svelte.js';
-	import { fileStreamingSupported } from '../views/screen-recorder.js';
+	import { fileStreamingSupported, RECORDING_QUALITIES } from '../views/screen-recorder.js';
+	import { settings } from '../settings/settings.svelte.js';
 	import { log } from './log.js';
 	import { toasts } from './toasts.svelte.js';
 	import { st } from './i18n.js';
 
 	async function start(): Promise<void> {
 		// `new Date()` here rather than in the bus: the bus stays testable without a clock.
-		if (await recordings.start(new Date())) {
+		if (await recordings.start(new Date(), quality)) {
 			log.info('game', 'Recording started');
 			toasts.push(st('record.started'), { tone: 'info' });
 		}
@@ -75,6 +76,8 @@
 		const id = setInterval(() => (frames = recordings.frameCount), 500);
 		return () => clearInterval(id);
 	});
+
+	const quality = $derived(settings.value.recordingQuality);
 
 	/** Images per second the clone draws — the video inherits it. */
 	const seconds = $derived(Math.round(frames / 12.5));
@@ -125,6 +128,25 @@
 		<p class="note">
 			{fileStreamingSupported() ? st('record.toFile') : st('record.toMemory')}
 		</p>
+
+		<div class="row">
+			<span id="record-quality-label">{st('record.quality')}</span>
+			<!-- Locked while recording: the video's size is fixed when it starts. -->
+			<div class="steps" role="group" aria-labelledby="record-quality-label">
+				{#each RECORDING_QUALITIES as q (q)}
+					<button
+						type="button"
+						class:on={q === quality}
+						aria-pressed={q === quality}
+						disabled={recordings.running || recordings.busy}
+						onclick={() => settings.set('recordingQuality', q)}
+					>
+						{q === 'high' ? st('record.qualityHigh') : st('record.qualityStandard')}
+					</button>
+				{/each}
+			</div>
+		</div>
+		<p class="note">{st('record.qualityNote')}</p>
 
 		<div class="row">
 			{#if recordings.running}
@@ -197,6 +219,17 @@
 		display: flex;
 		align-items: center;
 		gap: 0.6rem;
+	}
+
+	.steps {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+	}
+
+	.steps button.on {
+		border-color: var(--accent);
+		color: var(--accent);
 	}
 
 	.note {

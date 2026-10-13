@@ -107,6 +107,7 @@ describe('tables', () => {
 		'set.simulation',
 		'set.pause',
 		'enh.place.corner',
+		'record.qualityStandard',
 		'record.videoTitle',
 		'enh.hacks.name', // loan word — "Hacks" is what they are called in German too
 		'enh.hacks.tab.list',

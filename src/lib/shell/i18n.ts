@@ -331,6 +331,11 @@ const EN = {
 	'record.stopped': 'Recording stopped: {frames} frames, {size}',
 	'record.progress': 'Recording — {frames} images, about {seconds} s',
 	'record.needGame': 'Start a game first — there is nothing to record yet.',
+	'record.quality': 'Quality',
+	'record.qualityStandard': 'Standard',
+	'record.qualityHigh': 'High',
+	'record.qualityNote':
+		'High keeps the colours of the pixel art clean: the video gets at least two pixels per game pixel. Larger files and more work for the computer while recording.',
 	'record.done': '{name} — {frames} images, {size}.',
 	'view.map':
 		'Map view (left: place cursor, left drag: pull the view, right held: push the view like the original, middle held: grab and pull, right+left or Shift/Alt+left or long press: special click, wheel or two fingers: zoom)',
@@ -398,7 +403,8 @@ const EN = {
 	'help.rail.settings': 'Settings: game speed, pause and the size of these windows.',
 	'help.rail.io': 'Import & export: your ten saved games, a folder to mirror them into, and the archive.',
 	'help.rail.bug': 'Report a bug: packs the game, the last actions and a picture for an issue.',
-	'help.rail.record': 'Record: a screenshot of the game, or a video with the pointer.',
+	'help.rail.record':
+		'Record: a screenshot of the game, or a video with the pointer — in high quality the colours of the pixel art stay clean.',
 	'help.rail.enhance': 'Enhancements: extras the original never had, each off until you switch it on.',
 	'help.rail.info': 'About webserf: what this is, the version, and a new version when one is waiting.',
 	'help.rail.help': 'Help: this window. It is there as soon as an archive is loaded.',
@@ -761,6 +767,11 @@ const DE: Record<ShellKey, string> = {
 	'record.stopped': 'Aufnahme beendet: {frames} Bilder, {size}',
 	'record.progress': 'Aufnahme läuft — {frames} Bilder, etwa {seconds} s',
 	'record.needGame': 'Starte zuerst ein Spiel — es gibt noch nichts aufzunehmen.',
+	'record.quality': 'Qualität',
+	'record.qualityStandard': 'Standard',
+	'record.qualityHigh': 'Hoch',
+	'record.qualityNote':
+		'Hoch hält die Farben der Pixelgrafik sauber: das Video bekommt mindestens zwei Pixel je Spielpixel. Größere Dateien und mehr Arbeit für den Rechner während der Aufnahme.',
 	'record.done': '{name} — {frames} Bilder, {size}.',
 	'view.map':
 		'Kartenansicht (links: Zeiger setzen, links ziehen: Ansicht nachziehen, rechts halten: Ansicht schieben wie im Original, mittlere Taste halten: greifen und ziehen, rechts+links oder Umschalt/Alt+links oder langes Drücken: Spezialklick, Rad oder Zwei-Finger: Lupe)',
@@ -828,7 +839,8 @@ const DE: Record<ShellKey, string> = {
 	'help.rail.settings': 'Einstellungen: Spieltempo, Pause und die Größe dieser Fenster.',
 	'help.rail.io': 'Import & Export: deine zehn Spielstände, ein Ordner, in den sie gespiegelt werden, und das Archiv.',
 	'help.rail.bug': 'Fehler melden: packt Spielstand, die letzten Aktionen und ein Bild für ein Issue zusammen.',
-	'help.rail.record': 'Aufnehmen: ein Bildschirmfoto vom Spiel oder ein Video mit Mauszeiger.',
+	'help.rail.record':
+		'Aufnehmen: ein Bildschirmfoto vom Spiel oder ein Video mit Mauszeiger — in hoher Qualität bleiben die Farben der Pixelgrafik sauber.',
 	'help.rail.enhance': 'Verbesserungen: Extras, die das Original nie hatte, jedes aus, bis du es einschaltest.',
 	'help.rail.info': 'Über webserf: was das hier ist, der Programmstand und eine neue Version, wenn eine bereitliegt.',
 	'help.rail.help': 'Hilfe: dieses Fenster. Es ist da, sobald ein Archiv geladen ist.',

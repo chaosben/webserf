@@ -26,6 +26,7 @@ import {
 	VOLUME_MIN
 } from '../core/engine/view-options.js';
 import { SFX_DEFAULT } from '../core/options-popup.js';
+import { RECORDING_QUALITIES, type RecordingQuality } from '../views/screen-recorder.js';
 import { DEFAULT_TICKS_PER_SECOND } from '../core/engine/scheduler.js';
 import {
 	GOOD_SLOTS,
@@ -160,6 +161,12 @@ export interface SettingsShape {
 	assistOpacity: number;
 	/** The road assistant has a plate over the game view. */
 	assistShowRoad: boolean;
+	/**
+	 * Screen recording: `high` enlarges the video so pixel art keeps its colours (see
+	 * `views/screen-recorder.ts`). Remembered because it is a choice about files, not about one
+	 * recording.
+	 */
+	recordingQuality: RecordingQuality;
 }
 
 /**
@@ -205,7 +212,8 @@ const DEFAULTS: SettingsShape = {
 	// A corner neither of the two older plates takes by default.
 	assistCorner: 'bl',
 	assistOpacity: OVERLAY_OPACITY_DEFAULT,
-	assistShowRoad: false
+	assistShowRoad: false,
+	recordingQuality: 'standard'
 };
 
 /**
@@ -262,7 +270,8 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	assistCorner: (v): v is OverlayCorner => isOneOf(v, OVERLAY_CORNERS),
 	assistOpacity: (v): v is number =>
 		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
-	assistShowRoad: (v): v is boolean => typeof v === 'boolean'
+	assistShowRoad: (v): v is boolean => typeof v === 'boolean',
+	recordingQuality: (v): v is RecordingQuality => isOneOf(v, RECORDING_QUALITIES)
 };
 
 function read(): SettingsShape {

@@ -35,6 +35,19 @@ import { createIndexSurface, indexSurfaceToRgba, type IndexSurface } from '../co
 import type { Palette } from '../core/types.js';
 import { log } from '../shell/log.js';
 import { metrics } from './render-metrics.js';
+import { blitScaled, sharpSteps } from './sharp-scale.js';
+
+/** Nearest-neighbour enlargement of an index surface — the reference for the GPU's `n > 1` path. */
+export function upscaleIndexSurface(surface: IndexSurface, n: number): IndexSurface {
+  const { width: w, height: h } = surface;
+  const out = createIndexSurface(w * n, h * n);
+  for (let y = 0; y < h * n; y++) {
+    const src = Math.floor(y / n) * w;
+    const dst = y * w * n;
+    for (let x = 0; x < w * n; x++) out.data[dst + x] = surface.data[src + Math.floor(x / n)];
+  }
+  return out;
+}
 
 /**
  * Probe image of the self-test: 16x16 pixels, EVERY palette index exactly once. It cannot be smaller
@@ -93,10 +106,12 @@ precision highp float;
 uniform highp usampler2D uIndex;
 uniform highp sampler2D uPalette;
 uniform highp int uHeight;
+uniform highp int uScale;
 out vec4 fragColor;
 void main() {
-  // gl_FragCoord counts from the bottom, the surface from the top.
-  ivec2 p = ivec2(int(gl_FragCoord.x), uHeight - 1 - int(gl_FragCoord.y));
+  // gl_FragCoord counts from the bottom, the surface from the top. uHeight is the OUTPUT height;
+  // dividing by uScale is the integer nearest-neighbour enlargement.
+  ivec2 p = ivec2(int(gl_FragCoord.x), uHeight - 1 - int(gl_FragCoord.y)) / uScale;
   uint idx = texelFetch(uIndex, p, 0).r;
   // Alpha does NOT come from the palette: the CPU route writes a constant 0xff.
   fragColor = vec4(texelFetch(uPalette, ivec2(int(idx), 0), 0).rgb, 1.0);
@@ -110,12 +125,15 @@ class GpuPath {
     private readonly indexTex: WebGLTexture,
     private readonly paletteTex: WebGLTexture,
     private readonly heightLoc: WebGLUniformLocation,
+    private readonly scaleLoc: WebGLUniformLocation,
     private readonly maxTexture: number,
   ) {}
 
   /** Size of the index texture currently allocated (0 = none yet). */
   private w = 0;
   private h = 0;
+  /** Integer enlargement the output canvas is currently sized for. */
+  private n = 0;
   /** Palette uploaded last — compared by identity, not by value (it is immutable). */
   private uploaded: Palette | null = null;
   /**
@@ -151,7 +169,10 @@ class GpuPath {
     const indexTex = gl.createTexture();
     const paletteTex = gl.createTexture();
     const heightLoc = gl.getUniformLocation(program, 'uHeight');
-    if (indexTex === null || paletteTex === null || heightLoc === null) return null;
+    const scaleLoc = gl.getUniformLocation(program, 'uScale');
+    if (indexTex === null || paletteTex === null || heightLoc === null || scaleLoc === null) {
+      return null;
+    }
 
     gl.useProgram(program);
     gl.uniform1i(gl.getUniformLocation(program, 'uIndex'), 0);
@@ -178,6 +199,7 @@ class GpuPath {
       indexTex,
       paletteTex,
       heightLoc,
+      scaleLoc,
       gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
     );
 
@@ -186,14 +208,18 @@ class GpuPath {
       log.warn('render', 'WebGL context lost — palette conversion falls back to the CPU');
     });
 
-    // The self-test. It runs with the REAL palette, because those exact bytes have to arrive.
+    // The self-test. It runs with the REAL palette, because those exact bytes have to arrive — and
+    // at two enlargements, because the integer division in the shader is a second thing to get wrong.
     const probe = gpuProbeSurface();
-    if (!path.draw(probe, palette, false)) return null;
-    const back = new Uint8Array(probe.width * probe.height * 4);
-    gl.readPixels(0, 0, probe.width, probe.height, gl.RGBA, gl.UNSIGNED_BYTE, back);
-    if (!readbackMatchesCpu(back, probe, palette)) {
-      log.warn('render', 'WebGL2 does not produce the same pixels as the CPU — staying on the CPU');
-      return null;
+    for (const n of [1, 2]) {
+      if (!path.draw(probe, palette, n, false)) return null;
+      const want = n === 1 ? probe : upscaleIndexSurface(probe, n);
+      const back = new Uint8Array(want.width * want.height * 4);
+      gl.readPixels(0, 0, want.width, want.height, gl.RGBA, gl.UNSIGNED_BYTE, back);
+      if (!readbackMatchesCpu(back, want, palette)) {
+        log.warn('render', 'WebGL2 does not produce the same pixels as the CPU — staying on the CPU');
+        return null;
+      }
     }
     log.info('render', 'palette conversion runs on the GPU (self-test passed)');
     return path;
@@ -209,10 +235,10 @@ class GpuPath {
    * Only the lower bound of 2048 guaranteed by the standard sits below a 4K window — and there the
    * CPU simply draws it, correctly and more slowly.
    */
-  draw(surface: IndexSurface, palette: Palette, measure = true): boolean {
+  draw(surface: IndexSurface, palette: Palette, n: number, measure = true): boolean {
     const { gl } = this;
     const { width: w, height: h } = surface;
-    if (this.lost || w > this.maxTexture || h > this.maxTexture) return false;
+    if (this.lost || w * n > this.maxTexture || h * n > this.maxTexture) return false;
 
     if (measure) metrics.begin('upload');
     gl.activeTexture(gl.TEXTURE1);
@@ -226,11 +252,16 @@ class GpuPath {
     if (this.w !== w || this.h !== h) {
       this.w = w;
       this.h = h;
-      this.canvas.width = w;
-      this.canvas.height = h;
-      gl.viewport(0, 0, w, h);
-      gl.uniform1i(this.heightLoc, h);
+      this.n = 0;
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, w, h, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, null);
+    }
+    if (this.n !== n) {
+      this.n = n;
+      this.canvas.width = w * n;
+      this.canvas.height = h * n;
+      gl.viewport(0, 0, w * n, h * n);
+      gl.uniform1i(this.heightLoc, h * n);
+      gl.uniform1i(this.scaleLoc, n);
     }
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RED_INTEGER, gl.UNSIGNED_BYTE, surface.data);
     if (measure) metrics.end('upload');
@@ -273,6 +304,8 @@ export class IndexPresenter {
   #ctx: CanvasRenderingContext2D | null = null;
   #image: ImageData | null = null;
   #surface: IndexSurface | null = null;
+  /** Integer pre-enlargement of the CPU route (only used for a fractional scale). */
+  #big: HTMLCanvasElement | null = null;
   #gpu: GpuPath | null = null;
   /** The GPU route is attempted ONCE; a failure is final. */
   #gpuTried = false;
@@ -292,21 +325,31 @@ export class IndexPresenter {
     return this.#surface;
   }
 
-  /** Draws at `(0,0)`; zoom and pan have been set by the caller as a transform. */
-  present(ctx: CanvasRenderingContext2D, surface: IndexSurface, palette: Palette): void {
+  /**
+   * Draws at `(0,0)` with the size of the surface in user space; the caller has set the enlargement as
+   * a transform, and `scale` is that transform in device pixels per surface pixel — needed here only
+   * to choose the steps (see {@link sharpSteps}).
+   */
+  present(
+    ctx: CanvasRenderingContext2D,
+    surface: IndexSurface,
+    palette: Palette,
+    scale = 1,
+  ): void {
     const { width, height } = surface;
     if (width <= 0 || height <= 0) return;
+    const { n, smooth } = sharpSteps(scale);
 
     if (!this.#gpuTried) {
       this.#gpuTried = true;
       this.#gpu = GpuPath.create(palette);
     }
-    if (this.#gpu !== null && this.#gpu.draw(surface, palette)) {
+    if (this.#gpu !== null && this.#gpu.draw(surface, palette, n)) {
       metrics.notePresenter('gpu');
       // Within the same task the drawing buffer is still valid (it is only cleared before the next
       // compositing step) — so `drawImage` sees the finished image without `preserveDrawingBuffer`.
       metrics.begin('scale');
-      ctx.drawImage(this.#gpu.canvas, 0, 0);
+      blitScaled(ctx, this.#gpu.canvas, 0, 0, width, height, smooth);
       metrics.end('scale');
       return;
     }
@@ -334,7 +377,22 @@ export class IndexPresenter {
     own.putImageData(image, 0, 0);
     metrics.end('upload');
     metrics.begin('scale');
-    ctx.drawImage(this.#canvas, 0, 0);
+    if (n === 1) {
+      blitScaled(ctx, this.#canvas, 0, 0, width, height, smooth);
+    } else {
+      if (this.#big === null) this.#big = document.createElement('canvas');
+      const big = this.#big;
+      if (big.width !== width * n || big.height !== height * n) {
+        big.width = width * n;
+        big.height = height * n;
+      }
+      const bctx = big.getContext('2d');
+      if (bctx !== null) {
+        bctx.imageSmoothingEnabled = false;
+        bctx.drawImage(this.#canvas, 0, 0, width * n, height * n);
+        blitScaled(ctx, big, 0, 0, width, height, smooth);
+      }
+    }
     metrics.end('scale');
   }
 }

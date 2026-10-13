@@ -18,6 +18,7 @@ import {
   ScreenRecorder,
   canvasPng,
   recordingFileName,
+  type RecordingQuality,
   type RecordingResult,
   type RecordingTarget,
 } from '../views/screen-recorder.js';
@@ -107,14 +108,14 @@ class RecordingBus {
   }
 
   /** Start. MUST run inside a user gesture — the file picker needs one. */
-  async start(now: Date): Promise<boolean> {
+  async start(now: Date, quality: RecordingQuality = 'standard'): Promise<boolean> {
     const target = this.#target;
     if (target === null || this.busy || this.running) return false;
     this.busy = true;
     this.error = null;
     this.last = null;
     try {
-      const started = await this.#recorder.start(target, recordingFileName(now));
+      const started = await this.#recorder.start(target, recordingFileName(now), quality);
       this.running = started;
       // Not an error: cancelling the file picker is a decision, and so is a browser that cannot
       // record at all — but the two have to be told apart.

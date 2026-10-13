@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { devicePixelRatio } from 'svelte/reactivity/window';
   import type { SaveGameState, DecodedSprite } from '../core/types.js';
   import { HEIGHT_UNIT, TILE_W, TILE_H } from '../core/map-render.js';
   import { buildOptionsView, buildSettingsView, engineEntityIndex } from './map-view-data.js';
@@ -3044,7 +3045,7 @@
       el.getBoundingClientRect(),
       el.width,
       el.height,
-      originBoxRect(b, uiScale, viewportW, viewportH),
+      canvasBox(b),
       srcW,
       srcH,
     );
@@ -3460,6 +3461,28 @@
   const cursorScale = $derived(Math.max(1, Math.min(CURSOR_MAX_SCALE, Math.round(uiScale))));
 
   /**
+   * Device pixels per CSS pixel. Everything the player interacts with — `viewportW/H`, `zoom`, the
+   * camera, pointer positions — stays in CSS pixels; only the canvas backing store is `dpr` times
+   * larger, so a high-density screen shows its own pixels instead of a second enlargement by the
+   * browser.
+   */
+  const dpr = $derived(devicePixelRatio.current ?? 1);
+
+  /**
+   * A part of the original screen in CANVAS pixels. The same {@link originBoxRect}, fed with the
+   * canvas size and the scale in device pixels, so rounding happens once, on the pixels that are
+   * actually drawn — scaling a CSS-rounded rectangle afterwards would put it between pixels.
+   */
+  function canvasBox(b: { x: number; y: number; width: number; height: number }) {
+    return originBoxRect(
+      b,
+      uiScale * dpr,
+      Math.round(viewportW * dpr),
+      Math.round(viewportH * dpr),
+    );
+  }
+
+  /**
    * The pointer sprite as a drawable image. Built once per SCALE STEP, not per frame: the screen
    * recording asks for it with every image it takes, and building it means two canvases and two
    * draws. `null` while no archive is loaded (BYOA) — the sprite does not exist then.
@@ -3486,13 +3509,19 @@
       cursor: () => {
         const img = cursorImage;
         if (!pointerInside || img === null) return null;
-        const s = cursorScaleOf(cursorScale);
+        // The pointer position is a CSS pixel, the recording takes canvas pixels.
+        const s = cursorScaleOf(cursorScale) * dpr;
         return {
-          x: Math.round(pointerCanvasX) - CURSOR_HOTSPOT.x * s,
-          y: Math.round(pointerCanvasY) - CURSOR_HOTSPOT.y * s,
+          x: Math.round(pointerCanvasX * dpr - CURSOR_HOTSPOT.x * s),
+          y: Math.round(pointerCanvasY * dpr - CURSOR_HOTSPOT.y * s),
+          w: Math.round(img.width * dpr),
+          h: Math.round(img.height * dpr),
           image: img,
         };
       },
+      // The smallest game pixel on the canvas: the interface parts never grow past the map
+      // (`uiScale <= max(1, zoom)`), so theirs is it.
+      pixelSize: () => uiScale * dpr,
     }),
   );
 
@@ -3619,6 +3648,7 @@
       canvas,
       viewportW,
       viewportH,
+      dpr,
       zoom,
       cam: camera,
       geo,
@@ -3677,13 +3707,13 @@
     const overlay: OverlayLayer[] = [];
     const pop = popupSurface;
     if (pop !== null) {
-      overlay.push({ fb: pop, rect: originBoxRect(POPUP_BOUNDS, uiScale, viewportW, viewportH) });
+      overlay.push({ fb: pop, rect: canvasBox(POPUP_BOUNDS) });
     }
     const bar = barSurface;
     if (bar !== null) {
       overlay.push({
         fb: bar,
-        rect: originBoxRect(CONTROL_PANEL_BOUNDS, uiScale, viewportW, viewportH),
+        rect: canvasBox(CONTROL_PANEL_BOUNDS),
       });
     }
     if (overlay.length > 0) {
@@ -4103,9 +4133,9 @@
   function onPointerMove(e: PointerEvent) {
     // Before anything else: a move is also how a second button arrives and how one goes up again.
     trackButtons(e);
-    // Pointer position for the screen recording. `offsetX/offsetY` and not a measured rectangle:
-    // the canvas fills the viewport 1:1, so this is already the canvas pixel — and it costs no
-    // layout, which matters at pointer-move rate. Only the primary pointer: with two fingers the
+    // Pointer position for the screen recording, in CSS pixels. `offsetX/offsetY` and not a
+    // measured rectangle: the canvas covers the viewport exactly, so this needs only the `dpr`
+    // factor to become a canvas pixel — and it costs no layout, which matters at pointer-move rate. Only the primary pointer: with two fingers the
     // recorded cursor would otherwise jump back and forth between them.
     if (e.isPrimary) {
       pointerCanvasX = e.offsetX;
@@ -4707,7 +4737,7 @@
          draws the map, `composeUiOverlay` puts the parts on top. That is what makes a screenshot and
          a screen recording show the game rather than just the map, and it puts the stacking order
          into the code instead of into the document order. -->
-    <canvas bind:this={host}></canvas>
+    <canvas bind:this={host} style:width="{viewportW}px" style:height="{viewportH}px"></canvas>
     <!-- Where the keys of the save-game name really arrive: the canvas cannot take a focus, so on a
          phone it cannot bring up a keyboard. -->
     <TextEntryField

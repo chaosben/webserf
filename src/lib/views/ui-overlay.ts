@@ -20,6 +20,7 @@
 
 import type { Framebuffer } from '../core/ui-render.js';
 import type { BoxRect } from './ui-layout.js';
+import { blitScaled, sharpSteps } from './sharp-scale.js';
 
 /** One part: what to draw, and where it goes in canvas pixels. */
 export interface OverlayLayer {
@@ -35,6 +36,13 @@ interface Scratch {
 }
 
 const scratches = new Map<string, Scratch>();
+
+/**
+ * The integer pre-enlargement of a part for a fractional scale (see `sharp-scale.ts`). Keyed by
+ * source size and factor; `last` again records which framebuffer it was made from, so an unchanged
+ * part costs one blit per frame, as before.
+ */
+const enlarged = new Map<string, Scratch>();
 
 /**
  * Lazily, because there is no `document` while rendering on the server. Keyed by size, so a part of
@@ -78,21 +86,39 @@ export function composeUiOverlay(
       scratch.ctx.putImageData(img, 0, 0);
       scratch.last = fb;
     }
-    ctx.drawImage(
-      scratch.canvas,
-      0,
-      0,
-      fb.width,
-      fb.height,
-      rect.x,
-      rect.y,
-      rect.w,
-      rect.h,
-    );
+    const { n, smooth } = sharpSteps(rect.w / fb.width);
+    let source: HTMLCanvasElement = scratch.canvas;
+    if (n > 1) {
+      const big = enlargedFor(fb.width * n, fb.height * n);
+      if (big === null) continue;
+      if (big.last !== fb) {
+        big.ctx.imageSmoothingEnabled = false;
+        big.ctx.drawImage(scratch.canvas, 0, 0, fb.width * n, fb.height * n);
+        big.last = fb;
+      }
+      source = big.canvas;
+    }
+    blitScaled(ctx, source, rect.x, rect.y, rect.w, rect.h, smooth);
   }
+}
+
+function enlargedFor(w: number, h: number): Scratch | null {
+  const key = `${w}x${h}`;
+  const found = enlarged.get(key);
+  if (found !== undefined) return found;
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (ctx === null) return null;
+  const made: Scratch = { canvas, ctx, last: null };
+  enlarged.set(key, made);
+  return made;
 }
 
 /** Test seam: drops the scratch canvases so a case starts from nothing. */
 export function resetUiOverlayScratch(): void {
   scratches.clear();
+  enlarged.clear();
 }

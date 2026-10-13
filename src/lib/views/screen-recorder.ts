@@ -28,6 +28,13 @@
  *    long session does not grow in memory. Where the file-system access API is missing (Firefox),
  *    the chunks are collected and handed over as a download at the end — same result, bounded by
  *    memory.
+ * 4. **"High quality" is mostly about colour, not bits.** Every browser encoder stores colour at half
+ *    resolution in both directions (4:2:0), one colour per 2×2 block. Where one game pixel is one
+ *    video pixel, every colour edge falls inside such a block and bleeds into its neighbour — pixel
+ *    art turns to mush however high the bit rate. The fix is to give each game pixel at least 2×2
+ *    video pixels: the recording canvas is the source enlarged by a whole factor `k`, derived from
+ *    how large a game pixel already is on the canvas (zoom and screen density), never fixed —
+ *    a canvas that is already enlarged needs nothing.
  */
 
 /** Is there a file picker to write into, or does this browser need the download fallback? */
@@ -55,6 +62,69 @@ const MIME_CANDIDATES = [
  */
 const VIDEO_BITS_PER_SECOND = 6_000_000;
 
+/** The window the base rate above was chosen for. The rate follows the pixel count from there. */
+const BASE_PIXELS = 1600 * 900;
+const MIN_BITS_PER_SECOND = 2_000_000;
+const MAX_BITS_PER_SECOND = 25_000_000;
+
+/**
+ * Upper bound of the enlarged recording. Beyond 4K the software encoders fall behind a game running
+ * alongside, and players stop being able to decode it smoothly; a larger factor is then given up
+ * rather than the frame rate.
+ */
+const MAX_RECORDING_PIXELS = 3840 * 2160;
+const MAX_RECORDING_SIDE = 4096;
+
+/** What the recording panel offers. */
+export const RECORDING_QUALITIES = ['standard', 'high'] as const;
+export type RecordingQuality = (typeof RECORDING_QUALITIES)[number];
+
+/** Canvas pixels per game pixel a video needs so that 4:2:0 colour cannot bleed (module header §4). */
+const CHROMA_BLOCK = 2;
+
+/**
+ * Whole factor the recording enlarges the canvas by. `pixelSize` is how many canvas pixels one game
+ * pixel already covers (zoom times screen density, at its smallest — the interface parts included).
+ */
+export function recordingScale(
+  width: number,
+  height: number,
+  pixelSize: number,
+  quality: RecordingQuality,
+): number {
+  if (quality === 'standard' || !(pixelSize > 0)) return 1;
+  let k = Math.max(1, Math.ceil(CHROMA_BLOCK / pixelSize - 1e-6));
+  while (
+    k > 1 &&
+    (width * k * height * k > MAX_RECORDING_PIXELS ||
+      width * k > MAX_RECORDING_SIDE ||
+      height * k > MAX_RECORDING_SIDE)
+  ) {
+    k -= 1;
+  }
+  return k;
+}
+
+/**
+ * Target bit rate for a recording of the given size. Proportional to the pixel count, because four
+ * times the pixels sharing the same bits is exactly what "turns to mush" — clamped at both ends.
+ */
+export function recordingBitrate(width: number, height: number): number {
+  const rate = (VIDEO_BITS_PER_SECOND * width * height) / BASE_PIXELS;
+  return Math.round(Math.min(MAX_BITS_PER_SECOND, Math.max(MIN_BITS_PER_SECOND, rate)));
+}
+
+/** File extension of a container. Safari produces MP4, and a file named `.webm` would lie. */
+export function extensionOf(mimeType: string): string {
+  return mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+}
+
+/** Replaces the extension of a recording file name. */
+export function withExtension(fileName: string, ext: string): string {
+  const dot = fileName.lastIndexOf('.');
+  return `${dot < 0 ? fileName : fileName.slice(0, dot)}.${ext}`;
+}
+
 /** How often the recorder hands over a chunk. Smaller = less to lose if the tab dies. */
 const CHUNK_MS = 1000;
 
@@ -66,6 +136,9 @@ const CHUNK_MS = 1000;
 export interface RecordingCursor {
   readonly x: number;
   readonly y: number;
+  /** Size in canvas pixels — the image is built for CSS pixels and stretched by nearest-neighbour. */
+  readonly w: number;
+  readonly h: number;
   readonly image: CanvasImageSource;
 }
 
@@ -74,6 +147,8 @@ export interface RecordingTarget {
   readonly canvas: HTMLCanvasElement;
   /** The pointer for the NEXT frame, or `null` when it is outside the window. */
   readonly cursor?: () => RecordingCursor | null;
+  /** Canvas pixels per game pixel right now, see {@link recordingScale}. Absent = 1. */
+  readonly pixelSize?: () => number;
 }
 
 /** What a finished recording turned into. */
@@ -140,7 +215,7 @@ export function pickMimeType(
 }
 
 /** Writes into a file the user picked. Nothing is kept in memory. */
-async function fileSink(fileName: string): Promise<Sink | null> {
+async function fileSink(fileName: string, mimeType: string): Promise<Sink | null> {
   const pick = (globalThis as unknown as {
     showSaveFilePicker?: (o: unknown) => Promise<FsSaveHandle>;
   }).showSaveFilePicker;
@@ -149,7 +224,11 @@ async function fileSink(fileName: string): Promise<Sink | null> {
   try {
     handle = await pick({
       suggestedName: fileName,
-      types: [{ description: 'WebM video', accept: { 'video/webm': ['.webm'] } }],
+      types: [
+        extensionOf(mimeType) === 'mp4'
+          ? { description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }
+          : { description: 'WebM video', accept: { 'video/webm': ['.webm'] } },
+      ],
     });
   } catch {
     // Cancelled in the picker — not an error, but there is nothing to record into.
@@ -199,6 +278,9 @@ function memorySink(fileName: string, mimeType: string): Sink {
  * The black fill runs only when the source does not cover the target: the recording keeps the size
  * it started with, so a window shrunk mid-recording would otherwise leave the previous image
  * standing around the edge.
+ *
+ * `k` is the whole enlargement of the recording (see {@link recordingScale}); the destination context
+ * has smoothing off, so it is a plain pixel repetition and adds nothing that was not on screen.
  */
 export function composeRecordingFrame(
   dest: CanvasRenderingContext2D,
@@ -206,13 +288,14 @@ export function composeRecordingFrame(
   destHeight: number,
   source: HTMLCanvasElement,
   cursor: RecordingCursor | null,
+  k = 1,
 ): void {
-  if (source.width < destWidth || source.height < destHeight) {
+  if (source.width * k < destWidth || source.height * k < destHeight) {
     dest.fillStyle = '#000';
     dest.fillRect(0, 0, destWidth, destHeight);
   }
-  dest.drawImage(source, 0, 0);
-  if (cursor !== null) dest.drawImage(cursor.image, cursor.x, cursor.y);
+  dest.drawImage(source, 0, 0, source.width * k, source.height * k);
+  if (cursor !== null) dest.drawImage(cursor.image, cursor.x * k, cursor.y * k, cursor.w * k, cursor.h * k);
 }
 
 export class ScreenRecorder {
@@ -223,6 +306,8 @@ export class ScreenRecorder {
   /** The canvas the stream hangs off — never in the DOM, see the module header. */
   #dest: HTMLCanvasElement | null = null;
   #destCtx: CanvasRenderingContext2D | null = null;
+  /** Whole enlargement of this recording, fixed at the start like its size. */
+  #k = 1;
   #frames = 0;
 
   get recording(): boolean {
@@ -237,7 +322,11 @@ export class ScreenRecorder {
    * Starts recording. MUST be called from a user gesture — the file picker needs one.
    * `false` = the user cancelled the picker or this browser cannot record.
    */
-  async start(target: RecordingTarget, fileName: string): Promise<boolean> {
+  async start(
+    target: RecordingTarget,
+    fileName: string,
+    quality: RecordingQuality = 'standard',
+  ): Promise<boolean> {
     if (this.#recorder !== null) return false;
     const mimeType = pickMimeType();
     if (mimeType === null) return false;
@@ -246,19 +335,26 @@ export class ScreenRecorder {
     // The size is fixed here and stays: a video whose resolution changes mid-stream is a special
     // case for players. A window enlarged during the recording is cropped, a shrunk one gets a black
     // edge (see `composeRecordingFrame`).
+    const k = recordingScale(
+      source.width,
+      source.height,
+      target.pixelSize?.() ?? 1,
+      quality,
+    );
     const dest = document.createElement('canvas');
-    dest.width = source.width;
-    dest.height = source.height;
+    dest.width = source.width * k;
+    dest.height = source.height * k;
     const destCtx = dest.getContext('2d');
     if (destCtx === null) return false;
     destCtx.imageSmoothingEnabled = false;
     const stream = dest.captureStream(0);
     const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
     if (track === undefined) return false;
-    const sink = (await fileSink(fileName)) ?? memorySink(fileName, mimeType);
+    const named = withExtension(fileName, extensionOf(mimeType));
+    const sink = (await fileSink(named, mimeType)) ?? memorySink(named, mimeType);
     const recorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
+      videoBitsPerSecond: recordingBitrate(dest.width, dest.height),
     });
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) void sink.write(e.data);
@@ -269,6 +365,7 @@ export class ScreenRecorder {
     this.#target = target;
     this.#dest = dest;
     this.#destCtx = destCtx;
+    this.#k = k;
     this.#frames = 0;
     recorder.start(CHUNK_MS);
     return true;
@@ -291,6 +388,7 @@ export class ScreenRecorder {
       dest.height,
       target.canvas,
       target.cursor?.() ?? null,
+      this.#k,
     );
     track.requestFrame();
   }
@@ -307,6 +405,7 @@ export class ScreenRecorder {
     this.#target = null;
     this.#dest = null;
     this.#destCtx = null;
+    this.#k = 1;
     this.#frames = 0;
     await new Promise<void>((resolve) => {
       recorder.onstop = () => resolve();

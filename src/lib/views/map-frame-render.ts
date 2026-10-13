@@ -60,6 +60,12 @@ export interface MapFrameInput {
   readonly canvas: HTMLCanvasElement;
   readonly viewportW: number;
   readonly viewportH: number;
+  /**
+   * Device pixels per CSS pixel. `viewportW/H`, `zoom` and the camera stay in CSS pixels; only the
+   * canvas backing store is this much larger, so a high-density screen gets its own pixels instead
+   * of a second, browser-side enlargement.
+   */
+  readonly dpr?: number;
   readonly zoom: number;
 
   readonly cam: Camera;
@@ -146,6 +152,7 @@ export function renderMapFrame(input: MapFrameInput): boolean {
     canvas,
     viewportW,
     viewportH,
+    dpr = 1,
     zoom,
     cam,
     geo,
@@ -176,8 +183,8 @@ export function renderMapFrame(input: MapFrameInput): boolean {
   // The assignment RE-CREATES the drawing surface (free memory, allocate, clear) even when the
   // dimensions did not change. Whether that is expensive is for measurement to say.
   metrics.begin('resize');
-  canvas.width = viewportW;
-  canvas.height = viewportH;
+  canvas.width = Math.round(viewportW * dpr);
+  canvas.height = Math.round(viewportH * dpr);
   metrics.end('resize');
   const ctx = canvas.getContext('2d');
   if (!ctx) {
@@ -211,8 +218,11 @@ export function renderMapFrame(input: MapFrameInput): boolean {
   /** With torus wrap: `posOf` masks both axes, a `% rows` would break on negative values. */
   const heightAt = (c: number, r: number): number => rs.mapTiles[posOf(c, r, geo)].height;
 
+  /** Device pixels per surface pixel — the factor the presenter turns into sharp steps. */
+  const deviceScale = canvasScale * dpr;
+
   ctx.save();
-  ctx.scale(canvasScale, canvasScale);
+  ctx.scale(deviceScale, deviceScale);
 
   /** Part of the static ground surface, hence in index space. */
   const roadLayer = (target: IndexBlitter, f: WindowFrame): void => {
@@ -333,7 +343,7 @@ export function renderMapFrame(input: MapFrameInput): boolean {
     metrics.end('overlays');
 
     // Colour is produced here, INSIDE the zoom transform — that keeps the zoom on the canvas.
-    presenter.present(ctx, target, pal);
+    presenter.present(ctx, target, pal, deviceScale);
   } else {
     // Without archive/palette: colour triangles straight to the screen; roads, border stones and
     // sprites fall away because they need the index space.

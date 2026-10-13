@@ -52,7 +52,7 @@ The special-click shows up everywhere below. Demolishing always needs it, so not
 - **Sound and music** — the effects and the FM-synth soundtrack, read from your archive.
 - **German and English** — the game texts follow your archive, the frame around them follows your browser.
 - **Installable, and it runs offline** — install it from the browser; archive and saved games are already local.
-- **Screenshot and video** — a picture of the game screen, or a recording of it with the pointer.
+- **Screenshot and video** — a picture of the game screen, or a recording of it with the pointer; "High" quality keeps the pixel-art colours clean.
 - **Bug reports in one click** — game state, action log, screenshot and a summary, packed and ready to attach to an issue.
 - **Help built in** — every icon of the Menu, every building and chain, with the original's pictures and its real dialogs; searchable, and it opens on the window you have open.
 - **Levels, missions, free play** — campaign levels with their passwords, or a free game from a map seed code against computer opponents.
