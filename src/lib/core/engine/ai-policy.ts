@@ -161,15 +161,30 @@ export function aiMilitaryPolicy(state: GameState, player: Player): void {
   applyOccupationRow(player, capped);
 }
 
-/**
- * The shift-change trigger (`@0x5474f`..`@0x5489e`). Three weighted sums: strong knights in stock,
- * knights in the field, own military buildings — and the change starts only when the buildings fall
- * below **both** knight measures (`jae 0x5489e` @0x5484f and @0x54858).
- */
-function maybeStartKnightShift(player: Player): void {
-  const idle = (rank: number): number => player.aiIdleSerfs[SERF_KNIGHT0 + rank] ?? 0;
-  const count = (rank: number): number => player.serfCount[SERF_KNIGHT0 + rank] ?? 0;
+/** The three weighted sums of the shift-change trigger — see {@link knightShiftSums}. */
+export interface KnightShiftSums {
+  /** Strong knights in stock: `(K4·2 + K3)·2 + K2`. */
+  readonly stock: number;
+  /** Knights in the field: `((K0 − idleK0)·2 + K1 − idleK1)·2 + K2 − idleK2`. */
+  readonly field: number;
+  /** Own military buildings: `((fortress·2 + tower)·2 + hut)·2`. */
+  readonly forts: number;
+}
 
+/**
+ * The three sums of the shift-change trigger (`@0x5474f`..`@0x54839`), with the original's saturation
+ * and its one unchecked doubling. A pure function so the shift-change assistant asks exactly the
+ * question the AI asks — its inputs come from elsewhere for a human player (see
+ * `enhancements/knight-shift-advisor.ts`), the arithmetic must not.
+ *
+ * `idle(rank)` = knights of that rank in `IdleInStock`, `count(rank)` = `serfCount[Knight0 + rank]`,
+ * `done(type)` = completed buildings of that type.
+ */
+export function knightShiftSums(
+  idle: (rank: number) => number,
+  count: (rank: number) => number,
+  done: (type: number) => number,
+): KnightShiftSums {
  // strong knights in stock: ((K4*2 + K3)*2 + K2), every step saturating (`jb 0x5478a`).
   let stock = satAdd(idle(4), idle(4)); // `add %ax,(%edi)` @0x5475f
   stock = satAdd(stock, idle(3)); // @0x5476e
@@ -186,12 +201,26 @@ function maybeStartKnightShift(player: Player): void {
   field = u16(field - idle(2)); // @0x547ee
 
  // military buildings, weighted: ((fortress*2 + tower)*2 + hut)*2.
-  const done = (type: number): number => player.completedBuildingCount[type - 1] ?? 0;
   let forts = satAdd(done(22), done(22)); // @0x5480b
   forts = satAdd(forts, done(21)); // @0x54818
   forts = satAdd(forts, forts); // @0x54822
   forts = satAdd(forts, done(11)); // @0x5482f
   forts = satAdd(forts, forts); // @0x54839
+
+  return { stock, field, forts };
+}
+
+/**
+ * The shift-change trigger (`@0x5474f`..`@0x5489e`). Three weighted sums: strong knights in stock,
+ * knights in the field, own military buildings — and the change starts only when the buildings fall
+ * below **both** knight measures (`jae 0x5489e` @0x5484f and @0x54858).
+ */
+function maybeStartKnightShift(player: Player): void {
+  const { stock, field, forts } = knightShiftSums(
+    (rank) => player.aiIdleSerfs[SERF_KNIGHT0 + rank] ?? 0,
+    (rank) => player.serfCount[SERF_KNIGHT0 + rank] ?? 0,
+    (type) => player.completedBuildingCount[type - 1] ?? 0,
+  );
 
   if (forts >= field || forts >= stock) return; // @0x5484f/@0x54858
   player.flags |= 1 << 2; // `bts $0x2,%ax` @0x54862 — a shift change is running

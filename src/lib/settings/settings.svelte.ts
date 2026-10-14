@@ -159,8 +159,10 @@ export interface SettingsShape {
 	// switch on — see `enhancements/assistants.ts`. Additive, so no version bump.
 	assistCorner: OverlayCorner;
 	assistOpacity: number;
-	/** The road assistant has a plate over the game view. */
+	/** The road assistant has a row in the assistants overlay. */
 	assistShowRoad: boolean;
+	/** The shift-change assistant has a row in the assistants overlay. */
+	assistShowKnightShift: boolean;
 	/**
 	 * Screen recording: `high` enlarges the video so pixel art keeps its colours (see
 	 * `views/screen-recorder.ts`). Remembered because it is a choice about files, not about one
@@ -213,6 +215,7 @@ const DEFAULTS: SettingsShape = {
 	assistCorner: 'bl',
 	assistOpacity: OVERLAY_OPACITY_DEFAULT,
 	assistShowRoad: false,
+	assistShowKnightShift: false,
 	recordingQuality: 'standard'
 };
 
@@ -271,6 +274,7 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	assistOpacity: (v): v is number =>
 		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
 	assistShowRoad: (v): v is boolean => typeof v === 'boolean',
+	assistShowKnightShift: (v): v is boolean => typeof v === 'boolean',
 	recordingQuality: (v): v is RecordingQuality => isOneOf(v, RECORDING_QUALITIES)
 };
 

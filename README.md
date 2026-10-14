@@ -61,9 +61,10 @@ The special-click shows up everywhere below. Demolishing always needs it, so not
 
 Things the original never had. Every one of them is off until you switch it on, and the game rules stay untouched.
 
-- **Stock overview** — a panel over the map with your goods, your serfs and the supply pointers of your production chains, all on one screen. You choose what it shows, where it sits and how see-through it is.
+- **Stock overview** — an overlay over the map with your goods, your serfs and the supply pointers of your production chains, all on one screen. You choose what it shows, where it sits and how see-through it is.
 - **Hack: all underground riches** — shows every deposit in the ground with the same sign a geologist would plant, including the ones no geologist will ever report.
 - **Road assistant** — pick two of your flags and it builds the fastest road between them, using exactly the clicks you would make yourself.
+- **Shift change assistant** — a traffic light with a button that orders a shift change, like the one in the knight menu: green when every knight sent home would get a stronger replacement from your stores, yellow when knights would be swapped for little gain, red when no stronger knight waits.
 
 | the map up close | pulled back |
 |---|---|

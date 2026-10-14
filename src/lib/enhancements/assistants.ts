@@ -9,15 +9,15 @@
  * itself would be a second rule book beside the original's.
  *
  * Unlike a hack an assistant has nothing to switch on: it waits until it is asked. So each has one
- * setting only — whether its plate stands over the game view — and, like every enhancement, ships
- * without one.
+ * setting only — whether its row stands in the assistants overlay over the game view — and, like every
+ * enhancement, ships without one. All assistants share ONE overlay: one corner, one opacity.
  */
 import type { AssistSettingKey, SettingsShape } from '../settings/settings.svelte.js';
 import type { ShellKey } from '../shell/i18n.js';
 
 export interface Assistant {
   readonly id: string;
-  /** Its plate stands over the game view. */
+  /** Its row stands in the assistants overlay. */
   readonly showKey: AssistSettingKey;
   readonly labelKey: ShellKey;
   readonly noteKey: ShellKey;
@@ -30,6 +30,12 @@ export const ASSISTANTS: readonly Assistant[] = [
     labelKey: 'enh.assist.road',
     noteKey: 'enh.assist.road.note',
   },
+  {
+    id: 'knightShift',
+    showKey: 'assistShowKnightShift',
+    labelKey: 'enh.assist.shift',
+    noteKey: 'enh.assist.shift.note',
+  },
 ];
 
 export function assistantShown(settings: SettingsShape, assistant: Assistant): boolean {
@@ -40,4 +46,9 @@ export function assistantShown(settings: SettingsShape, assistant: Assistant): b
 export function assistantInUse(settings: SettingsShape, id: string): boolean {
   const a = ASSISTANTS.find((x) => x.id === id);
   return a !== undefined && assistantShown(settings, a);
+}
+
+/** Does the assistants overlay have at least one row? */
+export function anyAssistantShown(settings: SettingsShape): boolean {
+  return ASSISTANTS.some((a) => assistantShown(settings, a));
 }

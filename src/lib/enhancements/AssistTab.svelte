@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * Which assistants get a plate over the game view — one line per entry in `assistants.ts`.
+   * Which assistants get a row in the assistants overlay — one line per entry in `assistants.ts`.
    *
-   * Ticking a box switches nothing on: an assistant waits until it is asked, on its plate.
+   * Ticking a box switches nothing on: an assistant waits until it is asked, in its row.
    */
   import { ASSISTANTS, assistantShown } from './assistants.js';
   import { settings } from '../settings/settings.svelte.js';
@@ -26,7 +26,6 @@
       </li>
     {/each}
   </ul>
-  <p class="note">{st('enh.assist.note')}</p>
 </section>
 
 <style>
@@ -62,10 +61,5 @@
     margin: 0.25rem 0 0;
     color: var(--fg-dim);
     line-height: 1.5;
-  }
-
-  ul + .note {
-    padding-top: 0.9rem;
-    border-top: 1px solid var(--line);
   }
 </style>

@@ -100,6 +100,7 @@
   import { settings, ticksPerSecondOf } from '../settings/settings.svelte.js';
   import { activeHackIds, hackInForce } from '../enhancements/hacks.js';
   import { roadAssistant, ROAD_REFUSAL_TEXT } from '../enhancements/road-assistant.svelte.js';
+  import { knightShiftAssistant } from '../enhancements/knight-shift-assistant.svelte.js';
   import { isOwnFlag, planRoad, roadPlanCommands, type RoadPlan } from '../enhancements/road-planner.js';
   import { plannedRoadPaths } from '../core/road-plan-layer.js';
   import { logicFrame, runTicks } from '../core/engine/tick.js';
@@ -603,7 +604,17 @@
   $effect(() => (canPlay ? simulation.provide() : undefined));
   // … and the road assistant has someone to build for.
   $effect(() => (canPlay ? roadAssistant.provide() : undefined));
-  // Unlisting the assistant takes away its plate, and with it the only way to cancel a pick — so
+  // … and the shift-change assistant the same command the knight menu's button issues.
+  $effect(() =>
+    canPlay
+      ? knightShiftAssistant.provide(() => {
+          runCommand({ kind: 'startKnightShift', player: buildPlayer });
+          playUiSound(UI_SOUND_ACCEPT); // as the knight menu's button: sound 2 @0x2dde6
+          knightShiftAssistant.refresh(engineState, engineState.players[buildPlayer]);
+        })
+      : undefined,
+  );
+  // Unlisting the assistant takes away its row, and with it the only way to cancel a pick — so
   // the pick ends with it rather than keep swallowing map clicks.
   $effect(() => {
     if (!settings.value.assistShowRoad && roadAssistant.phase !== 'idle') roadAssistant.reset();
@@ -847,6 +858,9 @@
         applyRoadBuildAbort(); // @0x4a5f1 - the engine can only report the road build, not abort it
         openMissionEndIfDue();
         serviceMessageIndicators(n); // @0xbe22 - note, arrow, message sound, plus the arrow clock
+        if (settings.value.assistShowKnightShift) {
+          knightShiftAssistant.refresh(gs, gs.players[buildPlayer]);
+        }
       }
       // **Drawing rate: one frame per logic frame, not per `rAF`.** The original draws ~12.5 times a
       // second (`gameTick` +8 per frame); we ran at ~60 and thereby showed intermediate states it

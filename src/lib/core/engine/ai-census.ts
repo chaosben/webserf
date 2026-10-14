@@ -183,6 +183,24 @@ export function supplyRatio(supply: number, capacity: number): number {
 }
 
 /**
+ * The serf pass of the census (@0x5c120): idle serfs per profession of one player. Exported on its own
+ * because the shift-change assistant needs the same count for a HUMAN player, for whom the census never
+ * runs — and the count has to be this one, not a second rule beside it.
+ */
+export function countIdleSerfs(state: GameState, playerIndex: number): number[] {
+  const idle = new Array<number>(AI_IDLE_SERF_SLOTS).fill(0);
+  for (const serf of state.serfs) {
+    if (serf === null || serf === undefined) continue;
+    if (serf.state !== SERF_STATE_IDLE_IN_STOCK) continue; // `cmpb $0x1,0xa(%ebx)` @0x5c1bc
+    if (serf.owner !== playerIndex) continue; // `serf[0] & 3` @0x5c1ca
+    // `(serf[0] & 0x7c) >> 1` == type * 2 == the byte offset; our model keeps the type decoded.
+    if (serf.type < 0 || serf.type >= AI_IDLE_SERF_SLOTS) continue;
+    idle[serf.type] = u16((idle[serf.type] ?? 0) + 1);
+  }
+  return idle;
+}
+
+/**
  * **The census** — rewrites the player's `aiSupplyRatio`, `aiIdleSerfs` and `aiStockpile`. Returns how
  * many buildings/serfs/inventories were included; the original has no return value.
  */
@@ -220,17 +238,9 @@ export function aiCensus(state: GameState, player: Player): {
   player.aiSupplyRatio = ratios;
 
   // Serf pass (@0x5c120).
-  const idle = new Array<number>(AI_IDLE_SERF_SLOTS).fill(0);
+  const idle = countIdleSerfs(state, player.index);
   let serfs = 0;
-  for (const serf of state.serfs) {
-    if (serf === null || serf === undefined) continue;
-    if (serf.state !== SERF_STATE_IDLE_IN_STOCK) continue; // `cmpb $0x1,0xa(%ebx)` @0x5c1bc
-    if (serf.owner !== player.index) continue; // `serf[0] & 3` @0x5c1ca
-    // `(serf[0] & 0x7c) >> 1` == type * 2 == the byte offset; our model keeps the type decoded.
-    if (serf.type < 0 || serf.type >= AI_IDLE_SERF_SLOTS) continue;
-    idle[serf.type] = u16((idle[serf.type] ?? 0) + 1);
-    serfs += 1;
-  }
+  for (const n of idle) serfs += n;
   player.aiIdleSerfs = idle;
 
   // Resource pass (@0x5c218).

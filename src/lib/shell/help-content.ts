@@ -13,7 +13,7 @@
 import type { OverlayTab } from './drawer.js';
 import { st, type ShellKey } from './i18n.js';
 import { buildingName, goodName, serfName } from '../enhancements/entity-names.js';
-import { goodIcon, serfIcon } from '../enhancements/ui-icons.js';
+import { goodIcon, serfIcon, knightShiftIcon } from '../enhancements/ui-icons.js';
 import { UI_ICON_BASE, UI_PANELBUTTON_BASE, CURSOR_MARKER_BASE } from '../core/ui-render.js';
 import { MAP_OBJECT_BASE } from '../core/map-render.js';
 import { MAP_BUILDING_SPRITE } from '../core/building-sprites.js';
@@ -379,6 +379,11 @@ export const HELP_SECTIONS: Readonly<Record<string, readonly HelpSection[]>> = {
         { kind: 'text', textKey: 'help.enh.stock' },
         { kind: 'text', textKey: 'help.enh.hacks' },
         { kind: 'text', textKey: 'help.enh.assist' },
+        {
+          kind: 'text',
+          textKey: 'help.enh.assist.shift',
+          images: [{ kind: 'sprite', entry: UI_ICON_BASE + knightShiftIcon() }],
+        },
       ],
     },
   ],

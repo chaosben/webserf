@@ -14,7 +14,8 @@
    */
   import StockOverlay from './StockOverlay.svelte';
   import HacksOverlay from './HacksOverlay.svelte';
-  import RoadAssistantOverlay from './RoadAssistantOverlay.svelte';
+  import AssistantsOverlay from './AssistantsOverlay.svelte';
+  import { anyAssistantShown } from './assistants.js';
   import { OVERLAY_CORNERS } from './overlay-place.js';
   import { settings } from '../settings/settings.svelte.js';
   import type { StockView } from './stock-overview.js';
@@ -43,8 +44,8 @@
     {#if settings.value.hacksCorner === corner}
       <HacksOverlay opacity={settings.value.hacksOpacity} {scale} />
     {/if}
-    {#if settings.value.assistCorner === corner && settings.value.assistShowRoad}
-      <RoadAssistantOverlay opacity={settings.value.assistOpacity} {scale} />
+    {#if settings.value.assistCorner === corner && anyAssistantShown(settings.value)}
+      <AssistantsOverlay opacity={settings.value.assistOpacity} {scale} />
     {/if}
   </div>
 {/each}

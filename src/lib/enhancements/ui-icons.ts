@@ -13,6 +13,7 @@
  */
 import { CASTLE_POPUP_NUMBERS, resourceIcon } from '../core/building-popup.js';
 import { PROFESSION_STATS_LAYOUT, PROFESSION_STATS_SLOTS } from '../core/stats-popup.js';
+import { KNIGHT_POPUP_HITBOXES, KNIGHT_POPUP_ICONS } from '../core/settings-popup.js';
 
 /** Serf type of the unemployed settler — a number in the corner of screen 0x13, not a gauge. */
 export const SETTLER_SERF_TYPE = 21;
@@ -53,3 +54,19 @@ export const SERF_ORDER: readonly number[] = [
   ...PROFESSION_STATS_SLOTS.map((slot) => slot.type),
   SETTLER_SERF_TYPE,
 ];
+
+/** Action of the shift-change button in the knight menu. */
+const KNIGHT_SHIFT_ACTION = 0xaf;
+
+/**
+ * The icon of the knight menu's shift-change button. Derived, not copied: it is the layout entry of
+ * screen 0x2d that sits where the hit box of action `0xaf` starts (layout columns are eighths of the
+ * box's pixel x, rows are pixels).
+ */
+export function knightShiftIcon(): number {
+  const zone = KNIGHT_POPUP_HITBOXES.find((z) => z.action === KNIGHT_SHIFT_ACTION);
+  const item =
+    zone === undefined ? undefined : KNIGHT_POPUP_ICONS.find((i) => i.col === zone.x0 >> 3 && i.row === zone.y0);
+  if (item === undefined) throw new Error('knight menu: no icon at the shift-change button');
+  return item.icon;
+}

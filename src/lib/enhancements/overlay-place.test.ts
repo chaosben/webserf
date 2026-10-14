@@ -82,7 +82,7 @@ describe('the map click and our plates', () => {
  */
 describe('the size of our plates over the game surface', () => {
   const layout = readFileSync(join(HERE, '../../routes/+layout.svelte'), 'utf8');
-  const plates = ['StockOverlay.svelte', 'HacksOverlay.svelte', 'RoadAssistantOverlay.svelte'];
+  const plates = ['StockOverlay.svelte', 'HacksOverlay.svelte', 'AssistantsOverlay.svelte'];
 
   it('measures the game in its own pixel base, not in the shell size', () => {
     expect(layout).toContain('--game-px:');
@@ -123,7 +123,7 @@ describe('overlay opacity', () => {
     const layout = readFileSync(join(HERE, '../../routes/+layout.svelte'), 'utf8');
     const rule = layout.split(':global(.game-overlay)')[1]!.split('}')[0];
     expect(rule).toContain('opacity: var(--plate-opacity');
-    for (const name of ['StockOverlay.svelte', 'HacksOverlay.svelte', 'RoadAssistantOverlay.svelte']) {
+    for (const name of ['StockOverlay.svelte', 'HacksOverlay.svelte', 'AssistantsOverlay.svelte']) {
       const css = readFileSync(join(HERE, name), 'utf8');
       const style = css.slice(css.indexOf('<style>')).replace(/\/\*[\s\S]*?\*\//g, '');
       expect(style, name).not.toContain('--plate-opacity');

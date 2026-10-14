@@ -247,12 +247,23 @@ function knightRequestRankParam(player: Player | null): number {
  * bounds.
  */
 export function militaryOccupancyTarget(state: GameState, bld: Building): number | null {
+  const player = state.players[bld.owner];
+  if (!player) return null;
+  return occupancyTargetIn(state, bld, (player.flags & PLAYER_FLAG_REDUCED_OCCUPANCY) !== 0);
+}
+
+/**
+ * The target occupancy with phase 1 of the shift change forced on or off — what a building WOULD aim
+ * at, whatever the player's flags say now. The shift-change assistant asks this to predict how many
+ * knights a building would give away.
+ */
+export function occupancyTargetIn(state: GameState, bld: Building, reduced: boolean): number | null {
   const table = MILITARY_OCCUPANCY[bld.type];
   if (table === undefined) return null;
   const player = state.players[bld.owner];
   if (!player) return null;
   const occ = player.knightOccupation[bld.threatLevel & 3] ?? 0;
-  const idx = ((occ >> 4) & 0xf) + ((player.flags & PLAYER_FLAG_REDUCED_OCCUPANCY) !== 0 ? 5 : 0);
+  const idx = ((occ >> 4) & 0xf) + (reduced ? 5 : 0);
   return table[idx] ?? 0;
 }
 
