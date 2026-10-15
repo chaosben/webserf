@@ -14,11 +14,10 @@
  * a size nobody attaches to an issue.
  *
  * The log belongs with it because the engine is deterministic: from one state anything can be
- * computed forwards, but which clicks led there cannot be reconstructed. It is replayed from the
- * SOURCE state named in `report.md` — `state.json` is the result, the log the way there.
- *
- * A second state ("before/after") is deliberately missing: it would contain nothing that cannot be
- * computed from the first.
+ * computed forwards, but which clicks led there cannot be reconstructed. It is replayed from
+ * `source.json`, the state the session started from — `state.json` is the result, the log the way
+ * there. The source has to travel in the package: a loaded save lives in the reporter's browser and
+ * nowhere else.
  */
 import { FRAME_TICKS } from '../core/engine/tick.js';
 import { mapSeedInputCode } from '../core/main-menu.js';
@@ -33,7 +32,10 @@ import { ISSUE_NOTE_LIMIT, newIssueUrl } from '../shell/project.js';
 import { buildStamp } from '../shell/build-info.js';
 
 export interface RecordedAction {
+  /** `gameTick` when applied — a u16, it wraps. For replaying use {@link elapsed}. */
   readonly tick: number;
+  /** Ticks run since the source state when the command was applied (before that pump's ticks). */
+  readonly elapsed: number;
   readonly kind: string;
   readonly detail: Record<string, unknown>;
   /** `false` when the engine rejected it — often exactly the interesting case. */
@@ -68,6 +70,8 @@ export interface DebugReportInput {
   readonly view: DebugViewContext;
   readonly screenshotDataUrl: string | null;
   readonly sourceFile?: string;
+  /** Where {@link actions} start from — without it a report out of a loaded save cannot be replayed. */
+  readonly origin?: ReportOrigin;
   /**
    * Drawing cost, measured on the REPORTER's machine. It is here because "stutters when zooming
    * out" is the only class of fault that can NOT be recomputed from save and action log: it hangs
@@ -75,6 +79,15 @@ export interface DebugReportInput {
    * the situation is gone.
    */
   readonly render?: RenderMetricsReport;
+}
+
+/** The source state of the session plus how far it ran. */
+export interface ReportOrigin {
+  readonly source: SaveGameState;
+  /** Ticks run from `source` to `state`. */
+  readonly elapsed: number;
+  /** Log entries lost to the size limit; non-zero means the log cannot be replayed. */
+  readonly dropped: number;
 }
 
 /**
@@ -229,6 +242,28 @@ function renderCostLines(r: RenderMetricsReport): string[] {
   return out;
 }
 
+/** How to get from `source.json` to `state.json` — or why that is not possible. */
+function replayLines(origin: ReportOrigin | undefined): string[] {
+  if (origin === undefined) {
+    return ['No `source.json` in this package — the actions cannot be replayed.', ''];
+  }
+  const out = [
+    `\`source.json\` is the state the session started from (same form as \`state.json\`), and`,
+    `**${origin.elapsed} ticks** separate it from \`state.json\`. \`actions.json\` holds the commands`,
+    'machine-readable: for each entry run ticks up to its `elapsed`, then `applyCommand`; finally run',
+    'up to the total. Not included are input actions that do not go through the command layer yet.',
+  ];
+  if (origin.dropped > 0) {
+    out.push(
+      '',
+      `**NOT REPLAYABLE**: ${origin.dropped} early actions fell out of the log, so the way from`,
+      '`source.json` to `state.json` is incomplete.',
+    );
+  }
+  out.push('');
+  return out;
+}
+
 /** The readable part of the report. */
 function buildReport(input: DebugReportInput, id: string): string {
   const { state, view } = input;
@@ -291,7 +326,7 @@ function buildReport(input: DebugReportInput, id: string): string {
   else {
     for (const a of input.actions) {
       lines.push(
-        `- tick ${a.tick}: \`${a.kind}\` ${JSON.stringify(a.detail)}${a.applied ? '' : '  ⟵ REJECTED'}`,
+        `- tick ${a.tick} (+${a.elapsed}): \`${a.kind}\` ${JSON.stringify(a.detail)}${a.applied ? '' : '  ⟵ REJECTED'}`,
       );
     }
   }
@@ -328,10 +363,7 @@ function buildReport(input: DebugReportInput, id: string): string {
     '`restoreReportState` rebuilds it. The round trip is lossless — whatever does not match the',
     'generated map is in the diff.',
     '',
-    '`actions.json` holds the same commands machine-readable. Replay from the **source** named above,',
-    'not from `state.json` (the actions happened before it): for each entry advance to its `tick`,',
-    'then `applyCommand`. Not included are input actions that do not go through the command layer yet.',
-    '',
+    ...replayLines(input.origin),
   );
   return lines.join('\n');
 }
@@ -354,6 +386,21 @@ export async function buildDebugReport(
   const entries: { name: string; data: Uint8Array; modifiedAt: number }[] = [
     { name: 'report.md', data: utf8(report), modifiedAt: at },
     { name: 'state.json', data: utf8(JSON.stringify(reduceReportState(input.state))), modifiedAt: at },
+    ...(input.origin === undefined
+      ? []
+      : [
+          {
+            name: 'source.json',
+            data: utf8(
+              JSON.stringify({
+                ...reduceReportState(input.origin.source),
+                elapsed: input.origin.elapsed,
+                dropped: input.origin.dropped,
+              }),
+            ),
+            modifiedAt: at,
+          },
+        ]),
     { name: 'actions.json', data: utf8(JSON.stringify(input.actions, null, 2)), modifiedAt: at },
   ];
   if (input.screenshotDataUrl !== null) {
@@ -398,7 +445,8 @@ export function issueBody(input: DebugReportInput, id: string, fileName: string)
     '',
     `- [ ] \`${fileName}\` attached — drag the file into this issue`,
     '',
-    'The package holds the save game, the recorded actions, the screenshot and the render timings.',
+    'The package holds the save game, its starting state, the recorded actions, the screenshot and',
+    'the render timings.',
     'Without it only the fingerprint below is available.',
     '',
     '### Fingerprint',

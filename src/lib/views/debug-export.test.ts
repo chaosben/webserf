@@ -114,7 +114,7 @@ function input(over: Partial<DebugReportInput> = {}): DebugReportInput {
   return {
     note: 'Mine baut nicht',
     state: fakeState(),
-    actions: [{ tick: 100, kind: 'placeBuilding', detail: { col: 1, row: 0 }, applied: true }],
+    actions: [{ tick: 100, elapsed: 40, kind: 'placeBuilding', detail: { col: 1, row: 0 }, applied: true }],
     screenshotDataUrl: null,
     sourceFile: 'SAVE0.DS',
     view: {
@@ -263,6 +263,36 @@ describe('buildDebugReport — what actually ends up in the package', () => {
     expect([...(await filesOf()).keys()]).toEqual(['report.md', 'state.json', 'actions.json']);
   });
 
+  /**
+   * A loaded save lives only in the reporter's browser. Without its starting state in the package
+   * the action log has nothing to be replayed against — exactly what made report veqg2a9x useless
+   * for finding the cause.
+   */
+  it('carries the starting state as source.json and says how far it ran', async () => {
+    const origin = { source: fakeState(), elapsed: 1234, dropped: 0 };
+    const report = await buildDebugReport(input({ origin }));
+    const entries = await readZip(report.bytes);
+    expect(entries.map((e) => e.name)).toEqual(['report.md', 'state.json', 'source.json', 'actions.json']);
+    const text = (n: string) => new TextDecoder().decode(entries.find((e) => e.name === n)!.data);
+    const source = JSON.parse(text('source.json')) as { header: { tick: number }; elapsed: number };
+    expect(source.header.tick).toBe(43794);
+    expect(source.elapsed).toBe(1234);
+    expect(text('source.json')).not.toContain('"mapTiles"');
+    const md = text('report.md');
+    expect(md).toContain('**1234 ticks** separate it');
+    expect(md).toContain('tick 100 (+40)');
+    expect(md).not.toContain('NOT REPLAYABLE');
+  });
+
+  it('says plainly when the log lost entries and cannot be replayed', async () => {
+    const md = await mdOf({ origin: { source: fakeState(), elapsed: 9, dropped: 3 } });
+    expect(md).toContain('**NOT REPLAYABLE**: 3 early actions');
+  });
+
+  it('without a source it says the actions cannot be replayed', async () => {
+    expect(await mdOf()).toContain('No `source.json` in this package');
+  });
+
   it('puts the PNG into the package decoded — not the `data:` header', async () => {
     const report = await buildDebugReport(input({ screenshotDataUrl: 'data:image/png;base64,QUJD' }));
     const entries = await readZip(report.bytes);
@@ -298,7 +328,7 @@ describe('buildDebugReport — what actually ends up in the package', () => {
     // Interface state the save game does not know about.
     expect(md).toContain('zoom 200 %');
     // And how it got there.
-    expect(md).toContain('tick 100: `placeBuilding`');
+    expect(md).toContain('tick 100 (+40): `placeBuilding`');
   });
 
   /**
@@ -316,7 +346,7 @@ describe('buildDebugReport — what actually ends up in the package', () => {
   });
 
   it('marks rejected commands visibly (often the interesting case)', async () => {
-    const md = await mdOf({ actions: [{ tick: 5, kind: 'buildFlag', detail: {}, applied: false }] });
+    const md = await mdOf({ actions: [{ tick: 5, elapsed: 0, kind: 'buildFlag', detail: {}, applied: false }] });
     expect(md).toContain('REJECTED');
   });
 

@@ -85,11 +85,13 @@
   import { encodeSaveGame } from '../core/save-encoder.js';
   import { parseSaveGame } from '../core/save-parser.js';
   import type { SaveStore } from '../core/save-store.js';
+  import { buildDebugReport, type DebugReport } from './debug-export.js';
   import {
-    buildDebugReport,
-    type DebugReport,
-    type RecordedAction,
-  } from './debug-export.js';
+    advanceReportSession,
+    newReportSession,
+    recordReportAction,
+    type ReportSession,
+  } from './report-session.js';
   import { bugReports } from '../shell/bug-report.svelte.js';
   import { simulation } from '../shell/simulation.svelte.js';
   import { helpContext } from '../shell/help-context.svelte.js';
@@ -715,11 +717,10 @@
    * it. The REJECTED ones in particular are often the interesting case when debugging.
    *
    * Why this runs along at all: the engine is deterministic, from a save I can compute forward as far
-   * as I like — but not guess the clicks that led to the wrong picture. The ring buffer caps the
-   * memory; older entries drop out.
+   * as I like — but not guess the clicks that led to the wrong picture. The session hangs on `save`,
+   * so a save loaded in the disk menu starts a fresh log against its own source state.
    */
-  const ACTION_LOG_LIMIT = 500;
-  let actionLog = $state<RecordedAction[]>([]);
+  const reportSession = $derived<ReportSession>(newReportSession(save));
 
   /**
    * **Apply a command now and log it** — the only way a command enters the state.
@@ -769,9 +770,7 @@
   }
 
   function recordAction(cmd: Command, applied: boolean): void {
-    const { kind, ...detail } = cmd as { kind: string } & Record<string, unknown>;
-    actionLog.push({ tick: engineState.gameTick, kind, detail, applied });
-    if (actionLog.length > ACTION_LOG_LIMIT) actionLog = actionLog.slice(-ACTION_LOG_LIMIT);
+    recordReportAction(reportSession, engineState.gameTick, cmd, applied);
   }
 
   /**
@@ -791,9 +790,14 @@
     return buildDebugReport({
       note,
       state: snapshot(engineState),
-      actions: actionLog,
+      actions: reportSession.actions,
       screenshotDataUrl: png,
       sourceFile,
+      origin: {
+        source: reportSession.source,
+        elapsed: reportSession.elapsed,
+        dropped: reportSession.dropped,
+      },
       // The drawing costs of this machine. Nothing displays them; the measurement exists for exactly
       // this line of the report.
       render: metrics.report(),
@@ -852,6 +856,7 @@
       if (n > 0) {
         metrics.begin('logic');
         runTicks(gs, n);
+        advanceReportSession(reportSession, n);
         metrics.end('logic');
         metrics.countTicks(n); // reference: a median per call says nothing about load without the rate
         engineDirty = true;
