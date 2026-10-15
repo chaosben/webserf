@@ -100,10 +100,11 @@
 {/if}
 
 <style>
+  /* Two columns shared by every row (symbol | label): each button takes them over as a subgrid, so
+     the labels start at the same x whatever the width of the glyph in front of them. */
   .assist {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: auto 1fr;
     gap: 0.25em;
     padding: 0.35em;
     background: var(--bg-sunken);
@@ -112,22 +113,31 @@
     user-select: none;
   }
 
+  /* As low as a hack switch beside it. That one holds a 9 px sign (× scale) plus 0.25em padding,
+     ≈ 1.2em; a 1em line with 0.1em padding comes to the same height without clipping a letter. */
   button {
-    display: flex;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
     align-items: center;
-    gap: 0.35em;
-    padding: 0.25em 0.5em;
+    justify-items: start;
+    column-gap: 0.35em;
+    padding: 0.1em 0.4em;
+    line-height: 1;
+    text-align: start;
     white-space: nowrap;
   }
 
   button :global(svg) {
-    width: 1.3em;
-    height: 1.3em;
-    flex: none;
+    width: 1em;
+    height: 1em;
   }
 
+  /* `start`, not the default stretch: stretched to the width of the longer label, the shorter one
+     would be centred by the button's text alignment and begin further right than the row below. */
   .labels {
     display: grid;
+    justify-items: start;
   }
 
   .labels > span {
@@ -138,12 +148,10 @@
     visibility: hidden;
   }
 
-  /* As wide as the road assistant's symbol, so the labels of both rows start at the same x; the
-     dot is drawn inside that box. */
+  /* The box of the road assistant's symbol; the dot is drawn inside it. */
   .light {
-    flex: none;
-    width: 1.3em;
-    height: 1.3em;
+    width: 1em;
+    height: 1em;
     display: grid;
     place-items: center;
   }
@@ -151,8 +159,8 @@
   .light::before {
     content: '';
     /* About the extent of the symbol's glyph inside its box. */
-    width: 1.05em;
-    height: 1.05em;
+    width: 0.8em;
+    height: 0.8em;
     border-radius: 50%;
     border: 1px solid var(--line);
     background: var(--light);
