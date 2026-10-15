@@ -263,6 +263,7 @@ function makeMilitary(
     garrison?: number[];
  /** Serf on the building tile (blocks the exit). */
     tileSerf?: number;
+    flagTileSerf?: number;
     knightShiftTimer?: number;
   } = {},
 ): { state: GameState; bld: Building; inv: Inventory } {
@@ -366,6 +367,8 @@ function makeMilitary(
   const geo = { cols: 64, rows: 64, colMask: 63, rowMask: 63, rowShift: 6 };
   const mapTiles = Array.from({ length: 64 * 64 }, () => ({ serfIndex: 0 }));
   if (over.tileSerf !== undefined) mapTiles[10 * 64 + 10]!.serfIndex = over.tileSerf;
+  // The building's flag: DownRight of (10,10).
+  if (over.flagTileSerf !== undefined) mapTiles[11 * 64 + 11]!.serfIndex = over.flagTileSerf;
 
   const state = {
     gameTick: 500,
@@ -511,11 +514,17 @@ describe('serf-request — ejection when overstaffed', () => {
     expect(chain(state, bld)).toEqual([101, 102]);
   });
 
-  it('ejects nobody while a serf stands on the building tile', () => {
-    const { state, bld } = makeMilitary({ ...OVERSTAFFED, tileSerf: 55 });
+  it('ejects nobody while a serf stands on the building FLAG tile (@0x1575f)', () => {
+    const { state, bld } = makeMilitary({ ...OVERSTAFFED, flagTileSerf: 55 });
     requestBuildingWorkers(state);
     expect(chain(state, bld)).toEqual([100, 101, 102]);
     expect(bld.stock[0]).toEqual({ available: 3, requested: 0 });
+  });
+
+  it('a serf on the building tile itself does not block the ejection', () => {
+    const { state, bld } = makeMilitary({ ...OVERSTAFFED, tileSerf: 55 });
+    requestBuildingWorkers(state);
+    expect(chain(state, bld)).toEqual([100, 102]);
   });
 
   it('ejects nobody while the garrison does not EXCEED the target', () => {

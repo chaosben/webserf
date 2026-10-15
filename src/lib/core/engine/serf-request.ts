@@ -28,7 +28,7 @@
 import type { GameState, Building, Inventory, Player, Serf } from './state.js';
 import { setSerfType } from './state.js';
 import { landNeighborFlag, flagInventory } from './flag-update.js';
-import { posOf } from './position.js';
+import { posOf, neighbor, Direction } from './position.js';
 import { u16 } from './int.js';
 import { newFlagSearch, FLAG_BFS_LEVEL_BUDGET } from './flag-search.js';
 import { unionU16, setUnionU8, setUnionU16 } from './serf-machine.js';
@@ -339,9 +339,9 @@ export function militaryGoldDemand(state: GameState, bld: Building): void {
  * **Ejecting the weakest knight** (`@0x15707`) — the half of the shift change that lives in the
  * building. Runs only on over-occupancy; **one** knight per call.
  *
- * The order matters. First the **exit must be free**: if a serf stands on the building tile
- * (`game[bld.pos].serf != 0` @0x1575f) the original aborts, otherwise the one stepping out would
- * collide with it. Then the weakest is found by walking the garrison chain `bld[10] -> serf[0xe]` for
+ * The order matters. First the **exit must be free**: if a serf stands on the building's **flag** tile
+ * (`game[bld.pos + DownRight].serf != 0` @0x1575f) the original aborts, otherwise the one stepping out
+ * would have nowhere to go. Then the weakest is found by walking the garrison chain `bld[10] -> serf[0xe]` for
  * the **smallest** value of `serf[0] & 0x7c` — the mask leaves the type as `type << 2`, so a smaller
  * value is a lower rank. Then it is unhooked from the chain, and finally the exit is set up
  * (@0x158d0): `field_B = -2` ("back to the store"), `dest = 0` so state 2 finds the nearest store
@@ -353,8 +353,11 @@ export function militaryGoldDemand(state: GameState, bld: Building): void {
  */
 function ejectWeakestKnight(state: GameState, bld: Building): void {
   if (bld.col === null || bld.row === null) return;
-  const pos = posOf(bld.col, bld.row, state.geo);
-  if (state.mapTiles[pos].serfIndex !== 0) return; // exit occupied (@0x1577f)
+  // The flag tile, not the building tile (`add gs+0x08` == DownRight @0x1574e, `jne` @0x1577f): an
+  // ejected knight is registered nowhere until state 7 steps him onto that flag, so a test on the
+  // building tile would let ejections pile up inside behind a knight waiting on the flag.
+  const flagPos = neighbor(posOf(bld.col, bld.row, state.geo), Direction.DownRight, state.geo);
+  if (state.mapTiles[flagPos].serfIndex !== 0) return;
 
   let weakest = 0;
   let weakestRank = 0xff; // `mov $0xff,%al` @0x15798
