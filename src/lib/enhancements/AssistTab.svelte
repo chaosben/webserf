@@ -2,7 +2,8 @@
   /**
    * Which assistants get a row in the assistants overlay — one line per entry in `assistants.ts`.
    *
-   * Ticking a box switches nothing on: an assistant waits until it is asked, in its row.
+   * Ticking a box switches nothing on: an assistant waits until it is asked, in its row. Its
+   * options say how it works once asked, so they stand under it.
    */
   import { ASSISTANTS, assistantShown } from './assistants.js';
   import { settings } from '../settings/settings.svelte.js';
@@ -23,6 +24,16 @@
           <span>{st(assistant.labelKey)}</span>
         </label>
         <p class="note">{st(assistant.noteKey)}</p>
+        {#each assistant.options ?? [] as option (option.key)}
+          <label class="option">
+            <input
+              type="checkbox"
+              checked={settings.value[option.key]}
+              onchange={() => settings.set(option.key, !settings.value[option.key])}
+            />
+            <span>{st(option.labelKey)}</span>
+          </label>
+        {/each}
       </li>
     {/each}
   </ul>
@@ -55,6 +66,10 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .option {
+    margin: 0.4rem 0 0 1.5rem;
   }
 
   .note {

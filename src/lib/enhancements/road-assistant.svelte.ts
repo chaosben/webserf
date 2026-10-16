@@ -20,7 +20,7 @@ class RoadAssistantBus {
   phase = $state<RoadAssistPhase>('idle');
   /** The chosen start flag, from `pickTarget` on. */
   start = $state.raw<TilePoint | null>(null);
-  /** The route to the flag under the pointer, in `pickTarget` — a preview only. */
+  /** The route to the flag or road under the pointer, in `pickTarget` — a preview only. */
   hover = $state.raw<RoadPlan | null>(null);
   /** Is a game view mounted that can build? */
   present = $state(false);
@@ -81,6 +81,8 @@ export const roadAssistant = new RoadAssistantBus();
 /** The words for a refusal of the planner — spelled out, so every key is found where it is used. */
 export const ROAD_REFUSAL_TEXT: Readonly<Record<RoadPlanRefusal, ShellKey>> = {
   notOwnFlag: 'enh.assist.road.notOwnFlag',
+  notOwnTarget: 'enh.assist.road.notOwnTarget',
   sameFlag: 'enh.assist.road.sameFlag',
+  noFlagSpot: 'enh.assist.road.noFlagSpot',
   noRoute: 'enh.assist.road.noRoute',
 };

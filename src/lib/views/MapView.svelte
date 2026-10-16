@@ -4421,18 +4421,18 @@
   });
 
   /**
-   * **A map click while the road assistant picks flags.** The first click chooses the start flag;
-   * the second plans against the state as it is NOW and builds at once, so there is no preview to go
-   * stale in between.
+   * **A map click while the road assistant picks.** The first click chooses the start flag; the
+   * second — a flag or a road — plans against the state as it is NOW and builds at once, so there is
+   * no preview to go stale in between. Which target tiles count is the planner's business.
    */
   function assistMapClick(col: number, row: number): void {
     const player = engineState.players[buildPlayer];
     if (!player || !player.active) return;
-    if (!isOwnFlag(engineState, player, col, row)) {
-      roadAssistant.say('enh.assist.road.notOwnFlag', 'warn');
-      return;
-    }
     if (roadAssistant.phase === 'pickStart') {
+      if (!isOwnFlag(engineState, player, col, row)) {
+        roadAssistant.say('enh.assist.road.notOwnFlag', 'warn');
+        return;
+      }
       roadAssistant.chooseStart({ col, row });
       return;
     }
@@ -4459,7 +4459,7 @@
   let assistHoverKey = '';
   /**
    * Where the cost label of the hovered route sits, in canvas CSS pixels; `null` while there is no
-   * route under the pointer. Written only while there is one — outside a flag a pointer move then
+   * route under the pointer. Written only while there is one — off a target a pointer move then
    * touches no reactive state at all.
    */
   let assistTip = $state.raw<{ x: number; y: number } | null>(null);
@@ -4475,10 +4475,7 @@
     const key = `${from}:${pos}`;
     if (key === assistHoverKey) return;
     assistHoverKey = key;
-    const res =
-      isOwnFlag(engineState, player, t.col, t.row) && pos !== from
-        ? planRoad(engineState, player, start, { col: t.col, row: t.row })
-        : null;
+    const res = pos !== from ? planRoad(engineState, player, start, { col: t.col, row: t.row }) : null;
     roadAssistant.hover = res !== null && res.ok ? res.plan : null;
     assistTip = roadAssistant.hover !== null ? { x: pointerCanvasX, y: pointerCanvasY } : null;
   }
@@ -4550,7 +4547,9 @@
       return;
     }
     clearAssistHover();
-    roadAssistant.reset();
+    // Keep building: the flag the road ended on — possibly the one it just planted — is the next start.
+    if (settings.value.assistRoadChain) roadAssistant.chooseStart(plan.to);
+    else roadAssistant.reset();
     roadAssistant.say('enh.assist.road.built', 'good', {
       steps: plan.dirs.length,
       time: ((plan.forward + plan.backward) / 100).toFixed(1),
@@ -4779,7 +4778,7 @@
         style:left="{assistTipLeft}px"
         style:top="{assistTipTop}px"
       >
-        {st('enh.assist.road.summary', {
+        {st(roadAssistant.hover.newFlag ? 'enh.assist.road.summaryFlag' : 'enh.assist.road.summary', {
           steps: roadAssistant.hover.dirs.length,
           time: ((roadAssistant.hover.forward + roadAssistant.hover.backward) / 100).toFixed(1),
         })}

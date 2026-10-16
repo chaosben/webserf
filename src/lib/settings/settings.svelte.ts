@@ -155,12 +155,15 @@ export interface SettingsShape {
 	/** Signs on every tile carrying a deposit. */
 	hackMinerals: boolean;
 
-	// -- Assistants. Only a `show` field each: an assistant acts when asked and has nothing to
-	// switch on — see `enhancements/assistants.ts`. Additive, so no version bump.
+	// -- Assistants. A `show` field each, plus options of how an assistant works once asked — never
+	// a switch that makes it act on its own (see `enhancements/assistants.ts`). Additive, so no
+	// version bump.
 	assistCorner: OverlayCorner;
 	assistOpacity: number;
 	/** The road assistant has a row in the assistants overlay. */
 	assistShowRoad: boolean;
+	/** After each road the road assistant goes on from its target flag, until cancelled. */
+	assistRoadChain: boolean;
 	/** The shift-change assistant has a row in the assistants overlay. */
 	assistShowKnightShift: boolean;
 	/**
@@ -184,6 +187,8 @@ export type HackSettingKey = Extract<keyof SettingsShape, `hack${string}`>;
 
 /** The settings fields that list an assistant — `assistShow<Id>`, see `enhancements/assistants.ts`. */
 export type AssistSettingKey = Extract<keyof SettingsShape, `assistShow${string}`>;
+/** An option of how an assistant works — a boolean, and never a `show` field. */
+export type AssistOptionKey = 'assistRoadChain';
 
 const DEFAULTS: SettingsShape = {
 	speedFactor: 1,
@@ -215,6 +220,7 @@ const DEFAULTS: SettingsShape = {
 	assistCorner: 'bl',
 	assistOpacity: OVERLAY_OPACITY_DEFAULT,
 	assistShowRoad: false,
+	assistRoadChain: false,
 	assistShowKnightShift: false,
 	recordingQuality: 'standard'
 };
@@ -274,6 +280,7 @@ const CHECK: { [K in keyof SettingsShape]: (v: unknown) => v is SettingsShape[K]
 	assistOpacity: (v): v is number =>
 		typeof v === 'number' && v >= OVERLAY_OPACITY_MIN && v <= OVERLAY_OPACITY_MAX,
 	assistShowRoad: (v): v is boolean => typeof v === 'boolean',
+	assistRoadChain: (v): v is boolean => typeof v === 'boolean',
 	assistShowKnightShift: (v): v is boolean => typeof v === 'boolean',
 	recordingQuality: (v): v is RecordingQuality => isOneOf(v, RECORDING_QUALITIES)
 };
