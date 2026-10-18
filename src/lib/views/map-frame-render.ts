@@ -218,7 +218,7 @@ export function renderMapFrame(input: MapFrameInput): boolean {
   /** With torus wrap: `posOf` masks both axes, a `% rows` would break on negative values. */
   const heightAt = (c: number, r: number): number => rs.mapTiles[posOf(c, r, geo)].height;
 
-  /** Device pixels per surface pixel — the factor the presenter turns into sharp steps. */
+  /** Device pixels per surface pixel. */
   const deviceScale = canvasScale * dpr;
 
   ctx.save();
@@ -343,7 +343,7 @@ export function renderMapFrame(input: MapFrameInput): boolean {
     metrics.end('overlays');
 
     // Colour is produced here, INSIDE the zoom transform — that keeps the zoom on the canvas.
-    presenter.present(ctx, target, pal, deviceScale);
+    presenter.present(ctx, target, pal);
   } else {
     // Without archive/palette: colour triangles straight to the screen; roads, border stones and
     // sprites fall away because they need the index space.

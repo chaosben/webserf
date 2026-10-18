@@ -1,58 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
 	PINCH_MIN_DIST,
-	WHEEL_STEP,
 	anchorCamera,
 	fitScale,
 	pinchZoom,
 	scenePoint,
+	deviceOfStage,
+	snapZoom,
+	stageOfZoom,
+	stageZoomAtOrBelow,
+	stepZoomStage,
+	wheelStageSteps,
+	zoomOfStage,
 	wheelDeltaPixels,
-	wheelZoomFactor,
 } from './zoom-gesture.js';
 
 const ev = (deltaY: number, ctrlKey = false, deltaMode = 0) => ({ deltaY, ctrlKey, deltaMode });
-
-describe('wheelZoomFactor', () => {
-  it('yields exactly the previous step per wheel notch', () => {
-    expect(wheelZoomFactor(ev(-100))).toBeCloseTo(WHEEL_STEP, 10);
-    expect(wheelZoomFactor(ev(100))).toBeCloseTo(1 / WHEEL_STEP, 10);
-  });
-
-  it('composes: many small deltas == one large one', () => {
-    const once = wheelZoomFactor(ev(-60));
-    let stepwise = 1;
-    for (let i = 0; i < 20; i += 1) stepwise *= wheelZoomFactor(ev(-3));
-    expect(stepwise).toBeCloseTo(once, 10);
-
-    const pinchOnce = wheelZoomFactor(ev(-30, true));
-    let pinchStepwise = 1;
-    for (let i = 0; i < 10; i += 1) pinchStepwise *= wheelZoomFactor(ev(-3, true));
-    expect(pinchStepwise).toBeCloseTo(pinchOnce, 10);
-  });
-
-  it('reacts far more sensitively to a pinch than to the wheel', () => {
-    expect(wheelZoomFactor(ev(-3, true))).toBeGreaterThan(wheelZoomFactor(ev(-3)));
-    // A touchpad pinch of ~50 px total travel should zoom noticeably, not by 3 %.
-    expect(wheelZoomFactor(ev(-50, true))).toBeGreaterThan(1.6);
-    expect(wheelZoomFactor(ev(-50))).toBeLessThan(1.1);
-  });
-
-  it('converts lines and pages into pixels', () => {
-    expect(wheelDeltaPixels(ev(-3, false, 1))).toBe(-120);
-    expect(wheelDeltaPixels(ev(-1, false, 2))).toBe(-400);
-    expect(wheelZoomFactor(ev(-3, false, 1))).toBeCloseTo(WHEEL_STEP ** 1.2, 10);
-  });
-
-  it('caps single outliers', () => {
-    expect(wheelZoomFactor(ev(-5000, true))).toBe(4);
-    expect(wheelZoomFactor(ev(5000, true))).toBe(0.25);
-  });
-
-  it('does nothing on a zero delta', () => {
-    expect(wheelZoomFactor(ev(0))).toBe(1);
-    expect(wheelZoomFactor(ev(-0, true))).toBe(1);
-  });
-});
 
 describe('fitScale', () => {
   const surface = { width: 352, height: 240 };
@@ -152,9 +115,8 @@ describe('pinchZoom', () => {
 		expect(pinchZoom(1, 2, BIG, 0.1, 1000)).toBe(BIG / PINCH_MIN_DIST);
 	});
 
-	it('is NOT the wheel curve — that is the documented difference', () => {
+	it('is the direct ratio of the finger distances', () => {
 		expect(pinchZoom(1, BIG, 1.5 * BIG, 0.1, 8)).toBe(1.5);
-		expect(wheelZoomFactor({ deltaY: -100, ctrlKey: true, deltaMode: 0 })).not.toBeCloseTo(1.5, 2);
 	});
 
 	it('takes the DRAWN scale as its base, so a surface-limited zoom does not run up', () => {
@@ -202,4 +164,124 @@ describe('pinch camera', () => {
 		expect(zoom).toBe(startZoom);
 		expect(cam).toEqual({ x: Math.round(cam0.x), y: Math.round(cam0.y) });
 	});
+});
+
+describe('zoom stages', () => {
+  const DPRS = [1, 1.25, 1.5, 2, 3];
+  /** A stage's device factor is a quarter power of two below 1, a whole or half number above. */
+  const isStage = (z: number, dpr: number) => {
+    const d = z * dpr;
+    const whole = (x: number) => Math.abs(x - Math.round(x)) < 1e-9;
+    if (d < 1 - 1e-9) return whole(4 * Math.log2(d));
+    return whole(2 * d);
+  };
+
+  it('maps stages to device factors and back', () => {
+    const expected = [0.5, 2 ** -0.5, 2 ** -0.25, 1, 1.5, 2, 2.5, 3, 8];
+    [-4, -2, -1, 0, 1, 2, 3, 4, 14].forEach((s, i) => expect(deviceOfStage(s)).toBeCloseTo(expected[i], 12));
+    for (const dpr of DPRS) {
+      for (let s = -12; s <= 14; s += 1) expect(stageOfZoom(zoomOfStage(s, dpr), dpr)).toBe(s);
+    }
+  });
+
+  it('rounds by ratio, not by difference', () => {
+    // 1.23 is nearer to 1 by difference, but 1.5/1.23 < 1.23/1.
+    expect(deviceOfStage(stageOfZoom(1.23, 1))).toBe(1.5);
+    expect(deviceOfStage(stageOfZoom(1.22, 1))).toBe(1);
+    expect(deviceOfStage(stageOfZoom(1.74, 1))).toBe(2);
+    expect(deviceOfStage(stageOfZoom(2.7, 1))).toBe(2.5);
+    expect(deviceOfStage(stageOfZoom(0.4, 1))).toBeCloseTo(2 ** -1.25, 12);
+  });
+
+  it('only ever yields stages, inside the bounds', () => {
+    for (const dpr of DPRS) {
+      for (let z = 0.1; z < 9; z += 0.037) {
+        const s = snapZoom(z, dpr, 0.3, 8);
+        expect(isStage(s, dpr)).toBe(true);
+        expect(s).toBeLessThanOrEqual(8 + 1e-9);
+      }
+    }
+  });
+
+  it('keeps the whole world reachable: the lowest stage is at or below the bound', () => {
+    for (const dpr of DPRS) {
+      for (const min of [0.17, 0.3, 0.5, 0.71, 1]) {
+        const lowest = snapZoom(0.01, dpr, min, 8);
+        expect(lowest).toBeLessThanOrEqual(min + 1e-9);
+        expect(stepZoomStage(lowest, 1, dpr, min, 8)).toBeGreaterThan(min - 1e-9);
+      }
+    }
+  });
+
+  it('steps one stage at a time and stops at the bounds', () => {
+    expect(stepZoomStage(3, 1, 1, 0.5, 8)).toBe(3.5);
+    expect(stepZoomStage(3.5, 1, 1, 0.5, 8)).toBe(4);
+    expect(stepZoomStage(3, -2, 1, 0.5, 8)).toBe(2);
+    expect(stepZoomStage(2, -1, 1, 0.5, 8)).toBe(1.5);
+    expect(stepZoomStage(1.5, -1, 1, 0.5, 8)).toBe(1);
+    expect(stepZoomStage(1, -1, 1, 0.5, 8)).toBeCloseTo(2 ** -0.25, 12);
+    expect(stepZoomStage(1, -4, 1, 0.5, 8)).toBeCloseTo(0.5, 12);
+    expect(stepZoomStage(0.5, -1, 1, 0.5, 8)).toBeCloseTo(0.5, 12);
+    expect(stepZoomStage(8, 1, 1, 0.5, 8)).toBe(8);
+    // At 150 %: one stage further is one device pixel more, not one CSS pixel.
+    expect(stepZoomStage(2, 1, 1.5, 0.5, 8) * 1.5).toBeCloseTo(3.5, 9);
+  });
+
+  it('rounds a fitting scale down, never up', () => {
+    expect(stageZoomAtOrBelow(2.9, 1)).toBe(2.5);
+    expect(stageZoomAtOrBelow(3, 1)).toBe(3);
+    expect(stageZoomAtOrBelow(1.9, 1)).toBe(1.5);
+    expect(stageZoomAtOrBelow(0.9, 1)).toBeCloseTo(2 ** -0.25, 12);
+    expect(stageZoomAtOrBelow(2.2, 1.25) * 1.25).toBeCloseTo(2.5, 9);
+  });
+});
+
+describe('wheelStageSteps', () => {
+  it('converts lines and pages into pixels', () => {
+    expect(wheelDeltaPixels(ev(-3, false, 1))).toBe(-120);
+    expect(wheelDeltaPixels(ev(-1, false, 2))).toBe(-400);
+  });
+
+  it('turns one wheel notch into exactly one stage', () => {
+    expect(wheelStageSteps(0, ev(-100))).toEqual({ steps: 1, rest: 0 });
+    expect(wheelStageSteps(0, ev(100))).toEqual({ steps: -1, rest: 0 });
+    expect(wheelStageSteps(0, ev(-3, false, 1)).steps).toBe(1);
+  });
+
+  it('sums small touchpad deltas until a stage is full', () => {
+    let rest = 0;
+    let steps = 0;
+    for (let i = 0; i < 9; i += 1) {
+      const r = wheelStageSteps(rest, ev(-10));
+      rest = r.rest;
+      steps += r.steps;
+    }
+    expect(steps).toBe(0);
+    const r = wheelStageSteps(rest, ev(-10));
+    expect(r.steps).toBe(1);
+  });
+
+  it('drops the remainder on a change of direction', () => {
+    const half = wheelStageSteps(0, ev(-50));
+    expect(half.steps).toBe(0);
+    const back = wheelStageSteps(half.rest, ev(50));
+    expect(back.rest).toBeLessThan(0);
+    expect(back.rest).toBeCloseTo(-0.5, 9);
+  });
+
+  it('pinches faster than it scrolls', () => {
+    expect(wheelStageSteps(0, ev(-30, true)).steps).toBe(1);
+  });
+});
+
+describe('the map writes only stages', () => {
+  it('has no continuous writer of `zoom` left', async () => {
+    const { readFileSync } = await import('node:fs');
+    for (const file of ['MapView.svelte', 'MainMenuView.svelte']) {
+      const src = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8');
+      for (const m of src.matchAll(/^\s*zoom = (.+)$/gm)) {
+        expect(m[1], `${file}: zoom = ${m[1]}`).toMatch(/^(snapZoom|stepZoomStage|next;)/);
+      }
+    }
+  });
 });

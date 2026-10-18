@@ -45,7 +45,7 @@ The special-click shows up everywhere below. Demolishing always needs it, so not
 
 ## Features
 
-- **Zoom, in a window of any size** — mouse wheel, touchpad or two fingers, from the whole world in one frame up to eight times pixel size.
+- **Zoom, in a window of any size** — mouse wheel, touchpad or two fingers, from the whole world in one frame up to eight times pixel size, in whole and half steps that are never blurred.
 - **Mouse or touch** — place, pull, push-scroll and the special-click; on a tablet two fingers pan and zoom, and a long press stands in for the special-click.
 - **Speed and pause** — 0.25× to 8×; only the ticks per second of real time change, so a game stays reproducible at any of them.
 - **Ten saved-game slots** — kept in this browser, and optionally mirrored into a folder as real `ARCHIV.DS` / `SAVE0..9.DS` files, which the original reads as they are. Import and export as a single file or a package.

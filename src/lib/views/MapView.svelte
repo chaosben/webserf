@@ -299,7 +299,14 @@
     type MapPreviewData,
   } from '../core/map-preview.js';
 
-  import { anchorCamera, pinchZoom, scenePoint, wheelZoomFactor } from './zoom-gesture.js';
+  import {
+    anchorCamera,
+    pinchZoom,
+    scenePoint,
+    snapZoom,
+    stepZoomStage,
+    wheelStageSteps,
+  } from './zoom-gesture.js';
   import {
     TOUCH_HOLD_MS,
     TOUCH_IDLE,
@@ -3408,6 +3415,10 @@
    * value belongs to the two gestures that write it: the mouse wheel (`onWheel`) and the two-finger
    * pinch (`applyPinch`). A control for it is deliberately not provided. `minZoom` bounds it
    * downwards (whole world in frame), {@link ZOOM_MAX} upwards.
+   *
+   * It only ever holds a STAGE (`zoom-gesture.ts`): one game pixel is a whole or (from 2 on) half
+   * number of device pixels, or a finer fraction when zoomed out. Every writer goes through `snapZoom`/`stepZoomStage`; a raw value
+   * here would bring back a filtered, blurred or unevenly wide picture.
    */
   const DEFAULT_ZOOM = 3;
   /**
@@ -3564,6 +3575,24 @@
    * 100 % (small map, large screen), 100 % is the floor.
    */
   const minZoom = $derived(minZoomForWholeMap(viewportW, viewportH, geo));
+
+  /**
+   * Keeps `zoom` on a stage when the stages themselves move: a window dragged onto a screen with
+   * another pixel ratio, or a resize that shifts the lower bound. Zooms about the window centre.
+   */
+  $effect(() => {
+    const d = dpr;
+    const lo = minZoom;
+    untrack(() => {
+      const next = snapZoom(zoom, d, lo, ZOOM_MAX);
+      if (next === zoom) return;
+      const cx = viewportW / 2;
+      const cy = viewportH / 2;
+      camX = anchorCamera(scenePoint(camX, zoom, cx), next, cx);
+      camY = anchorCamera(scenePoint(camY, zoom, cy), next, cy);
+      zoom = next;
+    });
+  });
 
   /** Visible window in scene pixels (the zoom converts screen into scene pixels). */
   const camera = $derived.by((): Camera => ({
@@ -3776,7 +3805,7 @@
   $effect(() => {
     void save;
     untrack(() => {
-      zoom = DEFAULT_ZOOM;
+      zoom = snapZoom(DEFAULT_ZOOM, dpr, minZoom, ZOOM_MAX);
       // The OWN castle, not the first in the table: the original centres each viewport on the castle
       // of the player it belongs to (`vp+0x82` comparison @0x5360/@0x538f in `place_player_castles`).
       // `player.castleBuilding` (block 388) is unambiguous; the index order is not — if the AI founds
@@ -4067,7 +4096,10 @@
   function applyPinch(o: { dist: number; midX: number; midY: number }): void {
     const start = pinchStart;
     if (start === null) return;
-    const next = pinchZoom(start.zoom, start.dist, o.dist, minZoom, ZOOM_MAX);
+    // Continuous from the start of the gesture, then onto a stage: the zoom jumps from stage to
+    // stage while the fingers move, and no rounding accumulates.
+    const raw = pinchZoom(start.zoom, start.dist, o.dist, minZoom, ZOOM_MAX);
+    const next = snapZoom(raw, dpr, minZoom, ZOOM_MAX);
     camX = anchorCamera(start.sceneX, next, o.midX);
     camY = anchorCamera(start.sceneY, next, o.midY);
     zoom = next;
@@ -4708,15 +4740,20 @@
     pointerInside = false;
     clearAssistHover();
   }
+  /** Wheel delta not yet worth a whole stage (see `wheelStageSteps`). */
+  let wheelRest = 0;
   /**
-   * Mouse wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away.
-   * A pinch on a real touchscreen does NOT arrive here — it comes as pointer events
-   * ({@link applyPinch}).
+   * Mouse wheel and touchpad pinch, one stage per notch (`wheelStageSteps`); `preventDefault` keeps
+   * the page zoom away. A pinch on a real touchscreen does NOT arrive here — it comes as pointer
+   * events ({@link applyPinch}).
    */
   function onWheel(e: WheelEvent) {
     e.preventDefault();
+    const r = wheelStageSteps(wheelRest, e);
+    wheelRest = r.rest;
     // Lower bound: whole world in frame — below that only repetition would follow.
-    const next = Math.max(minZoom, Math.min(ZOOM_MAX, zoom * wheelZoomFactor(e)));
+    const next = stepZoomStage(zoom, r.steps, dpr, minZoom, ZOOM_MAX);
+    if (next === zoom) return;
     // Zoom around the cursor: the scene point under the pointer stays put.
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const mx = e.clientX - rect.left;

@@ -88,27 +88,13 @@ describe('composeUiOverlay', () => {
     expect(ctx.imageSmoothingEnabled).toBe(false);
   });
 
-  it('enlarges a fractional scale by its integer part first and filters only the rest', () => {
+  it('blits a fractional scale straight from the scratch canvas, unfiltered', () => {
     const ctx = destination();
-    composeUiOverlay(ctx, [layer(144, 160, 0, 0, 2.5)]);
-    // Scratch at source size plus one at twice the size; the final blit comes from the second one,
-    // filtered, and leaves smoothing off for whatever is drawn next.
-    expect(rec.scratches.map((s) => [s.w, s.h])).toEqual([
-      [144, 160],
-      [288, 320],
-    ]);
+    composeUiOverlay(ctx, [layer(144, 160, 0, 0, 2.25)]);
+    expect(rec.scratches.map((s) => [s.w, s.h])).toEqual([[144, 160]]);
     expect(rec.draws).toEqual([
-      { from: { w: 288, h: 320 }, args: [0, 0, 360, 400], smooth: true },
+      { from: { w: 144, h: 160 }, args: [0, 0, 324, 360], smooth: false },
     ]);
-    expect(ctx.imageSmoothingEnabled).toBe(false);
-  });
-
-  it('re-enlarges only when the part has changed', () => {
-    const same = layer(144, 160, 0, 0, 2.5);
-    composeUiOverlay(destination(), [same]);
-    composeUiOverlay(destination(), [same]);
-    // The drawing into the enlarged canvas is recorded on that canvas (the second one).
-    expect(rec.scratches[1].enlargements).toBe(1);
   });
 
   it('keeps one scratch canvas per size, not one per call', () => {

@@ -11,6 +11,7 @@
    * zoom.
    */
   import { untrack } from 'svelte';
+  import { devicePixelRatio } from 'svelte/reactivity/window';
   import { log } from '../shell/log.js';
   import { settings } from '../settings/settings.svelte.js';
   import { PaArchive } from '../core/pa-parser.js';
@@ -55,7 +56,14 @@
     type MenuTarget,
   } from '../core/main-menu.js';
   import TextEntryField from './TextEntryField.svelte';
-  import { fitScale, pinchZoom, wheelZoomFactor } from './zoom-gesture.js';
+  import {
+    fitScale,
+    pinchZoom,
+    snapZoom,
+    stageZoomAtOrBelow,
+    stepZoomStage,
+    wheelStageSteps,
+  } from './zoom-gesture.js';
   import { TOUCH_IDLE, touchDown, touchMove, touchUp } from './touch-gesture.js';
   import {
     CREDITS_PALETTE_ENTRY,
@@ -264,15 +272,28 @@
    * The drawn scale: wish value, clipped to the surface. Both directions count — the stage clips
    * what does not fit, so too large a scale would cut off the menu edge. Free of feedback, because
    * `.menu-view` takes its size from its parent and not from its content.
+   *
+   * Then rounded DOWN onto a zoom stage (`zoom-gesture.ts`): the canvas is in CSS pixels and the
+   * browser enlarges it by `dpr` with `pixelated`, so only a stage keeps every game pixel equally
+   * wide. Down, because the result has to keep fitting.
    */
-  const scale = $derived(fitScale(zoom, { width: availWidth, height: availHeight }, MENU_SURFACE));
+  const dpr = $derived(devicePixelRatio.current ?? 1);
+  const scale = $derived(
+    stageZoomAtOrBelow(
+      fitScale(zoom, { width: availWidth, height: availHeight }, MENU_SURFACE),
+      dpr,
+    ),
+  );
+
+  /** Wheel delta not yet worth a whole stage (see `wheelStageSteps`). */
+  let wheelRest = 0;
 
   /**
    * Computes from the drawn scale, not from the wish value: otherwise `zoom` would run up to its
    * upper bound on a limited surface and zooming out would do nothing at first.
    */
-  function zoomBy(factor: number): void {
-    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scale * factor));
+  function zoomBy(steps: number): void {
+    zoom = stepZoomStage(scale, steps, dpr, ZOOM_MIN, ZOOM_MAX);
   }
 
   /** Sprite provider with cache; fresh on every change of archive or palette. */
@@ -364,7 +385,7 @@
     const dimDraw = dimProvider;
     const pal = palette;
     const cmds = commands;
-    const s = scale;
+    const s = scale * dpr;
     const screen = popupScreen;
     const view = optionsView;
     const textColor = uiTextColor;
@@ -378,7 +399,9 @@
     const ctx = el.getContext('2d');
     if (ctx === null) return;
 
-    // Fractional scales are allowed; the canvas itself needs whole pixels.
+    // In DEVICE pixels: `scale · dpr` is a stage and thus whole or half, while `scale` alone can be
+    // fractional in CSS pixels — a backing store in CSS pixels would leave the last enlargement to the
+    // browser at that fractional factor.
     el.width = Math.max(1, Math.round(MENU_SURFACE.width * s));
     el.height = Math.max(1, Math.round(MENU_SURFACE.height * s));
     ctx.imageSmoothingEnabled = false;
@@ -745,12 +768,14 @@
   }
 
   /**
-   * Wheel and touchpad pinch (`wheelZoomFactor`); `preventDefault` keeps the page zoom away. A pinch
+   * Wheel and touchpad pinch, one stage per notch; `preventDefault` keeps the page zoom away. A pinch
    * on a real touchscreen does NOT arrive here — it comes as pointer events ({@link onPointerMove}).
    */
   function handleWheel(e: WheelEvent): void {
     e.preventDefault();
-    zoomBy(wheelZoomFactor(e));
+    const r = wheelStageSteps(wheelRest, e);
+    wheelRest = r.rest;
+    if (r.steps !== 0) zoomBy(r.steps);
   }
 
   /**
@@ -774,7 +799,8 @@
     touch = r.state;
     const start = pinchStart;
     if (r.outcome?.kind !== 'pinch' || start === null) return;
-    zoom = pinchZoom(start.scale, start.dist, r.outcome.dist, ZOOM_MIN, ZOOM_MAX);
+    const raw = pinchZoom(start.scale, start.dist, r.outcome.dist, ZOOM_MIN, ZOOM_MAX);
+    zoom = snapZoom(raw, dpr, ZOOM_MIN, ZOOM_MAX);
   }
 
   function onPointerUp(e: PointerEvent): void {
@@ -982,7 +1008,13 @@
   bind:clientWidth={availWidth}
   bind:clientHeight={availHeight}
 >
-  <canvas bind:this={canvas} onclick={handleClick} onwheel={handleWheel} style:cursor={cursorStyle}
+  <canvas
+    bind:this={canvas}
+    onclick={handleClick}
+    onwheel={handleWheel}
+    style:cursor={cursorStyle}
+    style:width="{MENU_SURFACE.width * scale}px"
+    style:height="{MENU_SURFACE.height * scale}px"
   ></canvas>
   <!-- Where the keys really arrive: the canvas cannot take a focus, so it cannot bring up a
        keyboard on a phone. -->
