@@ -8,9 +8,6 @@
    * same reason the step's instruction is a status message and the cost of the road under the pointer
    * is shown at the pointer. The road itself is built by the click on the target flag.
    *
-   * Shift-change assistant: a traffic light and a button that orders the shift change. The light advises and
-   * does not lock — the knight menu's button cannot be locked either.
-   *
    * OUR OWN ADDITION, and a DOM layer — it appears in neither a screenshot nor a recording, but what
    * the assistants do does, through the ordinary commands. It holds no game state; everything runs
    * through the buses the game view serves.
@@ -20,7 +17,6 @@
    * shield can and cannot do.
    */
   import { roadAssistant } from './road-assistant.svelte.js';
-  import { knightShiftAssistant } from './knight-shift-assistant.svelte.js';
   import { settings } from '../settings/settings.svelte.js';
   import IconAssistant from '~icons/material-symbols-light/brightness-auto';
   import { st } from '../shell/i18n.js';
@@ -37,17 +33,10 @@
   const swallow = (e: Event): void => e.stopPropagation();
 
   const showRoad = $derived(settings.value.assistShowRoad && roadAssistant.present);
-  const showShift = $derived(settings.value.assistShowKnightShift && knightShiftAssistant.present);
   const roadActive = $derived(roadAssistant.phase !== 'idle');
-
-  const LIGHT_TEXT = {
-    green: 'enh.assist.shift.green',
-    yellow: 'enh.assist.shift.yellow',
-    red: 'enh.assist.shift.red'
-  } as const;
 </script>
 
-{#if showRoad || showShift}
+{#if showRoad}
   <!-- The handlers here are a shield, not a control: they keep clicks, drags and the wheel off the
        viewport underneath. The controls are real buttons and reachable on their own. -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -80,20 +69,6 @@
           <span class:hidden={roadActive}>{st('enh.assist.road.plan')}</span>
           <span class:hidden={!roadActive}>{st('enh.assist.road.cancel')}</span>
         </span>
-      </button>
-    {/if}
-    {#if showShift}
-      <button
-        type="button"
-        title={st(LIGHT_TEXT[knightShiftAssistant.light])}
-        onclick={() => knightShiftAssistant.start()}
-      >
-        <span
-          class="light {knightShiftAssistant.light}"
-          role="img"
-          aria-label={st(LIGHT_TEXT[knightShiftAssistant.light])}
-        ></span>
-        <span>{st('enh.assist.shift.button')}</span>
       </button>
     {/if}
   </section>
@@ -146,35 +121,5 @@
 
   .hidden {
     visibility: hidden;
-  }
-
-  /* The box of the road assistant's symbol; the dot is drawn inside it. */
-  .light {
-    width: 1em;
-    height: 1em;
-    display: grid;
-    place-items: center;
-  }
-
-  .light::before {
-    content: '';
-    /* About the extent of the symbol's glyph inside its box. */
-    width: 0.8em;
-    height: 0.8em;
-    border-radius: 50%;
-    border: 1px solid var(--line);
-    background: var(--light);
-  }
-
-  .light.green {
-    --light: var(--accent);
-  }
-
-  .light.yellow {
-    --light: var(--amber);
-  }
-
-  .light.red {
-    --light: var(--danger);
   }
 </style>

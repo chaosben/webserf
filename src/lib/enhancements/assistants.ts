@@ -39,12 +39,6 @@ export const ASSISTANTS: readonly Assistant[] = [
     noteKey: 'enh.assist.road.note',
     options: [{ key: 'assistRoadChain', labelKey: 'enh.assist.road.chain' }],
   },
-  {
-    id: 'knightShift',
-    showKey: 'assistShowKnightShift',
-    labelKey: 'enh.assist.shift',
-    noteKey: 'enh.assist.shift.note',
-  },
 ];
 
 export function assistantShown(settings: SettingsShape, assistant: Assistant): boolean {

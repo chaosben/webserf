@@ -310,12 +310,6 @@ const EN = {
 	'enh.assist.road.busy': 'Finish or cancel the road you are building first.',
 	'enh.assist.road.failed': 'The road could not be built.',
 	'enh.assist.road.built': 'Road built: {steps} steps · {time} s there and back',
-	'enh.assist.shift': 'Shift change assistant',
-	'enh.assist.shift.note': 'A traffic light for when a shift change pays off',
-	'enh.assist.shift.button': 'Shift change',
-	'enh.assist.shift.green': 'Shift change worthwhile',
-	'enh.assist.shift.yellow': 'Shift change would swap knights, but gain little',
-	'enh.assist.shift.red': 'Shift change not worthwhile now',
 
 	// -- Screen-reader labels for the game surfaces --------------------------------------------
 	// These are OURS, not the original's: the original has none. That is why they live here and not
@@ -525,7 +519,6 @@ const EN = {
 	'help.enh.stock': 'Stock overview: an overlay over the map with your goods, your serfs and the supply gauges of your chains.',
 	'help.enh.hacks': 'Hack “all underground riches”: every deposit shows the sign a geologist would plant — even where no geologist will ever look.',
 	'help.enh.assist': 'Road assistant: pick one of your flags, then a target — another flag, or a road. It builds the fastest road there, with exactly the clicks you would make. On a road it picks the best spot itself: an end flag, or a new flag in between, which splits the old road, just like a special-click at the end of road building. With "keep building" ticked, the target flag is the next start, so you can lay one road after another; Cancel ends it.',
-	'help.enh.assist.shift': 'Shift change assistant: a traffic light with a button that orders the shift change, just like the one in the knight menu. Green: every knight a shift change would send home gets a stronger replacement from your stores — the only case in which your garrisons measurably gain. Yellow: knights would be swapped, but not every one for a stronger one; that gains next to nothing. Red: no stronger knight waits, or a shift change is running. A shift change always costs something: while the replacements walk in, your garrisons are thinner for several minutes. The button works in every colour.',
 	// The invisible field that holds the focus while the original asks for text, so that a phone
 	// brings up its keyboard — see `views/TextEntryField.svelte`.
 	'view.textEntry': 'Text entry'
@@ -760,12 +753,6 @@ const DE: Record<ShellKey, string> = {
 	'enh.assist.road.busy': 'Beende oder brich zuerst den Wegebau ab, der gerade läuft.',
 	'enh.assist.road.failed': 'Der Weg ließ sich nicht bauen.',
 	'enh.assist.road.built': 'Weg gebaut: {steps} Schritte · {time} s hin und zurück',
-	'enh.assist.shift': 'Schichtwechsel-Assistent',
-	'enh.assist.shift.note': 'Eine Ampel, wann sich ein Schichtwechsel lohnt',
-	'enh.assist.shift.button': 'Schichtwechsel',
-	'enh.assist.shift.green': 'Schichtwechsel lohnt sich',
-	'enh.assist.shift.yellow': 'Schichtwechsel würde tauschen, bringt aber kaum etwas',
-	'enh.assist.shift.red': 'Schichtwechsel lohnt sich gerade nicht',
 	'record.stillTitle': 'Bildschirmfoto',
 	'record.stillNote':
 		'Aufgenommen, als dieses Fenster aufging — Karte, Bedienleiste und ein offenes Fenster, so wie sie gezeichnet waren.',
@@ -971,7 +958,6 @@ const DE: Record<ShellKey, string> = {
 	'help.enh.stock': 'Lager-Übersicht: eine Anzeige über der Karte mit deinen Waren, deinen Siedlern und den Versorgungs-Zeigern deiner Ketten.',
 	'help.enh.hacks': 'Hack „Alle Bodenschätze“: jedes Vorkommen zeigt das Schild, das ein Geologe aufstellen würde — auch dort, wo nie ein Geologe hinschaut.',
 	'help.enh.assist': 'Wegebau-Assistent: wähl eine deiner Fahnen und dann ein Ziel — eine andere Fahne oder einen Weg. Er baut den schnellsten Weg dorthin, mit genau den Klicks, die du machen würdest. Auf einem Weg sucht er die beste Stelle selbst: eine Endfahne oder eine neue Fahne dazwischen, die den alten Weg teilt, genau wie ein Spezialklick am Ende des Wegebaus. Mit Haken bei „Weiterbauen“ ist die Zielfahne gleich der nächste Start, so legst du Weg um Weg; „Abbrechen“ beendet das.',
-	'help.enh.assist.shift': 'Schichtwechsel-Assistent: eine Ampel mit einem Knopf, der den Schichtwechsel anordnet, genau wie der im Ritter-Menu. Grün: jeder Ritter, den ein Schichtwechsel heimschicken würde, bekommt einen stärkeren Ersatz aus deinen Lagern — nur dann werden deine Besatzungen messbar stärker. Gelb: es würde getauscht, aber nicht jeder gegen einen stärkeren; das bringt kaum etwas. Rot: kein stärkerer Ritter wartet, oder ein Schichtwechsel läuft gerade. Etwas kostet ein Schichtwechsel immer: solange der Ersatz unterwegs ist, sind deine Besatzungen ein paar Minuten lang dünner. Der Knopf geht in jeder Farbe.',
 	'view.textEntry': 'Texteingabe'
 };
 

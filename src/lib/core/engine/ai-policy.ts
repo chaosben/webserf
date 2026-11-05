@@ -173,9 +173,7 @@ export interface KnightShiftSums {
 
 /**
  * The three sums of the shift-change trigger (`@0x5474f`..`@0x54839`), with the original's saturation
- * and its one unchecked doubling. A pure function so the shift-change assistant asks exactly the
- * question the AI asks — its inputs come from elsewhere for a human player (see
- * `enhancements/knight-shift-advisor.ts`), the arithmetic must not.
+ * and its one unchecked doubling.
  *
  * `idle(rank)` = knights of that rank in `IdleInStock`, `count(rank)` = `serfCount[Knight0 + rank]`,
  * `done(type)` = completed buildings of that type.
