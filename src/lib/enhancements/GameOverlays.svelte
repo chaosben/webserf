@@ -8,6 +8,10 @@
    * ordinary blocks in it; the bottom corners stack upwards so each plate stays anchored to its own
    * edge.
    *
+   * **The bottom corners keep clear of the control bar.** A column whose measured width reaches into
+   * the bar's horizontal span starts above the bar's top edge instead of at the window edge; beside
+   * the bar it stays in its corner (`cornerBottom`).
+   *
    * The container lets the pointer through. A plate that needs it takes it back for itself — the
    * viewport underneath carries panning, zoom and the map click, and an invisible catcher stretched
    * across a corner would eat them.
@@ -16,23 +20,48 @@
   import HacksOverlay from './HacksOverlay.svelte';
   import AssistantsOverlay from './AssistantsOverlay.svelte';
   import { anyAssistantShown } from './assistants.js';
-  import { OVERLAY_CORNERS } from './overlay-place.js';
+  import { CORNER_INSET_PX, OVERLAY_CORNERS, cornerBottom } from './overlay-place.js';
+  import type { BoxRect } from '../views/ui-layout.js';
   import { settings } from '../settings/settings.svelte.js';
   import type { StockView } from './stock-overview.js';
 
   let {
     stockView,
-    scale
+    scale,
+    bar,
+    viewportW,
+    viewportH
   }: {
     /** `null` = nothing selected, or no player to show. */
     stockView: StockView | null;
     /** The control bar's own scale (`uiScaleFor`) — every plate is sized by it and nothing else. */
     scale: number;
+    /** The control bar in CSS pixels of the viewport, `null` while none is drawn. */
+    bar: BoxRect | null;
+    viewportW: number;
+    viewportH: number;
   } = $props();
+
+  /** Measured width of each corner column. */
+  let widths = $state<Record<string, number>>({ tl: 0, tr: 0, bl: 0, br: 0 });
+
+  function bottomOf(corner: 'bl' | 'br'): number {
+    return cornerBottom(corner, widths[corner] ?? 0, bar, viewportW, viewportH);
+  }
 </script>
 
 {#each OVERLAY_CORNERS as corner (corner)}
-  <div class="corner {corner}">
+  <div
+    class="corner {corner}"
+    bind:clientWidth={widths[corner]}
+    style:top={corner === 'tl' || corner === 'tr' ? `${CORNER_INSET_PX}px` : null}
+    style:bottom={corner === 'bl' || corner === 'br' ? `${bottomOf(corner)}px` : null}
+    style:left={corner === 'tl' || corner === 'bl' ? `${CORNER_INSET_PX}px` : null}
+    style:right={corner === 'tr' || corner === 'br' ? `${CORNER_INSET_PX}px` : null}
+    style:max-height={corner === 'bl' || corner === 'br'
+      ? `min(90%, ${Math.max(0, viewportH - bottomOf(corner) - CORNER_INSET_PX)}px)`
+      : null}
+  >
     {#if settings.value.stockCorner === corner}
       <StockOverlay
         view={stockView}
@@ -64,28 +93,20 @@
   }
 
   .tl {
-    top: 0.5rem;
-    left: 0.5rem;
     align-items: flex-start;
   }
 
   .tr {
-    top: 0.5rem;
-    right: 0.5rem;
     align-items: flex-end;
   }
 
   /* Upwards, so the first plate keeps the edge and a second one grows away from it. */
   .bl {
-    bottom: 0.5rem;
-    left: 0.5rem;
     flex-direction: column-reverse;
     align-items: flex-start;
   }
 
   .br {
-    bottom: 0.5rem;
-    right: 0.5rem;
     flex-direction: column-reverse;
     align-items: flex-end;
   }

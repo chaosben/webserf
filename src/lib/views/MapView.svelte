@@ -3463,6 +3463,10 @@
    *   which is any window narrower than the bar's 352 px; see `uiScaleFor`.
    */
   const uiScale = $derived(uiScaleFor(zoom, viewportW));
+  /** The bar in CSS pixels, for our plates to keep clear of — the same rectangle the blit uses. */
+  const barCss = $derived(
+    barVisible ? originBoxRect(CONTROL_PANEL_BOUNDS, uiScale, viewportW, viewportH) : null,
+  );
 
   /**
    * Scale of the pointer — the bar's factor ({@link uiScale}), rounded to WHOLE steps: a cursor image
@@ -4789,7 +4793,7 @@
     <!-- Our own plates, and the one thing to know about them: they are a DOM layer, so they are NOT
          in a screenshot or a screen recording, which see the canvas alone — but what a hack DRAWS
          is. They sit before the end credits so that those, which take the whole stage, cover them. -->
-    <GameOverlays {stockView} scale={uiScale} />
+    <GameOverlays {stockView} scale={uiScale} bar={barCss} {viewportW} {viewportH} />
     {#if assistTip !== null && roadAssistant.hover !== null}
       <!-- The road assistant's cost of the route under the pointer. A DOM layer like the plates, so
            not in a screenshot or recording; it never takes the pointer, the click belongs to the map. -->

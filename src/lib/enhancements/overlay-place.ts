@@ -34,3 +34,37 @@ export const CORNER_LABEL = {
 export const OVERLAY_OPACITY_MIN = 0.2;
 export const OVERLAY_OPACITY_MAX = 1;
 export const OVERLAY_OPACITY_DEFAULT = 0.8;
+
+/**
+ * Distance of every corner from its two window edges, in CSS pixels — a pixel value rather than a
+ * `rem`, because {@link cornerBottom} compares it with pixel geometry and the root font size moves
+ * with the shell's UI size.
+ */
+export const CORNER_INSET_PX = 8;
+
+/**
+ * The `bottom` offset of a bottom corner, in CSS pixels.
+ *
+ * The control bar is blitted into the canvas at the bottom centre and is narrower than the window
+ * once the window is wide. A corner column therefore only moves up above the bar's top edge when it
+ * would reach into the bar's horizontal span; otherwise it keeps its window corner. Lifting it
+ * always would waste the space beside the bar on every wide screen.
+ *
+ * `bar` is the bar in CSS pixels, `null` while no bar is drawn (no archive, end credits).
+ * `width` is the column's measured width — it does not depend on the column's height, so the lift
+ * cannot feed back into it.
+ */
+export function cornerBottom(
+  corner: 'bl' | 'br',
+  width: number,
+  bar: { readonly x: number; readonly y: number; readonly w: number } | null,
+  viewportW: number,
+  viewportH: number,
+): number {
+  if (bar === null || width <= 0) return CORNER_INSET_PX;
+  const overlaps =
+    corner === 'bl'
+      ? CORNER_INSET_PX + width > bar.x
+      : viewportW - CORNER_INSET_PX - width < bar.x + bar.w;
+  return overlaps ? viewportH - bar.y + CORNER_INSET_PX : CORNER_INSET_PX;
+}
