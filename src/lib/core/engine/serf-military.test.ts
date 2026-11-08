@@ -9,6 +9,7 @@ import {
   knightPrepareDefending,
   knightDefending,
   knightAttacking,
+  knightAttackingDefeat,
   knightEngagingBuilding,
   knightOccupyEnemyBuilding,
   knightAttackingVictoryFree,
@@ -909,6 +910,47 @@ describe('open-field fight resolution 60/62/63/64', () => {
     expect(defender.animation).toBe(0xb4);
     expect(defender.stateData[3] | (defender.stateData[4] << 8)).toBe(1); // defender[0xe] = attacker index
     expect(state.mapTiles[attPos].serfIndex).toBe(5); // tile → defender
+  });
+
+  it('open-field loss, loser dispatched first: the winner keeps his tile and frees the loser', () => {
+    // The loser has the LOWER index, so an index-ordered driver reaches his state 51 first. The tile
+    // must still end up with the winner, as it does on screen in the original.
+    const defender = mkK({ index: 5, type: 24, state: 61, col: 10, row: 10 });
+    const att = mkK({ index: 1, type: 26, state: 0x3c, tick: 100, col: 10, row: 10, data: [15, 0, 0, 5, 0] });
+    const state = mkFreeState([null, att, null, null, null, defender]);
+    const pos = posOf(10, 10, geo);
+    state.mapTiles[pos].serfIndex = 1;
+    knightAttacking(state, att); // 60 -> 51 (Dead), 61 -> 63, tile -> winner
+    (state as { gameTick: number }).gameTick = 200 + 0x200; // well past the death counter 0xff
+    knightAttackingDefeat(state, att);
+    expect(state.mapTiles[pos].serfIndex).toBe(5);
+    expect(state.serfs[1]).toBe(att); // not freed by himself
+    knightDefendingVictoryFree(state, defender);
+    expect(state.serfs[1]).toBeNull(); // freed by the winner
+    expect(defender.state).toBe(0x35); // 53
+    expect(state.mapTiles[pos].serfIndex).toBe(5);
+  });
+
+  it('51 at a building (the dead attacker holds the tile): clears it and frees himself', () => {
+    const att = mkK({ index: 1, type: 27, state: 0x33, counter: 0xff, tick: 200, col: 10, row: 10 });
+    const state = mkFreeState([null, att]);
+    const pos = posOf(10, 10, geo);
+    state.mapTiles[pos].serfIndex = 1;
+    (state as { gameTick: number }).gameTick = 200 + 0x200;
+    knightAttackingDefeat(state, att);
+    expect(state.mapTiles[pos].serfIndex).toBe(0);
+    expect(state.serfs[1]).toBeNull();
+  });
+
+  it('51 without a 63 winner on the tile runs as in the original', () => {
+    // The tile holder is no open-field winner pointing at him: nobody else would free him.
+    const other = mkK({ index: 5, type: 24, state: 0x35, col: 10, row: 10 });
+    const att = mkK({ index: 1, type: 27, state: 0x33, counter: 0xff, tick: 200, col: 10, row: 10 });
+    const state = mkFreeState([null, att, null, null, null, other]);
+    state.mapTiles[posOf(10, 10, geo)].serfIndex = 5;
+    (state as { gameTick: number }).gameTick = 200 + 0x200;
+    knightAttackingDefeat(state, att);
+    expect(state.serfs[1]).toBeNull();
   });
 
   it('62 AttackingVictoryFree: loser freed, →64 (with no queue serf[0xf]=0)', () => {

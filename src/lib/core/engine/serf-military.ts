@@ -413,8 +413,29 @@ export const knightAttackingVictory = (state: GameState, serf: Serf): void => {
 /**
  * State 51 `KnightAttackingDefeat` @0x18e5a — the dead attacker plays out his death animation, then
  * clears his tile and frees himself.
+ *
+ * **Deliberate deviation for the open-field loser.** There the tile already belongs to the winner
+ * (@0x18bfd hands it over), who waits in state 63 on the same death counter and frees the loser
+ * himself (@0x1d06b). The original runs both handlers, and whichever sees the counter run out first
+ * does the freeing; the unconditional clear @0x18ea2 then wipes the **winner's** tile if 51 got there
+ * first. On screen that almost never happens: the winner is drawn, so the draw pass dispatches him
+ * every frame (@0x15d2c), while the unregistered loser only runs in his slice of the serf driver
+ * (`andw $0xf` @0x159ea). This port dispatches every serf every frame in index order, which would hand
+ * the race to the loser whenever his index is lower — leaving the winner unregistered: invisible, and
+ * his tile free for the next knight to walk onto. So 51 stands aside whenever a 63 winner on its tile
+ * owns the cleanup; without one it runs as in the original.
  */
 export const knightAttackingDefeat = (state: GameState, serf: Serf): void => {
+  const here = posOf(serf.col ?? 0, serf.row ?? 0, state.geo);
+  const holder = state.serfs[state.mapTiles[here].serfIndex];
+  if (
+    holder != null &&
+    holder !== serf &&
+    holder.state === ST_KNIGHT_DEFENDING_VICTORY_FREE &&
+    unionU16(holder, 0xe) === serf.index
+  ) {
+    return;
+  }
   const delta = subU16(state.gameTick, serf.tick);
   serf.tick = state.gameTick;
   const oldCounter = serf.counter;
